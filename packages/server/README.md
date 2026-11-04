@@ -43,7 +43,7 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 | Way | How |
 | --- | --- |
 | npx | `npx nid-inbox serve` |
-| Docker | `docker run -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 ghcr.io/<org>/nid` |
+| Docker | `docker run -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 ghcr.io/oluwatobiadegoke/nid` |
 | Playwright | Add it to `webServer` in `playwright.config.ts` (below) |
 | GitHub Actions | Use the image as a job `services:` container |
 
