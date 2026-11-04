@@ -1,5 +1,5 @@
 export { createServer, defaultHost, defaultPort, defaultSmtpPort } from './server.js'
-export type { ServerOptions, ListenOptions, Listening, TestinboxServer } from './server.js'
+export type { ServerOptions, ListenOptions, Listening, NidServer } from './server.js'
 export { createSqliteStore, KyselyStore, NodeSqliteDialect } from './store/index.js'
 export type { Store, MessageQuery, RejectionQuery, Database, SqliteStoreOptions } from './store/index.js'
 export { providers, resend, brevo, SendError } from './providers/index.js'

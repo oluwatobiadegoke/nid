@@ -17,7 +17,7 @@ Node 22.13 or later. Tests use `node:test` and run against a server started in-p
 
 ```
 packages/
-  server/           the npm package `testinbox`: server and CLI
+  server/           the npm package `nid-inbox`: the server and the `nid` command
     src/
       providers/    one file per provider: resend.ts, brevo.ts, ...
       ingest/       the HTTP and SMTP listeners that call the providers and the store
@@ -29,7 +29,7 @@ packages/
       server.ts     createServer: wires it all together
       cli.ts        serve, read, clear, healthcheck
     test/
-  client/           the npm package `@testinbox/client`: a tiny client and a Playwright fixture
+  client/           the npm package `@nid-inbox/client`: a tiny client and a Playwright fixture
 ```
 
 ## Adding a provider

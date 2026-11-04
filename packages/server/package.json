@@ -1,5 +1,5 @@
 {
-  "name": "testinbox",
+  "name": "nid-inbox",
   "version": "0.1.0",
   "description": "A local inbox that stands in for your email provider. Change one URL and every email your app sends lands where your tests can read it.",
   "license": "Apache-2.0",
@@ -8,7 +8,7 @@
     "node": ">=22.13"
   },
   "bin": {
-    "testinbox": "./dist/cli.js"
+    "nid": "./dist/cli.js"
   },
   "exports": {
     ".": {

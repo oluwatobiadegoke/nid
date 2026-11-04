@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createServer } from 'testinbox'
+import { createServer } from 'nid-inbox'
 import { InboxTimeoutError, createInbox } from '../src/index.js'
 
 async function running(t: { after(fn: () => Promise<void>): void }) {

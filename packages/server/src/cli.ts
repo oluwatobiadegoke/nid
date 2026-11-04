@@ -7,19 +7,19 @@ const defaultPort = 4400
 const defaultSmtpPort = 1025
 const defaultHost = '127.0.0.1'
 
-const help = `testinbox ${version}
+const help = `nid ${version}
 
 Usage:
-  testinbox serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
-  testinbox read <address> [--latest] [--code] [--links] [--wait 30] [--json]
-  testinbox clear [<address>]
-  testinbox healthcheck
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
+  nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
+  nid clear [<address>]
+  nid healthcheck
 
 Options for read, clear and healthcheck:
-  --url <url>   The server to talk to (default: $TESTINBOX_URL or http://127.0.0.1:4400)
+  --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
-  TESTINBOX_URL, TESTINBOX_TOKEN, TESTINBOX_PORT, TESTINBOX_SMTP_PORT, TESTINBOX_HOST, TESTINBOX_DB
+  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB
 `
 
 function fail(message: string, code = 1): never {
@@ -28,17 +28,17 @@ function fail(message: string, code = 1): never {
 }
 
 function baseUrl(value: string | undefined): string {
-  return (value ?? process.env.TESTINBOX_URL ?? `http://127.0.0.1:${defaultPort}`).replace(/\/+$/, '')
+  return (value ?? process.env.NID_URL ?? `http://127.0.0.1:${defaultPort}`).replace(/\/+$/, '')
 }
 
 async function api(url: string, path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
-  const token = process.env.TESTINBOX_TOKEN
+  const token = process.env.NID_TOKEN
   if (token) headers.set('authorization', `Bearer ${token}`)
   try {
     return await fetch(`${url}${path}`, { ...init, headers })
   } catch (err) {
-    fail(`Could not reach ${url}: ${(err as Error).message}. Is testinbox serve running?`, 2)
+    fail(`Could not reach ${url}: ${(err as Error).message}. Is nid serve running?`, 2)
   }
 }
 
@@ -46,10 +46,10 @@ async function serve(args: string[]) {
   const { values } = parseArgs({
     args,
     options: {
-      port: { type: 'string', default: process.env.TESTINBOX_PORT ?? String(defaultPort) },
-      'smtp-port': { type: 'string', default: process.env.TESTINBOX_SMTP_PORT ?? String(defaultSmtpPort) },
-      host: { type: 'string', default: process.env.TESTINBOX_HOST ?? defaultHost },
-      db: { type: 'string', default: process.env.TESTINBOX_DB },
+      port: { type: 'string', default: process.env.NID_PORT ?? String(defaultPort) },
+      'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
+      host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
+      db: { type: 'string', default: process.env.NID_DB },
       cors: { type: 'boolean', default: false },
       'allow-host': { type: 'string', multiple: true, default: [] },
       quiet: { type: 'boolean', default: false },
@@ -61,7 +61,7 @@ async function serve(args: string[]) {
     store,
     cors: values.cors,
     allowHosts: values['allow-host'],
-    onError: (err) => process.stderr.write(`testinbox: ${err.message}\n`),
+    onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   })
   const listening = await server.listen({
     port: Number(values.port),
@@ -72,7 +72,7 @@ async function serve(args: string[]) {
     const where = values.db ? `kept in ${values.db}` : 'kept in memory until you stop the server'
     process.stdout.write(
       [
-        `testinbox ${version}`,
+        `nid ${version}`,
         `  web view    ${listening.url}`,
         `  provider APIs and read API on ${listening.url}`,
         `  SMTP        ${listening.host}:${listening.smtpPort}`,
@@ -125,7 +125,7 @@ async function read(args: string[]) {
     },
   })
   const address = positionals[0]
-  if (!address) fail('Usage: testinbox read <address> [--latest] [--code] [--links] [--wait 30]')
+  if (!address) fail('Usage: nid read <address> [--latest] [--code] [--links] [--wait 30]')
   const url = baseUrl(values.url)
   const flags = { code: values.code, links: values.links, json: values.json }
   if (values.wait !== undefined) {

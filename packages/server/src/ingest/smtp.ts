@@ -48,7 +48,7 @@ async function toMessage(raw: Buffer, session: SMTPServerSession): Promise<NewMe
   }))
   return {
     provider: 'smtp',
-    providerId: parsed.messageId ?? `<${Date.now()}.${Math.random().toString(16).slice(2)}@testinbox.local>`,
+    providerId: parsed.messageId ?? `<${Date.now()}.${Math.random().toString(16).slice(2)}@nid.local>`,
     from: formatFrom(parsed.from),
     replyTo: addresses(parsed.replyTo),
     recipients,

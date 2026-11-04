@@ -140,9 +140,9 @@ export class Inbox {
   #start: number | null = null
 
   constructor(options: InboxOptions = {}) {
-    this.url = (options.url ?? process.env.TESTINBOX_URL ?? 'http://127.0.0.1:4400').replace(/\/+$/, '')
-    this.domain = options.domain ?? process.env.TESTINBOX_DOMAIN ?? 'inbox.test'
-    this.#token = options.token ?? process.env.TESTINBOX_TOKEN
+    this.url = (options.url ?? process.env.NID_URL ?? 'http://127.0.0.1:4400').replace(/\/+$/, '')
+    this.domain = options.domain ?? process.env.NID_DOMAIN ?? 'inbox.test'
+    this.#token = options.token ?? process.env.NID_TOKEN
     this.#fetch = options.fetch ?? fetch
   }
 
@@ -234,7 +234,7 @@ export class Inbox {
     try {
       return await this.#fetch(`${this.url}${path}`, { ...init, headers })
     } catch (err) {
-      throw new InboxError(`Could not reach testinbox at ${this.url}: ${(err as Error).message}`, 0)
+      throw new InboxError(`Could not reach nid at ${this.url}: ${(err as Error).message}`, 0)
     }
   }
 

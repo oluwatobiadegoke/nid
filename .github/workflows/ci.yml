@@ -33,15 +33,15 @@ jobs:
           context: .
           push: false
           load: true
-          tags: testinbox:ci
+          tags: nid:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Start the image and send an email through it
         run: |
-          docker run -d --name testinbox -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 testinbox:ci
+          docker run -d --name nid -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 nid:ci
           for i in $(seq 1 20); do curl -fs http://127.0.0.1:4400/healthz && break; sleep 1; done
           curl -fs -X POST http://127.0.0.1:4400/emails \
             -H 'authorization: Bearer re_ci' -H 'content-type: application/json' \
             -d '{"from":"ci@acme.com","to":"ci@inbox.test","subject":"CI","text":"Your code is 123456"}'
           curl -fs 'http://127.0.0.1:4400/api/wait?to=ci@inbox.test&timeout=5' | grep -q 123456
-          docker rm -f testinbox
+          docker rm -f nid

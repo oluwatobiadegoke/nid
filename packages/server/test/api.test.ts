@@ -115,7 +115,7 @@ test('only localhost-like hosts are answered unless allowed', async (t) => {
   t.after(() => server.close())
   const evil = await server.app.request('/api/cursor', { headers: { host: 'evil.example.com' } })
   assert.equal(evil.status, 403)
-  for (const host of ['localhost:4400', '127.0.0.1', '[::1]:4400', 'testinbox:4400', 'mail.internal.example']) {
+  for (const host of ['localhost:4400', '127.0.0.1', '[::1]:4400', 'nid:4400', 'mail.internal.example']) {
     const ok = await server.app.request('/api/cursor', { headers: { host } })
     assert.equal(ok.status, 200, host)
   }
@@ -131,7 +131,7 @@ test('healthz, providers and the openapi document are served', async (t) => {
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')
   assert.equal(page.status, 200)
-  assert.match(await page.text(), /testinbox/)
+  assert.match(await page.text(), /nid/)
 })
 
 test('the auth and limits hooks pick the project and its retention', async (t) => {

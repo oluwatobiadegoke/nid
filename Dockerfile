@@ -6,13 +6,13 @@ COPY packages/server/package.json packages/server/
 COPY packages/client/package.json packages/client/
 RUN pnpm install --frozen-lockfile
 COPY packages ./packages
-RUN pnpm --filter testinbox build && pnpm --filter testinbox deploy --prod --legacy /app
+RUN pnpm --filter nid-inbox build && pnpm --filter nid-inbox deploy --prod --legacy /app
 
 FROM node:22-alpine
 ENV NODE_ENV=production \
-    TESTINBOX_HOST=0.0.0.0 \
-    TESTINBOX_PORT=4400 \
-    TESTINBOX_SMTP_PORT=1025
+    NID_HOST=0.0.0.0 \
+    NID_PORT=4400 \
+    NID_SMTP_PORT=1025
 WORKDIR /app
 COPY --from=build /app /app
 USER node

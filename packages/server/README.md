@@ -1,11 +1,11 @@
-# testinbox
+# nid
 
 A local inbox that stands in for your email provider. Change one URL, and every email your app sends shows up in an inbox your tests can read.
 
-Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at testinbox, and every send lands here instead of at the provider. Tests, the CLI and AI agents then read the mail, with sign-in codes and links already pulled out.
+Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and AI agents then read the mail, with sign-in codes and links already pulled out.
 
 ```
-npx testinbox serve
+npx nid-inbox serve
 ```
 
 ```
@@ -13,7 +13,7 @@ RESEND_BASE_URL=http://localhost:4400 npm run dev
 ```
 
 ```ts
-import { test, expect } from '@testinbox/client/playwright'
+import { test, expect } from '@nid-inbox/client/playwright'
 
 test('sign up, then resend the code', async ({ page, inbox }) => {
   const email = inbox.address('signup')
@@ -42,20 +42,20 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 
 | Way | How |
 | --- | --- |
-| npx | `npx testinbox serve` |
-| Docker | `docker run -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 ghcr.io/<org>/testinbox` |
+| npx | `npx nid-inbox serve` |
+| Docker | `docker run -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 ghcr.io/<org>/nid` |
 | Playwright | Add it to `webServer` in `playwright.config.ts` (below) |
 | GitHub Actions | Use the image as a job `services:` container |
 
 ```ts
 // playwright.config.ts
 webServer: [
-  { command: 'npx testinbox serve', port: 4400, reuseExistingServer: true },
+  { command: 'npx nid-inbox serve', port: 4400, reuseExistingServer: true },
   { command: 'npm run dev', port: 3000, reuseExistingServer: true },
 ],
 ```
 
-Options: `--port 4400`, `--smtp-port 1025`, `--host 127.0.0.1`, `--db mail.sqlite`, `--cors`, `--allow-host <name>`. The same settings read from `TESTINBOX_PORT`, `TESTINBOX_SMTP_PORT`, `TESTINBOX_HOST` and `TESTINBOX_DB`.
+Options: `--port 4400`, `--smtp-port 1025`, `--host 127.0.0.1`, `--db mail.sqlite`, `--cors`, `--allow-host <name>`. The same settings read from `NID_PORT`, `NID_SMTP_PORT`, `NID_HOST` and `NID_DB`.
 
 ## Point your app at it
 
@@ -74,7 +74,7 @@ Every client is a thin wrapper over the read API, so every language behaves the 
 ### From tests
 
 ```ts
-import { createInbox } from '@testinbox/client'
+import { createInbox } from '@nid-inbox/client'
 
 const inbox = createInbox({ url: 'http://localhost:4400' })
 await inbox.start()
@@ -93,13 +93,13 @@ message.text
 ### From the command line
 
 ```
-testinbox read signup.8f3a@inbox.test               # list mail for an address
-testinbox read signup.8f3a@inbox.test --latest      # the newest message in full
-testinbox read signup.8f3a@inbox.test --latest --code    # just the code, for piping
-testinbox read signup.8f3a@inbox.test --latest --links   # just the links
-testinbox read signup.8f3a@inbox.test --wait 30     # wait for the next one
-testinbox clear [address]
-testinbox healthcheck
+nid read signup.8f3a@inbox.test               # list mail for an address
+nid read signup.8f3a@inbox.test --latest      # the newest message in full
+nid read signup.8f3a@inbox.test --latest --code    # just the code, for piping
+nid read signup.8f3a@inbox.test --latest --links   # just the links
+nid read signup.8f3a@inbox.test --wait 30     # wait for the next one
+nid clear [address]
+nid healthcheck
 ```
 
 ### From anything else
@@ -126,7 +126,7 @@ It listens on 127.0.0.1 only, sends no CORS headers unless you pass `--cors`, an
 ## Use it as a library
 
 ```ts
-import { createServer } from 'testinbox'
+import { createServer } from 'nid-inbox'
 
 const server = await createServer({ store, auth, limits })
 await server.listen({ port: 4400, smtpPort: 1025 })

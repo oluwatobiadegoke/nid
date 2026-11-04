@@ -42,7 +42,7 @@ export interface Listening {
   close(): Promise<void>
 }
 
-export interface TestinboxServer {
+export interface NidServer {
   app: Hono
   store: Store
   ingest: Ingest
@@ -67,7 +67,7 @@ function closeSmtp(server: SMTPServer): Promise<void> {
   return new Promise((resolve) => server.close(() => resolve()))
 }
 
-export async function createServer(options: ServerOptions = {}): Promise<TestinboxServer> {
+export async function createServer(options: ServerOptions = {}): Promise<NidServer> {
   const store = options.store ?? (await createSqliteStore())
   const providers = options.providers ?? builtInProviders
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes

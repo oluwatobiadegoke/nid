@@ -1,7 +1,7 @@
 {
-  "name": "@testinbox/client",
+  "name": "@nid-inbox/client",
   "version": "0.1.0",
-  "description": "A tiny client for reading mail from testinbox in tests, with a Playwright fixture.",
+  "description": "A tiny client for reading mail from nid in tests, with a Playwright fixture.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -36,7 +36,7 @@
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.6",
-    "testinbox": "workspace:*",
+    "nid-inbox": "workspace:*",
     "tsx": "4.23.15",
     "typescript": "6.0.3"
   },
@@ -44,6 +44,6 @@
     "email",
     "testing",
     "playwright",
-    "testinbox"
+    "nid"
   ]
 }

@@ -23,7 +23,7 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
-      testinbox:
+      nid-inbox:
         specifier: workspace:*
         version: link:../server
       tsx:

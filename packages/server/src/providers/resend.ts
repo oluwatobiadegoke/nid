@@ -179,7 +179,7 @@ function emailShape(m: Message) {
     last_event: 'delivered',
     scheduled_at: (m.meta.scheduledAt as string | undefined) ?? null,
     tags: (m.meta.tags as unknown[] | undefined) ?? [],
-    message_id: `<${m.providerId}@testinbox.local>`,
+    message_id: `<${m.providerId}@nid.local>`,
   }
 }
 

@@ -94,10 +94,10 @@ export function openapi(version: string) {
   return {
     openapi: '3.0.3',
     info: {
-      title: 'testinbox read API',
+      title: 'nid read API',
       version,
       description:
-        'Reads the mail your app sent to testinbox. The CLI, the MCP endpoint and the client SDKs are thin wrappers over these routes.',
+        'Reads the mail your app sent to nid. The CLI, the MCP endpoint and the client SDKs are thin wrappers over these routes.',
     },
     paths: {
       '/api/cursor': {

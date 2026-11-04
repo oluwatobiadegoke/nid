@@ -1,5 +1,5 @@
 {
-  "name": "testinbox-workspace",
+  "name": "nid-workspace",
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "engines": {
@@ -9,7 +9,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "typecheck": "pnpm -r typecheck",
-    "dev": "pnpm --filter testinbox dev",
+    "dev": "pnpm --filter nid-inbox dev",
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
     "check": "pnpm typecheck && pnpm build && pnpm test"
