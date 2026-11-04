@@ -1,0 +1,49 @@
+{
+  "name": "@testinbox/client",
+  "version": "0.1.0",
+  "description": "A tiny client for reading mail from testinbox in tests, with a Playwright fixture.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./playwright": {
+      "types": "./dist/playwright.d.ts",
+      "default": "./dist/playwright.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "testinbox": "workspace:*",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  },
+  "keywords": [
+    "email",
+    "testing",
+    "playwright",
+    "testinbox"
+  ]
+}

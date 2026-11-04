@@ -1,0 +1,61 @@
+{
+  "name": "testinbox",
+  "version": "0.1.0",
+  "description": "A local inbox that stands in for your email provider. Change one URL and every email your app sends lands where your tests can read it.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "testinbox": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "ui"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/cli.ts serve",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.6",
+    "hono": "4.13.16",
+    "kysely": "0.29.8",
+    "mailparser": "3.14.2",
+    "smtp-server": "3.21.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@getbrevo/brevo": "6.2.0",
+    "@types/mailparser": "3.9.0",
+    "@types/node": "26.6.6",
+    "@types/nodemailer": "8.0.2",
+    "@types/smtp-server": "3.5.13",
+    "nodemailer": "10.3.1",
+    "resend": "6.37.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  },
+  "keywords": [
+    "email",
+    "testing",
+    "resend",
+    "brevo",
+    "sendgrid",
+    "postmark",
+    "mailgun",
+    "ses",
+    "smtp",
+    "playwright",
+    "mcp"
+  ]
+}

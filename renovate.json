@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":pinAllExceptPeerDependencies"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Provider SDKs: a new release reruns the SDK tests",
+      "matchPackageNames": ["resend", "@getbrevo/brevo", "@sendgrid/mail", "postmark", "mailgun.js", "@aws-sdk/client-sesv2", "nodemailer"],
+      "groupName": "provider SDKs",
+      "automerge": false
+    }
+  ]
+}
