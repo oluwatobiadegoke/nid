@@ -9,7 +9,7 @@ nid serves the same MCP tools in two ways:
 
 Both read mail through the [read API](read-api.md), so they see the same mail and give the same answers. Over HTTP, nid passes the request's `Authorization` header on to the read API. `nid mcp` sends `NID_TOKEN` as `Authorization: Bearer <token>` when it is set.
 
-`/mcp` refuses a request whose `Origin` header names a host nid does not accept, so a web page on another site cannot call it. See [Security](../explanation/security.md).
+`/mcp` refuses a request whose `Origin` header names a host nid does not accept, such as `https://evil.example`. See [Security](../explanation/security.md).
 
 ## Tools
 

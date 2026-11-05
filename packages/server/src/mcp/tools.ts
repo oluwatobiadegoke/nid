@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { McpServer, type CallToolResult, type ServerContext } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import type { SerializedMessage } from '../api/serialize.js'
-import { htmlToText } from '../extract/index.js'
+import { bodyText } from '../extract/index.js'
 import { version } from '../version.js'
 
 export type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
@@ -20,7 +20,7 @@ function summary(m: SerializedMessage) {
 }
 
 function detail(m: SerializedMessage) {
-  return { ...summary(m), cc: m.cc, links: m.extracted.links, text: m.text ?? (m.html ? htmlToText(m.html) : '') }
+  return { ...summary(m), cc: m.cc, links: m.extracted.links, text: bodyText(m) }
 }
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {

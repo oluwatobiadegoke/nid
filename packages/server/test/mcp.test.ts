@@ -83,6 +83,9 @@ test('a wait that times out tells the agent which send nid refused', async (t) =
   assert.equal(result.isError, true)
   assert.match(result.text, /Timed out waiting for mail to refused@inbox\.test/)
   assert.match(result.text, /resend request was rejected .* with 422: Missing `from` field\./)
+  assert.doesNotMatch(result.text, /without \/mcp/)
+  const badPattern = await call(client, 'wait_for_email', { to: 'refused@inbox.test', code_pattern: '(', timeout: 0 })
+  assert.match(badPattern.text, /code_pattern: Invalid regular expression/)
 })
 
 test('a web page on another site cannot reach the MCP endpoint', async (t) => {
@@ -95,6 +98,7 @@ test('a web page on another site cannot reach the MCP endpoint', async (t) => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
     })
   assert.equal((await request('https://evil.example')).status, 403)
+  assert.equal((await request('null')).status, 403)
   assert.notEqual((await request('http://localhost:3000')).status, 403)
 })
 
