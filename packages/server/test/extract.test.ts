@@ -83,7 +83,8 @@ test('code_pattern runs over subject and text and returns the first group', () =
 
 test('broken or hostile html is read quickly and still gives the code and link', () => {
   const start = '<p>Your code is 482913</p><a class="btn" data-href="x" href="https://app.acme.com/verify?t=1">Verify</a>'
-  const junk = ['<'.repeat(200_000), '<a '.repeat(70_000), '<script'.repeat(30_000), `https://a${'.'.repeat(200_000)}x`]
+  const codes = Array.from({ length: 40_000 }, (_, i) => `<p>code ${1_000_000 + i}</p>`).join('')
+  const junk = ['<'.repeat(200_000), '<a '.repeat(70_000), '<script'.repeat(30_000), `<a href="https://a${'.'.repeat(200_000)}x">x</a>`, codes]
   for (const tail of junk) {
     const began = performance.now()
     const result = extract({ subject: 'Sign in', text: null, html: start + tail })
@@ -92,4 +93,19 @@ test('broken or hostile html is read quickly and still gives the code and link',
     assert.equal(result.link, 'https://app.acme.com/verify?t=1')
   }
   assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")'), 'Code 1234')
+})
+
+test('links and codes survive the html quirks real templates produce', () => {
+  const result = extract({
+    subject: 'Sign in',
+    text: null,
+    html: [
+      '<a class="btn"href="https://app.acme.com/verify?t=1">Verify</a >',
+      '<p>Expires in <10 min. Your code: 482913 &#99999999;</p>',
+      '<a href="https://app.acme.com/help">Help</a>',
+    ].join(''),
+  })
+  assert.equal(result.code, '482913')
+  assert.equal(result.link, 'https://app.acme.com/verify?t=1')
+  assert.deepEqual(result.links.map((l) => l.text), ['Verify', 'Help'])
 })

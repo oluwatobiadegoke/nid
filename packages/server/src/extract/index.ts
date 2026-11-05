@@ -8,9 +8,13 @@ const urlPattern = /https?:\/\/[^\s<>"'`)\]]+/g
 const windowBefore = 80
 const windowAfter = 40
 
-const anchorPattern = /<a\b([^<>]*)>((?:(?!<a\b)[\s\S])*?)<\/a>/gi
-const hrefPattern = /(?:^|\s)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i
+const anchorPattern = /<a\b([^<>]*)>((?:(?!<a\b)[\s\S])*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
+const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
+
+function codePoint(value: number, entity: string): string {
+  return value <= 0x10ffff ? String.fromCodePoint(value) : entity
+}
 
 function decodeEntities(value: string): string {
   return value
@@ -20,8 +24,8 @@ function decodeEntities(value: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (entity, n: string) => codePoint(Number(n), entity))
+    .replace(/&#x([0-9a-f]+);/gi, (entity, n: string) => codePoint(parseInt(n, 16), entity))
 }
 
 export function htmlToText(html: string): string {
@@ -30,7 +34,7 @@ export function htmlToText(html: string): string {
       .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|tr|li|h[1-6]|td|th)>/gi, '\n')
-      .replace(/<[^>]+(?:>|$)/g, ' '),
+      .replace(/<[a-z!/?][^>]*(?:>|$)/gi, ' '),
   )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n+/g, '\n')
@@ -74,9 +78,7 @@ function findCodes(text: string): string[] {
     found.push({ index: match.index, token })
   }
   found.sort((a, b) => a.index - b.index)
-  const unique: string[] = []
-  for (const f of found) if (!unique.includes(f.token)) unique.push(f.token)
-  return unique
+  return [...new Set(found.map((f) => f.token))]
 }
 
 function findLinks(html: string | null, text: string | null): Link[] {
@@ -146,9 +148,7 @@ export function bodyText(message: { text: string | null; html: string | null }):
 
 export function extract(input: ExtractInput): Extracted {
   const text = bodyText(input)
-  let codes = [...findCodes(input.subject), ...findCodes(text)].filter(
-    (token, i, all) => all.indexOf(token) === i,
-  )
+  let codes = [...new Set([...findCodes(input.subject), ...findCodes(text)])]
   const links = findLinks(input.html, input.text)
   let link = links.find(isPrimaryLink)?.href ?? null
   if (input.variables && !text && !input.html) {
@@ -156,10 +156,12 @@ export function extract(input: ExtractInput): Extracted {
     if (found.code) codes = [found.code, ...codes.filter((c) => c !== found.code)]
     if (codes.length === 0) codes = findCodes(found.values.join('\n'))
     if (found.link) link = found.link
+    const seen = new Set(links.map((l) => l.href))
     for (const value of found.values) {
       for (const m of value.matchAll(urlPattern)) {
         const href = trimUrl(m[0])
-        if (!links.some((l) => l.href === href)) links.push({ href, text: '' })
+        if (!seen.has(href)) links.push({ href, text: '' })
+        seen.add(href)
       }
     }
     if (!link) link = links.find(isPrimaryLink)?.href ?? null
