@@ -26,7 +26,7 @@ function detail(m: SerializedMessage) {
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value))
-  return query.size > 0 ? `?${query}` : ''
+  return `?${query}`
 }
 
 const wrongUrl = "Check that nid's URL is its address, such as http://127.0.0.1:4400, without /mcp."
@@ -87,9 +87,8 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
       }),
       annotations: readOnly,
     },
-    async ({ to, after, subject, has_code, code_pattern, timeout }, ctx) => {
-      const query = queryString({ to, after, subject, has_code, code_pattern, timeout })
-      const body = await call<{ message: SerializedMessage }>(ctx, `/api/wait${query}`)
+    async (args, ctx) => {
+      const body = await call<{ message: SerializedMessage }>(ctx, `/api/wait${queryString(args)}`)
       return reply(detail(body.message))
     },
   )
@@ -128,12 +127,12 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
       description: 'List recent email, newest first, for one address or for every address',
       inputSchema: z.object({
         to: address.optional(),
-        limit: z.number().int().min(1).max(100).optional().describe('How many to list. Default 20'),
+        limit: z.number().int().min(1).max(100).default(20).describe('How many to list'),
       }),
       annotations: readOnly,
     },
-    async ({ to, limit }, ctx) => {
-      const body = await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString({ to, limit: limit ?? 20 })}`)
+    async (args, ctx) => {
+      const body = await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString(args)}`)
       return reply(body.messages.map(summary))
     },
   )
@@ -145,8 +144,8 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
       inputSchema: z.object({ to: address.optional() }),
       annotations: { destructiveHint: true, idempotentHint: true },
     },
-    async ({ to }, ctx) => {
-      const body = await call<{ deleted: number }>(ctx, `/api/messages${queryString({ to })}`, { method: 'DELETE' })
+    async (args, ctx) => {
+      const body = await call<{ deleted: number }>(ctx, `/api/messages${queryString(args)}`, { method: 'DELETE' })
       return reply({ deleted: body.deleted })
     },
   )
