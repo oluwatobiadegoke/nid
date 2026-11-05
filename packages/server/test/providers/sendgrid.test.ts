@@ -123,6 +123,19 @@ test('bad sends fail with SendGrid-shaped 400 errors and show up as rejections',
   assert.equal(rejections[0]?.provider, 'sendgrid')
 })
 
+test('a request-wide error is recorded against every recipient in the send', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await send(server, {
+    personalizations: [{ to: [{ email: 'first@inbox.test' }] }, { to: [{ email: 'second@inbox.test' }] }],
+    from: { email: 'not-an-address' },
+    subject: 'Hi',
+    content: [{ type: 'text/plain', value: 'Hi' }],
+  })
+  assert.equal(res.body.errors[0].field, 'from.email')
+  assert.equal((await server.store.listRejections('default', { to: 'second@inbox.test' })).length, 1)
+})
+
 test('a missing API key gets the SendGrid 401', async (t) => {
   const server = await createServer()
   t.after(() => server.close())

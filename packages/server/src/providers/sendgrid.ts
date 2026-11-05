@@ -87,11 +87,10 @@ function substitute(value: string | null | undefined, substitutions: Record<stri
   return out
 }
 
-function build(data: SendBody, p: Personalization, i: number, id: string, raw: string): NewMessage {
+function build(data: SendBody, p: Personalization, i: number, id: string, raw: string, to: string[]): NewMessage {
   const field = `personalizations.${i}`
-  const to = (p.to ?? []).map((a) => parseMailbox(a.email)?.address ?? normalizeAddress(a.email))
-  if (to.length === 0) {
-    throw error(400, 'The to array is required for all personalization objects, and must have at least one email object with a valid email address.', `${field}.to`)
+  if (!p.to?.length) {
+    throw error(400, 'The to array is required for all personalization objects, and must have at least one email object with a valid email address.', `${field}.to`, to)
   }
   const from = p.from ?? data.from
   if (!from?.email) {
@@ -176,7 +175,8 @@ const send: SendRoute = {
       throw error(400, 'The personalizations field is required and must have at least one personalization.', 'personalizations')
     }
     const id = randomBytes(16).toString('base64url').slice(0, 22)
-    return data.personalizations.map((p, i) => build(data, p, i, id, req.rawBody))
+    const to = [...new Set(rawTo(req.body).map((v) => parseMailbox(v)?.address ?? v))]
+    return data.personalizations.map((p, i) => build(data, p, i, id, req.rawBody, to))
   },
   reply(messages) {
     const id = messages[0]?.providerId.split('.')[0] ?? ''

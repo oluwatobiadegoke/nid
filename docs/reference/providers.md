@@ -150,7 +150,8 @@ Sends an email from a `multipart/form-data` or `application/x-www-form-urlencode
 
 | Check | Error |
 | --- | --- |
-| `from` is present and is an address | `400 {"message": "'from' parameter is missing"}` |
+| `from` is present | `400 {"message": "'from' parameter is missing"}` |
+| `from` is an address | `400 {"message": "from parameter is not a valid address. please check documentation"}` |
 | `to` has at least one address | `400 {"message": "'to' parameter is missing"}` |
 | `text`, `html` or `template` is present | `400 {"message": "Need at least one of 'text', 'html' or 'template' parameters specified"}` |
 | Every address looks like an address | `400 {"message": "... is not a valid address ..."}` |

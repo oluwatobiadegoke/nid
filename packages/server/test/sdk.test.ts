@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { BrevoClient, BrevoError } from '@getbrevo/brevo'
+import sgMail from '@sendgrid/mail'
+import Mailgun from 'mailgun.js'
+import MailComposer from 'nodemailer/lib/mail-composer/index.js'
+import { Errors, ServerClient } from 'postmark'
 import { Resend } from 'resend'
 import { start } from './helpers.js'
 
@@ -55,7 +59,6 @@ test('the official Brevo SDK sends and raises its own error on a bad request', a
 test('the official SendGrid SDK sends and surfaces SendGrid errors', async (t) => {
   const running = await start()
   t.after(() => running.close())
-  const sgMail = (await import('@sendgrid/mail')).default
   sgMail.setApiKey('SG.test')
   sgMail.client.setDefaultRequest('baseUrl', running.url)
   const [res] = await sgMail.send({
@@ -89,7 +92,6 @@ test('the official SendGrid SDK sends and surfaces SendGrid errors', async (t) =
 test('the official Postmark SDK sends single, template and batch mail', async (t) => {
   const running = await start()
   t.after(() => running.close())
-  const { ServerClient, Errors } = await import('postmark')
   const client = new ServerClient('pm-test', { useHttps: false, requestHost: new URL(running.url).host })
   const sent = await client.sendEmail({ From: 'hello@acme.com', To: 'pm-sdk@inbox.test', Subject: 'Code', TextBody: 'Code 135790' })
   assert.equal(sent.ErrorCode, 0)
@@ -112,7 +114,6 @@ test('the official Postmark SDK sends single, template and batch mail', async (t
 test('the official Mailgun SDK sends with an attachment and sees Mailgun errors', async (t) => {
   const running = await start()
   t.after(() => running.close())
-  const Mailgun = (await import('mailgun.js')).default
   const mg = new Mailgun(FormData).client({ username: 'api', key: 'key-test', url: running.url })
   const sent = await mg.messages.create('mg.acme.com', {
     from: 'Acme <hello@acme.com>',
@@ -129,7 +130,6 @@ test('the official Mailgun SDK sends with an attachment and sees Mailgun errors'
   assert.equal(stored?.attachments[0]?.filename, 'hello.txt')
   assert.equal(stored?.attachments[0]?.size, 5)
 
-  const MailComposer = (await import('nodemailer/lib/mail-composer/index.js')).default
   const mimeMessage = await new MailComposer({
     from: 'hello@acme.com',
     to: 'mg-mime@inbox.test',
