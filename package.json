@@ -7,12 +7,13 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r --workspace-concurrency=1 test",
+    "test": "pnpm -r --workspace-concurrency=1 test && pnpm test:docs",
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm --filter nid-inbox dev",
     "changeset": "changeset",
     "release": "pnpm build && changeset publish",
-    "check": "pnpm typecheck && pnpm build && pnpm test"
+    "check": "pnpm typecheck && pnpm build && pnpm test",
+    "test:docs": "node --test scripts/docs.test.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

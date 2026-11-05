@@ -157,7 +157,7 @@ export const postmark: Provider = {
     batch('/email/batchWithTemplates', true),
   ],
   setup: {
-    env: "new postmark.ServerClient(token, { useHttps: false, requestHost: 'localhost:4400' })",
+    env: "new postmark.ServerClient(token, { useHttps: false, requestHost: '127.0.0.1:4400' })",
     note: 'requestHost takes a host and port, not a URL.',
   },
 }

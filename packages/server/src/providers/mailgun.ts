@@ -150,7 +150,7 @@ export const mailgun: Provider = {
   },
   routes: [send],
   setup: {
-    env: "mailgun.client({ username: 'api', key, url: 'http://localhost:4400' })",
-    note: 'Other SDKs: set the API base URL to http://localhost:4400 (no /v3).',
+    env: "mailgun.client({ username: 'api', key, url: 'http://127.0.0.1:4400' })",
+    note: 'Other SDKs: set the API base URL to http://127.0.0.1:4400 (no /v3).',
   },
 }

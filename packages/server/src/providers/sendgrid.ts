@@ -161,7 +161,7 @@ export const sendgrid: Provider = {
   },
   routes: [send],
   setup: {
-    env: "sgMail.client.setDefaultRequest('baseUrl', 'http://localhost:4400')",
-    note: 'Call it after sgMail.setApiKey. Other SDKs: set the API host to http://localhost:4400.',
+    env: "sgMail.client.setDefaultRequest('baseUrl', 'http://127.0.0.1:4400')",
+    note: 'Call it after sgMail.setApiKey. Other SDKs: set the API host to http://127.0.0.1:4400.',
   },
 }
