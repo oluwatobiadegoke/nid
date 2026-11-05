@@ -2,11 +2,15 @@
 
 nid holds email your app sent, which can include sign-in codes and reset links. This page explains what nid does to keep that mail on your machine, and what you need to do when you change the defaults.
 
+## Your mail stays with you
+
+nid keeps every email on your machine. By default, only your own computer can open the web view or the read API.
+
 ## Defaults
 
 - **It listens on 127.0.0.1 only.** Other machines on your network cannot reach it. Use `--host 0.0.0.0` only when you need to, such as inside a container.
 - **It sends no CORS headers.** A web page on another origin cannot read nid's answers. Turn them on with `--cors` only if a page you trust needs them.
-- **It checks the Host header.** See below.
+- **It checks the Host header.** See [Why nid checks the Host header](#why-nid-checks-the-host-header).
 - **It renders email HTML in a sandboxed frame** with scripts blocked, so an email cannot run code in the web view.
 - **It sends nothing out.** There is no relay to real inboxes and no telemetry.
 

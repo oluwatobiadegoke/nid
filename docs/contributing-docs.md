@@ -13,6 +13,7 @@ The docs change in the same pull request as the code they describe. A change tha
 | The client library | [reference/client.md](reference/client.md), and [how-to/read-mail-in-tests.md](how-to/read-mail-in-tests.md) if it needs an example |
 | A provider, or a provider route | [reference/providers.md](reference/providers.md), [how-to/connect-your-app.md](how-to/connect-your-app.md), the provider list in the root README, and "What nid does not do yet" in [explanation/how-nid-works.md](explanation/how-nid-works.md) |
 | Code or link extraction | "Finding codes and links" in [explanation/how-nid-works.md](explanation/how-nid-works.md) |
+| The web view (`packages/server/ui/index.html`) | [how-to/use-the-web-view.md](how-to/use-the-web-view.md), and the tutorial if its steps mention the view |
 | Host checks, CORS or anything about who can reach nid | [explanation/security.md](explanation/security.md) |
 | The Docker image | [how-to/run-nid.md](how-to/run-nid.md) and [reference/configuration.md](reference/configuration.md) |
 | Something the tutorial uses | [tutorials/get-started.md](tutorials/get-started.md). Run the tutorial again from a clean folder. |
@@ -62,4 +63,8 @@ The docs follow the [Google developer documentation style guide](https://develop
 - **Every command must work** when pasted as is. Test it before you commit.
 - **Use `127.0.0.1:4400`** in examples, and `inbox.test` or `acme.com` for addresses.
 - **No marketing.** Say what it does. Avoid "simply", "just", "easy" and "powerful".
+- **Use the same word for the same thing.** The words in "Words these docs use" in `docs/README.md` are the agreed ones: "SDK" is the provider's library, "client library" is nid's. Add a new term there before you use it.
+- **Write examples that run as pasted.** Use `npx nid-inbox` in how-to guides and the tutorial, since a reader may not have nid installed.
+- **Show the result after each step** in the tutorial and how-to guides, so a reader knows it worked.
+- **Say where a link goes.** Write "see Security" as a link to that page, never "see below" or "click here".
 - **Link instead of repeating.** If two pages need the same detail, keep it in the reference and link to it.

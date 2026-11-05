@@ -1,6 +1,6 @@
 # How nid works
 
-This page explains the ideas behind nid: why it copies provider APIs, why any address is an inbox, how waiting works, and how it finds codes and links. You do not need it to use nid, but it helps when something surprises you.
+This page explains the ideas behind nid: why you run the inbox yourself, why it copies provider APIs, why any address is an inbox, how waiting works, and how it finds codes and links. You do not need it to use nid, but it helps when something surprises you.
 
 ## One process, two ways in, one way out
 
@@ -17,6 +17,12 @@ Mail goes out one way: the **read API** under `/api`. The CLI, the client librar
 your app ──Resend/Brevo API──┐
 your app ──SMTP──────────────┼──> nid store ──> read API ──> tests, CLI, web view
 ```
+
+## Why you run the inbox yourself
+
+When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, nothing leaves your machine, and you decide when to clear it.
+
+You read the mail in the web view, and your tests read the same mail through the read API. The [web view guide](../how-to/use-the-web-view.md) shows what the page offers.
 
 ## Why it copies the provider's API
 
@@ -86,7 +92,7 @@ Every stored message and every query carries a project id. On your machine there
 
 Today:
 
-- Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. Amazon SES is planned.
+- Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
 - There is no MCP server for AI agents yet.
 - There are no delivery webhooks, so nid never calls your app back with "delivered" or "bounced" events.
 - `retentionHours` stamps an expiry time on messages, but nothing deletes expired messages yet.
