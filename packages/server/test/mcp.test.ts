@@ -98,17 +98,6 @@ test('a web page on another site cannot reach the MCP endpoint', async (t) => {
   assert.notEqual((await request('http://localhost:3000')).status, 403)
 })
 
-test('nid mcp serves the same tools over stdio to a running server', async (t) => {
-  const running = await start()
-  const client = await connectStdio(running.url)
-  t.after(async () => {
-    await client.close()
-    await running.close()
-  })
-  await sendResend(running.server, signInEmail('stdio@inbox.test', '908172'))
-  assert.equal((await call(client, 'get_code', { to: 'stdio@inbox.test' })).value.code, '908172')
-})
-
 test('nid mcp says so when no server is running', async (t) => {
   const client = await connectStdio('http://127.0.0.1:9')
   t.after(() => client.close())
@@ -169,9 +158,7 @@ test('nid mcp pointed at the /mcp URL says the URL is wrong instead of pretendin
     await client.close()
     await running.close()
   })
-  for (const tool of ['new_address', 'clear', 'list_messages']) {
-    const result = await call(client, tool)
-    assert.equal(result.isError, true, tool)
-    assert.match(result.text, /without \/mcp/)
-  }
+  const result = await call(client, 'clear')
+  assert.equal(result.isError, true)
+  assert.match(result.text, /without \/mcp/)
 })

@@ -15,17 +15,12 @@ function reply(value: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] }
 }
 
-function problem(text: string): CallToolResult {
-  return { content: [{ type: 'text', text }], isError: true }
-}
-
 function summary(m: SerializedMessage) {
   return { id: m.id, from: m.from, to: m.to, subject: m.subject, receivedAt: m.createdAt, code: m.extracted.code, link: m.extracted.link }
 }
 
 function detail(m: SerializedMessage) {
-  const { id, from, to, ...rest } = summary(m)
-  return { id, from, to, cc: m.cc, ...rest, links: m.extracted.links, text: m.text ?? (m.html ? htmlToText(m.html) : '') }
+  return { ...summary(m), cc: m.cc, links: m.extracted.links, text: m.text ?? (m.html ? htmlToText(m.html) : '') }
 }
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -34,10 +29,6 @@ function queryString(params: Record<string, string | number | boolean | undefine
   return query.size > 0 ? `?${query}` : ''
 }
 
-class ApiError extends Error {}
-
-type Call = <T>(path: string, init?: RequestInit) => Promise<T>
-
 const wrongUrl = "Check that nid's URL is its address, such as http://127.0.0.1:4400, without /mcp."
 
 async function request<T>(api: ApiFetch, path: string, init: RequestInit): Promise<T> {
@@ -45,31 +36,13 @@ async function request<T>(api: ApiFetch, path: string, init: RequestInit): Promi
   try {
     response = await api(path, init)
   } catch (err) {
-    if (init.signal?.aborted) throw err
-    throw new ApiError(`Could not reach nid: ${(err as Error).message}. Is nid serve running?`)
+    throw new Error(`Could not reach nid: ${(err as Error).message}. Is nid serve running?`)
   }
   const body = (await response.json().catch(() => null)) as (T & { error?: string; details?: string[]; timedOut?: boolean }) | null
-  if (!body) throw new ApiError(`The server answered ${response.status} and not like nid. ${wrongUrl}`)
-  if (response.ok || body.timedOut) return body
-  const hint = response.status === 404 ? [wrongUrl] : []
-  throw new ApiError([body.error ?? `nid answered ${response.status}`, ...(body.details ?? []), ...hint].join('. '))
-}
-
-function guarded<A>(api: ApiFetch, handler: (args: A, call: Call) => Promise<CallToolResult>) {
-  return async (args: A, ctx: ServerContext) => {
-    const call: Call = (path, init) => request(api, path, { ...init, signal: ctx.mcpReq.signal })
-    try {
-      return await handler(args, call)
-    } catch (err) {
-      if (err instanceof ApiError) return problem(err.message)
-      throw err
-    }
-  }
-}
-
-async function latest(call: Call, to: string, hasCode?: boolean): Promise<SerializedMessage | undefined> {
-  const body = await call<{ messages: SerializedMessage[] }>(`/api/messages${queryString({ to, has_code: hasCode, limit: 1 })}`)
-  return body.messages[0]
+  if (!body) throw new Error(`The server answered ${response.status} and not like nid. ${wrongUrl}`)
+  if (response.ok) return body
+  const hint = response.status === 404 && !body.timedOut ? [wrongUrl] : []
+  throw new Error([body.error ?? `nid answered ${response.status}`, ...(body.details ?? []), ...hint].join('. '))
 }
 
 const maxWaitSeconds = 55
@@ -78,8 +51,12 @@ const readOnly = { readOnlyHint: true }
 
 const address = z.string().trim().min(1).describe('The email address the app sent to')
 
-export function createMcpServer(api: ApiFetch): McpServer {
+export function createMcpServer(api: ApiFetch, authorization?: string): McpServer {
   const server = new McpServer({ name: 'nid', version }, { instructions })
+  const headers = authorization ? { authorization } : {}
+  const call = <T>(ctx: ServerContext, path: string, init?: RequestInit) => request<T>(api, path, { ...init, headers, signal: ctx.mcpReq.signal })
+  const latest = async (ctx: ServerContext, to: string, hasCode?: boolean) =>
+    (await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString({ to, has_code: hasCode, limit: 1 })}`)).messages[0]
 
   server.registerTool(
     'new_address',
@@ -88,11 +65,11 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ prefix: z.string().optional().describe('A word to start the address with, such as signup') }),
       annotations: readOnly,
     },
-    guarded(api, async ({ prefix }, call) => {
+    async ({ prefix }, ctx) => {
       const tag = (prefix ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'test'
-      const body = await call<{ cursor: number }>('/api/cursor')
+      const body = await call<{ cursor: number }>(ctx, '/api/cursor')
       return reply({ address: `${tag}.${randomBytes(4).toString('hex')}@inbox.test`, cursor: body.cursor })
-    }),
+    },
   )
 
   server.registerTool(
@@ -110,12 +87,11 @@ export function createMcpServer(api: ApiFetch): McpServer {
       }),
       annotations: readOnly,
     },
-    guarded(api, async ({ to, after, subject, has_code, code_pattern, timeout }, call) => {
+    async ({ to, after, subject, has_code, code_pattern, timeout }, ctx) => {
       const query = queryString({ to, after, subject, has_code, code_pattern, timeout })
-      const body = await call<{ message?: SerializedMessage; error?: string }>(`/api/wait${query}`)
-      if (!body.message) return problem(body.error ?? `No email arrived for ${to}`)
+      const body = await call<{ message: SerializedMessage }>(ctx, `/api/wait${query}`)
       return reply(detail(body.message))
-    }),
+    },
   )
 
   server.registerTool(
@@ -125,11 +101,11 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address }),
       annotations: readOnly,
     },
-    guarded(api, async ({ to }, call) => {
-      const message = await latest(call, to, true)
-      if (!message) return problem(`No email with a code has arrived for ${to}. Call wait_for_email to wait for one.`)
+    async ({ to }, ctx) => {
+      const message = await latest(ctx, to, true)
+      if (!message) throw new Error(`No email with a code has arrived for ${to}. Call wait_for_email to wait for one.`)
       return reply({ code: message.extracted.code, id: message.id, subject: message.subject })
-    }),
+    },
   )
 
   server.registerTool(
@@ -139,11 +115,11 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address }),
       annotations: readOnly,
     },
-    guarded(api, async ({ to }, call) => {
-      const message = await latest(call, to)
-      if (!message) return problem(`No email has arrived for ${to}. Call wait_for_email to wait for one.`)
+    async ({ to }, ctx) => {
+      const message = await latest(ctx, to)
+      if (!message) throw new Error(`No email has arrived for ${to}. Call wait_for_email to wait for one.`)
       return reply({ link: message.extracted.link, links: message.extracted.links, id: message.id, subject: message.subject })
-    }),
+    },
   )
 
   server.registerTool(
@@ -156,10 +132,10 @@ export function createMcpServer(api: ApiFetch): McpServer {
       }),
       annotations: readOnly,
     },
-    guarded(api, async ({ to, limit }, call) => {
-      const body = await call<{ messages: SerializedMessage[] }>(`/api/messages${queryString({ to, limit: limit ?? 20 })}`)
+    async ({ to, limit }, ctx) => {
+      const body = await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString({ to, limit: limit ?? 20 })}`)
       return reply(body.messages.map(summary))
-    }),
+    },
   )
 
   server.registerTool(
@@ -169,10 +145,10 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address.optional() }),
       annotations: { destructiveHint: true, idempotentHint: true },
     },
-    guarded(api, async ({ to }, call) => {
-      const body = await call<{ deleted: number }>(`/api/messages${queryString({ to })}`, { method: 'DELETE' })
+    async ({ to }, ctx) => {
+      const body = await call<{ deleted: number }>(ctx, `/api/messages${queryString({ to })}`, { method: 'DELETE' })
       return reply({ deleted: body.deleted })
-    }),
+    },
   )
 
   return server

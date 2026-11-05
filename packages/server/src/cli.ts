@@ -172,13 +172,8 @@ async function mcp(args: string[]) {
     import('@modelcontextprotocol/server/stdio'),
     import('./mcp/tools.js'),
   ])
-  serveStdio(() =>
-    createMcpServer((path, init) => {
-      const headers = new Headers(init?.headers)
-      if (process.env.NID_TOKEN) headers.set('authorization', `Bearer ${process.env.NID_TOKEN}`)
-      return fetch(`${url}${path}`, { ...init, headers })
-    }),
-  )
+  const token = process.env.NID_TOKEN
+  serveStdio(() => createMcpServer((path, init) => fetch(`${url}${path}`, init), token ? `Bearer ${token}` : undefined))
 }
 
 async function healthcheck(args: string[]) {

@@ -9,8 +9,8 @@ import { createIngest, defaultLimits, type Ingest } from './ingest/index.js'
 import { providerRoutes } from './ingest/http.js'
 import { createSmtpServer, listenSmtp } from './ingest/smtp.js'
 import { providers as builtInProviders, type Provider } from './providers/index.js'
-import { hostCheck } from './security/host.js'
-import { mcpRoute } from './mcp/http.js'
+import { hostCheck, originCheck } from './security/host.js'
+import { mcpHandler } from './mcp/http.js'
 import { createSqliteStore, type Store } from './store/index.js'
 import type { AuthHook, LimitsHook, Message } from './types.js'
 import { webView } from './ui/index.js'
@@ -86,7 +86,9 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
   )
   app.get('/healthz', (c) => c.json({ ok: true, version }))
   app.route('/api', readApi({ store, ingest, providers, version }))
-  app.route('/', mcpRoute(async (path, init) => app.request(path, init), options.allowHosts ?? []))
+  const mcp = mcpHandler(async (path, init) => app.request(path, init))
+  app.use('/mcp', originCheck(options.allowHosts ?? []))
+  app.all('/mcp', (c) => mcp(c.req.raw))
   if (options.ui !== false) app.route('/', webView())
   app.route('/', providerRoutes({ providers, ingest, store }))
   app.notFound((c) => c.json({ error: `No route for ${c.req.method} ${c.req.path}` }, 404))

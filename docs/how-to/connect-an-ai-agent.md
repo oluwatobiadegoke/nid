@@ -55,11 +55,11 @@ Once connected, ask in plain words, for example: "Sign up on http://127.0.0.1:30
   "to": [
     "signup.974487fb@inbox.test"
   ],
-  "cc": [],
   "subject": "Your sign-in code",
   "receivedAt": "2026-11-05T23:08:57.436Z",
   "code": "482913",
   "link": "http://127.0.0.1:3000/verify?token=abc",
+  "cc": [],
   "links": [
     {
       "href": "http://127.0.0.1:3000/verify?token=abc",

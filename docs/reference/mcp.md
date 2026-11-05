@@ -18,7 +18,7 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 | Tool | Arguments | Returns |
 | --- | --- | --- |
 | `new_address` | `prefix` (optional) | `address`, a fresh address such as `signup.974487fb@inbox.test`, and `cursor`, the newest message id. |
-| `wait_for_email` | `to`, and optional `after`, `subject`, `has_code`, `code_pattern`, `timeout` | The next email to `to` after the cursor: `id`, `from`, `to`, `cc`, `subject`, `receivedAt`, `code`, `link`, `links` and `text`. |
+| `wait_for_email` | `to`, and optional `after`, `subject`, `has_code`, `code_pattern`, `timeout` | The next email to `to` after the cursor: `id`, `from`, `to`, `subject`, `receivedAt`, `code`, `link`, `cc`, `links` and `text`. |
 | `get_code` | `to` | `code`, `id` and `subject` of the newest email to `to` that has a code. |
 | `get_links` | `to` | `link`, `links`, `id` and `subject` of the newest email to `to`. |
 | `list_messages` | `to` (optional), `limit` (optional, 1 to 100, default 20) | Emails newest first, each with `id`, `from`, `to`, `subject`, `receivedAt`, `code` and `link`. |
@@ -37,6 +37,6 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 
 `text` is the email's text part. When the email has only HTML, `text` is the HTML with its tags removed.
 
-Every tool except `clear` is marked read-only, and `clear` is marked destructive. An agent may still ask you before each call. In Claude Code, add `mcp__nid` to `permissions.allow` in its settings to let it call nid's tools without asking.
+Every tool except `clear` is marked read-only, and `clear` is marked destructive. An agent may still ask you before each call. See [Let an AI agent read your mail](../how-to/connect-an-ai-agent.md) for how to stop Claude Code asking.
 
 When an agent cancels a wait, `nid mcp` stops it at once. Over HTTP, nid keeps waiting until the timeout, because each request stands alone.
