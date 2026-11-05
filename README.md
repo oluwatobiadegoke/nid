@@ -2,140 +2,77 @@
 
 A local inbox that stands in for your email provider. Change one URL, and every email your app sends shows up in an inbox your tests can read.
 
-Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and AI agents then read the mail, with sign-in codes and links already pulled out.
+Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and other tools then read the mail, with sign-in codes and links already pulled out.
 
-```
-npx nid-inbox serve
-```
+**[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
-```
-RESEND_BASE_URL=http://localhost:4400 npm run dev
-```
+## Quick start
 
-```ts
-import { test, expect } from '@nid-inbox/client/playwright'
+You need Node.js 22.13 or later.
 
-test('sign up, then resend the code', async ({ page, inbox }) => {
-  const email = inbox.address('signup')
-  await page.fill('#email', email)
-  await page.click('text=Send code')
-  const first = await inbox.waitFor(email, { hasCode: true })
-  await page.click('text=Resend code')
-  const second = await inbox.waitFor(email, { hasCode: true })
-  expect(second.code).not.toBe(first.code)
-  await page.fill('#code', second.code)
-})
-```
+1. Start nid:
+
+   ```sh
+   npx nid-inbox serve
+   ```
+
+2. Start your app with its provider pointed at nid. For Resend:
+
+   ```sh
+   RESEND_BASE_URL=http://127.0.0.1:4400 npm run dev
+   ```
+
+3. Read the mail in a test:
+
+   ```ts
+   import { test, expect } from '@nid-inbox/client/playwright'
+
+   test('sign up, then resend the code', async ({ page, inbox }) => {
+     const email = inbox.address('signup')
+     await page.fill('#email', email)
+     await page.click('text=Send code')
+     const first = await inbox.waitFor(email, { hasCode: true })
+     await page.click('text=Resend code')
+     const second = await inbox.waitFor(email, { hasCode: true })
+     expect(second.code).not.toBe(first.code)
+     await page.fill('#code', second.code!)
+   })
+   ```
+
+Or open the web view at [http://127.0.0.1:4400](http://127.0.0.1:4400) to see the mail.
 
 ## What it does
 
-- Answers the provider's own API on one port, so each SDK only needs a base URL. Resend and Brevo today; SendGrid, Postmark, Mailgun and SES are next.
+- Answers the provider's own API, so each SDK only needs a base URL. Resend and Brevo today. SendGrid, Postmark, Mailgun and SES are next.
 - Takes SMTP on port 1025 for everything else.
-- Stores every email keyed by recipient address. There is no "create inbox" step: a test makes up an address and reads it, so parallel tests never share mail.
-- Pulls out one-time codes and links on arrival, and lets a test pass its own pattern when the guess is wrong.
+- Treats every address as an inbox. There is no "create inbox" step, so parallel tests never share mail.
+- Pulls out one-time codes and links when mail arrives, and lets a test pass its own pattern.
 - Holds a `wait` request open until the next matching email arrives, so tests have no polling loops or sleeps.
-- Answers like the real provider on bad requests, so the SDK raises its own typed error, and keeps every refused send so a timed-out wait can explain itself.
-- Shows the mail in a small web view at [http://localhost:4400](http://localhost:4400).
-- Keeps nothing by default: mail lives in memory until the server stops. `--db mail.sqlite` keeps it across restarts.
+- Answers bad requests the way the real provider does, and keeps every refused send so a timed-out wait can explain itself.
+- Keeps mail in memory by default. `--db mail.sqlite` keeps it across restarts.
+- Listens on 127.0.0.1 only, and sends nothing out.
 
-## Run it
+## Packages
 
-| Way | How |
+| Package | What it is |
 | --- | --- |
-| npx | `npx nid-inbox serve` |
-| Docker | `docker run -p 127.0.0.1:4400:4400 -p 127.0.0.1:1025:1025 ghcr.io/oluwatobiadegoke/nid` |
-| Playwright | Add it to `webServer` in `playwright.config.ts` (below) |
-| GitHub Actions | Use the image as a job `services:` container |
+| [`nid-inbox`](https://www.npmjs.com/package/nid-inbox) | The server and the `nid` command. |
+| [`@nid-inbox/client`](https://www.npmjs.com/package/@nid-inbox/client) | A small client for tests, with a Playwright fixture. |
+| [`ghcr.io/oluwatobiadegoke/nid`](https://github.com/users/oluwatobiadegoke/packages/container/package/nid) | The Docker image. |
 
-```ts
-// playwright.config.ts
-webServer: [
-  { command: 'npx nid-inbox serve', port: 4400, reuseExistingServer: true },
-  { command: 'npm run dev', port: 3000, reuseExistingServer: true },
-],
-```
+## Documentation
 
-Options: `--port 4400`, `--smtp-port 1025`, `--host 127.0.0.1`, `--db mail.sqlite`, `--cors`, `--allow-host <name>`. The same settings read from `NID_PORT`, `NID_SMTP_PORT`, `NID_HOST` and `NID_DB`.
-
-## Point your app at it
-
-| Provider | Setting |
+| Kind | Pages |
 | --- | --- |
-| Resend | `RESEND_BASE_URL=http://localhost:4400` (Node), `RESEND_API_URL` (Python) |
-| Brevo | `new BrevoClient({ apiKey, baseUrl: 'http://localhost:4400/v3' })`, or `api.basePath = 'http://localhost:4400/v3'` on older SDKs |
-| SMTP | Host `localhost`, port `1025`, no TLS, any username and password |
-
-Locally any API key works, but a request with no key, or the wrong kind of key, fails exactly as it would in production.
-
-## Read the mail
-
-Every client is a thin wrapper over the read API, so every language behaves the same.
-
-### From tests
-
-```ts
-import { createInbox } from '@nid-inbox/client'
-
-const inbox = createInbox({ url: 'http://localhost:4400' })
-await inbox.start()
-
-const email = inbox.address('signup')
-const message = await inbox.waitFor(email, { hasCode: true, timeout: 30 })
-message.code
-message.link
-message.links
-message.subject
-message.text
-```
-
-`waitFor` remembers the cursor per address, so a second call on the same address returns the next email, never the first one again. `start()` takes a cursor at the start of a test so leftovers from an earlier run never match. Pass `{ after }` to override it, `{ subject }` to pick one of two emails sent close together, or `{ codePattern: /key is (\w+)/ }` to pull out something the built-in extraction does not know.
-
-### From the command line
-
-```
-nid read signup.8f3a@inbox.test               # list mail for an address
-nid read signup.8f3a@inbox.test --latest      # the newest message in full
-nid read signup.8f3a@inbox.test --latest --code    # just the code, for piping
-nid read signup.8f3a@inbox.test --latest --links   # just the links
-nid read signup.8f3a@inbox.test --wait 30     # wait for the next one
-nid clear [address]
-nid healthcheck
-```
-
-### From anything else
-
-| Route | What it does |
-| --- | --- |
-| `GET /api/cursor` | Newest message id. Take it before triggering an email. |
-| `GET /api/wait?to=&after=&subject=&has_code=&code_pattern=&timeout=` | Holds the request open until the first matching message after the cursor arrives. On timeout: 404 with what did arrive and recent rejections. |
-| `GET /api/messages?to=&subject=&provider=&after=&limit=` | Lists messages, newest first. |
-| `GET /api/messages/{id}` | One message in full, with the request as received. |
-| `GET /api/messages/{id}/attachments/{n}` | Downloads an attachment. |
-| `GET /api/rejections?to=` | Sends the server refused, with the exact error. |
-| `DELETE /api/messages?to=` | Clears one address, or everything. |
-| `GET /api/stream` | Server-sent events of new messages and rejections. |
-| `GET /healthz` | 200 and the version once ready. |
-| `GET /api/openapi.json` | The spec. |
-
-A typo in a query parameter is a 400, not a silent match-everything.
-
-## Safe by default
-
-It listens on 127.0.0.1 only, sends no CORS headers unless you pass `--cors`, and answers only requests whose Host is an IP, `localhost` or a name without a dot (such as a Compose service name), so a web page cannot point its own domain at your inbox. Email HTML renders in a sandboxed iframe with scripts blocked. There is no telemetry.
-
-## Use it as a library
-
-```ts
-import { createServer } from 'nid-inbox'
-
-const server = await createServer({ store, auth, limits })
-await server.listen({ port: 4400, smtpPort: 1025 })
-```
-
-`store` is where mail lives (SQLite by default; the same queries run on Postgres), `auth` maps a credential to a project, and `limits` sets body size and retention per project. Locally each has a one-line default. Every query carries a `project_id`, so one server can hold many projects.
+| Tutorial | [Get started](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md) |
+| How-to guides | [Run nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/run-nid.md) (npm, Docker, Playwright, GitHub Actions), [Point your app at nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-your-app.md), [Read mail in tests](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/read-mail-in-tests.md), [Use the command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-cli.md), [Embed nid in your own code](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/embed-nid.md) |
+| Reference | [Command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/cli.md), [Configuration](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/configuration.md), [Read API](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/read-api.md), [Client library](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/client.md), [Providers](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/providers.md) |
+| Explanation | [How nid works](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/how-nid-works.md), [Security](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/security.md) |
 
 ## Contributing
 
-Each provider is one file under `packages/server/src/providers/`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Each provider is one file under `packages/server/src/providers/`, and docs change in the same pull request as the code. See [CONTRIBUTING.md](https://github.com/oluwatobiadegoke/nid/blob/main/CONTRIBUTING.md).
+
+## License
 
 Apache-2.0.
