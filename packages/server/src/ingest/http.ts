@@ -90,7 +90,13 @@ async function handleSend(
     throw err
   }
   const stored: Message[] = []
-  for (const message of parsed) {
+  const failed = new Map<number, SendError>()
+  for (const [i, message] of parsed.entries()) {
+    if (message instanceof SendError) {
+      await ingest.reject(project, { provider: provider.name, to: message.to, status: message.reply.status, error: message.message, raw: req.rawBody })
+      failed.set(i, message)
+      continue
+    }
     if (message.idempotencyKey) {
       const existing = await store.findByIdempotencyKey(project.projectId, provider.name, message.idempotencyKey)
       if (existing) {
@@ -100,7 +106,7 @@ async function handleSend(
     }
     stored.push(await ingest.accept(project, message))
   }
-  return send(c, route.reply(stored, req))
+  return send(c, route.reply(stored, req, failed))
 }
 
 async function handleRead(c: Context, route: ReadRoute, req: IncomingRequest, project: Project, store: Store) {

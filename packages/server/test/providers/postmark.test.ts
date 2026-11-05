@@ -81,6 +81,21 @@ test('batch endpoints store every message and answer with one receipt each', asy
   assert.equal((await server.store.listMessages('default', { to: 'b3@inbox.test' }))[0]?.extracted.code, '424242')
 })
 
+test('a batch with one bad message still sends the others and reports the bad one in its slot', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await send(server, '/email/batch', [
+    { From: 'a@acme.com', To: 'good1@inbox.test', TextBody: 'Code 111000' },
+    { From: 'a@acme.com', To: 'not-an-address', TextBody: 'Hi' },
+    { From: 'a@acme.com', To: 'good2@inbox.test', TextBody: 'Code 222000' },
+  ])
+  assert.equal(res.status, 200)
+  assert.deepEqual(res.body.map((r: { ErrorCode: number }) => r.ErrorCode), [0, 300, 0])
+  assert.equal(res.body[2].To, 'good2@inbox.test')
+  assert.equal((await server.store.listMessages('default', { to: 'good2@inbox.test' }))[0]?.extracted.code, '222000')
+  assert.equal((await server.store.listRejections('default', {})).length, 1)
+})
+
 test('bad sends fail with Postmark 422 errors and a missing token gets the 401', async (t) => {
   const server = await createServer()
   t.after(() => server.close())

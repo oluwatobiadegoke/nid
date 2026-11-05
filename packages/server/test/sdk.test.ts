@@ -71,6 +71,14 @@ test('the official SendGrid SDK sends and surfaces SendGrid errors', async (t) =
   assert.equal(stored?.extracted.code, '246810')
   assert.equal(stored?.from, 'Acme <hello@acme.com>')
 
+  await sgMail.send(
+    [
+      { to: 'sg-one@inbox.test', substitutions: { code: '112233' } },
+      { to: 'sg-two@inbox.test', substitutions: { code: '445566' } },
+    ].map((p) => ({ ...p, from: 'hello@acme.com', subject: 'Code', text: 'Your code is {{code}}' })),
+  )
+  assert.equal((await running.server.store.listMessages('default', { to: 'sg-two@inbox.test' }))[0]?.extracted.code, '445566')
+
   await assert.rejects(
     sgMail.send({ to: 'sg-sdk@inbox.test', from: 'hello@acme.com', text: 'No subject' }),
     (err: { code?: number; response?: { body?: { errors?: Array<{ field: string }> } } }) =>
@@ -120,6 +128,20 @@ test('the official Mailgun SDK sends with an attachment and sees Mailgun errors'
   assert.equal(stored?.extracted.code, '975310')
   assert.equal(stored?.attachments[0]?.filename, 'hello.txt')
   assert.equal(stored?.attachments[0]?.size, 5)
+
+  const MailComposer = (await import('nodemailer/lib/mail-composer/index.js')).default
+  const mimeMessage = await new MailComposer({
+    from: 'hello@acme.com',
+    to: 'mg-mime@inbox.test',
+    subject: 'Built with nodemailer',
+    text: 'Your code is 808080',
+  }).compile().build()
+  const viaMime = await mg.messages.create('mg.acme.com', { to: 'mg-mime@inbox.test', message: mimeMessage })
+  assert.equal(viaMime.status, 200)
+  const mimeStored = (await running.server.store.listMessages('default', { to: 'mg-mime@inbox.test' }))[0]
+  assert.equal(mimeStored?.provider, 'mailgun')
+  assert.equal(mimeStored?.subject, 'Built with nodemailer')
+  assert.equal(mimeStored?.extracted.code, '808080')
 
   await assert.rejects(
     mg.messages.create('mg.acme.com', { to: ['mg-sdk@inbox.test'], text: 'No from' } as never),

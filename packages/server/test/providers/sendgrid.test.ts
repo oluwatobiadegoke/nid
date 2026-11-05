@@ -82,8 +82,17 @@ test('bad sends fail with SendGrid-shaped 400 errors and show up as rejections',
   assert.deepEqual(badTo.body.errors[0].message, 'Does not contain a valid address.')
   const noContent = await send(server, { personalizations: [{ to: [{ email: 'x@inbox.test' }] }], from: { email: 'a@acme.com' }, subject: 'Hi' })
   assert.equal(noContent.body.errors[0].field, 'content')
+  const named = await send(server, { personalizations: [{ to: [{ email: 'Bob <x@inbox.test>' }] }], from: { email: 'a@acme.com' }, subject: 'Hi', content })
+  assert.equal(named.body.errors[0].field, 'personalizations.0.to.0.email')
+  const duplicate = await send(server, {
+    personalizations: [{ to: [{ email: 'x@inbox.test' }], cc: [{ email: 'X@inbox.test' }] }],
+    from: { email: 'a@acme.com' },
+    subject: 'Hi',
+    content,
+  })
+  assert.equal(duplicate.body.errors[0].field, 'personalizations.0.cc')
   const rejections = await server.store.listRejections('default', { to: 'x@inbox.test' })
-  assert.equal(rejections.length, 2)
+  assert.equal(rejections.length, 4)
   assert.equal(rejections[0]?.provider, 'sendgrid')
 })
 

@@ -59,11 +59,32 @@ const sendSchema = z
 type SendBody = z.infer<typeof sendSchema>
 type Personalization = z.infer<typeof personalizationSchema>
 
-function recipients(list: Array<{ email: string; name?: string | undefined }> | undefined, kind: Recipient['kind'], field: string, to: string[]) {
-  for (const [j, a] of (list ?? []).entries()) {
-    if (!parseMailbox(a.email)) throw error(400, 'Does not contain a valid address.', `${field}.${kind}.${j}.email`, to)
-  }
-  return recipientsFrom((list ?? []).map((a) => ({ address: a.email, name: a.name })), kind)
+function checkAddress(email: string, field: string, to: string[]) {
+  if (!/^[^\s@<>",]+@[^\s@<>",]+\.[^\s@<>",]+$/.test(email.trim())) throw error(400, 'Does not contain a valid address.', field, to)
+}
+
+function recipients(p: Personalization, field: string, to: string[]): Recipient[] {
+  const seen = new Set<string>()
+  return (['to', 'cc', 'bcc'] as const).flatMap((kind) => {
+    const list = p[kind] ?? []
+    for (const [j, a] of list.entries()) {
+      checkAddress(a.email, `${field}.${kind}.${j}.email`, to)
+      const address = normalizeAddress(a.email)
+      if (seen.has(address)) {
+        const message = `Each email address in the personalization block should be unique between to, cc, and bcc. We found the first duplicate instance of [${address}] in the ${field}.${kind} field.`
+        throw error(400, message, `${field}.${kind}`, to)
+      }
+      seen.add(address)
+    }
+    return recipientsFrom(list.map((a) => ({ address: a.email, name: a.name })), kind)
+  })
+}
+
+function substitute(value: string | null | undefined, substitutions: Record<string, unknown> | undefined): string | null {
+  if (value === null || value === undefined) return null
+  let out = value
+  for (const [key, replacement] of Object.entries(substitutions ?? {})) out = out.split(key).join(String(replacement))
+  return out
 }
 
 function formatAddress(a: { email: string; name?: string | undefined }): string {
@@ -72,7 +93,7 @@ function formatAddress(a: { email: string; name?: string | undefined }): string 
 
 function build(data: SendBody, p: Personalization, i: number, id: string, raw: string): NewMessage {
   const field = `personalizations.${i}`
-  const to = (p.to ?? []).map((a) => normalizeAddress(a.email))
+  const to = (p.to ?? []).map((a) => parseMailbox(a.email)?.address ?? normalizeAddress(a.email))
   if (to.length === 0) {
     throw error(400, 'The to array is required for all personalization objects, and must have at least one email object with a valid email address.', `${field}.to`)
   }
@@ -80,16 +101,26 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   if (!from?.email) {
     throw error(400, 'The from object must be provided for every email send. It is an object that requires the email parameter, but may also contain a name parameter.', 'from.email', to)
   }
-  if (!parseMailbox(from.email)) throw error(400, 'Does not contain a valid address.', 'from.email', to)
+  checkAddress(from.email, 'from.email', to)
+  const list = recipients(p, field, to)
+  if (data.reply_to && data.reply_to_list) {
+    throw error(400, 'The reply_to and reply_to_list parameters cannot be used together.', 'reply_to', to)
+  }
+  const replyTo = data.reply_to_list ?? (data.reply_to ? [data.reply_to] : [])
+  for (const [j, a] of replyTo.entries()) checkAddress(a.email, data.reply_to_list ? `reply_to_list.${j}.email` : 'reply_to.email', to)
   const subject = p.subject ?? data.subject
   if (!subject && !data.template_id) {
     throw error(400, 'The subject is required. You can get around this requirement if you use a template with a subject defined or if every personalization has a subject defined.', 'subject', to)
   }
-  const text = data.content?.find((c) => c.type === 'text/plain')?.value ?? null
-  const html = data.content?.find((c) => c.type === 'text/html')?.value ?? null
   if (!data.template_id && !data.content?.some((c) => c.value)) {
     throw error(400, 'Unless a valid template_id is provided, the content parameter is required. There must be at least one defined content block. We typically suggest both text/plain and text/html blocks are included, but only one block is required.', 'content', to)
   }
+  const plainAt = data.content?.findIndex((c) => c.type === 'text/plain') ?? -1
+  if (plainAt > 0) {
+    throw error(400, 'If present, text/plain content must be first, followed by text/html, followed by any other content.', 'content.0.type', to)
+  }
+  const text = data.content?.[plainAt]?.value
+  const html = data.content?.find((c) => c.type === 'text/html')?.value
   const meta: Record<string, unknown> = {}
   if (data.template_id) meta.templateId = data.template_id
   const variables = p.dynamic_template_data ?? p.substitutions
@@ -101,20 +132,15 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   if (sendAt) meta.scheduledAt = new Date(sendAt * 1000).toISOString()
   if (data.batch_id) meta.batchId = data.batch_id
   if (data.mail_settings?.sandbox_mode?.enable) meta.sandbox = true
-  const replyTo = data.reply_to_list ?? (data.reply_to ? [data.reply_to] : [])
   return {
     provider: name,
     providerId: `${id}.${i}`,
     from: formatAddress(from),
     replyTo: replyTo.map((a) => normalizeAddress(a.email)),
-    recipients: [
-      ...recipients(p.to, 'to', field, to),
-      ...recipients(p.cc, 'cc', field, to),
-      ...recipients(p.bcc, 'bcc', field, to),
-    ],
-    subject: subject ?? '',
-    text,
-    html,
+    recipients: list,
+    subject: substitute(subject, p.substitutions) ?? '',
+    text: substitute(text, p.substitutions),
+    html: substitute(html, p.substitutions),
     headers: { ...stringHeaders(data.headers), ...stringHeaders(p.headers) },
     attachments: (data.attachments ?? []).map((a) =>
       attachmentFrom(a.filename, a.content, a.type, a.disposition === 'inline' ? a.content_id : null),

@@ -22,7 +22,7 @@ test('a multipart send with an attachment lands in the inbox and answers Queued'
   form.append('html', '<p>Your code is <b>731900</b> <a href="https://acme.com/v?t=3">Verify</a></p>')
   form.append('o:tag', 'auth')
   form.append('o:tag', 'signup')
-  form.append('h:Reply-To', 'help@acme.com')
+  form.append('h:reply-to', 'help@acme.com')
   form.append('h:X-Ref', '9')
   form.append('v:user-id', '123456')
   form.append('attachment', new File(['hello'], 'hello.txt', { type: 'text/plain' }))

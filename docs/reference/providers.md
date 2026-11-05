@@ -8,7 +8,7 @@ nid answers the HTTP APIs of these email providers, plus SMTP. Each one stores m
 | [Brevo](#brevo) | `brevo` | `POST /v3/smtp/email` |
 | [SendGrid](#sendgrid) | `sendgrid` | `POST /v3/mail/send` |
 | [Postmark](#postmark) | `postmark` | `POST /email`, `POST /email/batch`, `POST /email/withTemplate`, `POST /email/batchWithTemplates` |
-| [Mailgun](#mailgun) | `mailgun` | `POST /v3/{domain}/messages` |
+| [Mailgun](#mailgun) | `mailgun` | `POST /v3/{domain}/messages`, `POST /v3/{domain}/messages.mime` |
 | [SMTP](#smtp) | `smtp` | Port 1025 |
 
 Amazon SES is planned. It is not supported yet.
@@ -90,11 +90,14 @@ nid checks, in the same way SendGrid does:
 | `from.email` is present | `400`, field `from.email` |
 | `subject` is present, at the top or in the personalization, unless `template_id` is set | `400`, field `subject` |
 | `content` has a value, unless `template_id` is set | `400`, field `content` |
-| Every address looks like an address | `400 Does not contain a valid address.` |
+| Every `email` is a bare address, without a display name | `400 Does not contain a valid address.` |
+| No address appears twice across `to`, `cc` and `bcc` of one personalization | `400`, field `personalizations.{n}.cc` |
+| `reply_to` and `reply_to_list` are not both set | `400`, field `reply_to` |
+| A `text/plain` block, if any, comes first in `content` | `400`, field `content.0.type` |
 
 Errors have SendGrid's shape: `{"errors": [{"message", "field", "help"}]}`.
 
-Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data`, or its `substitutions`, becomes `meta.variables`. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
+Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data` becomes `meta.variables`. Its `substitutions` are replaced in the subject and body, as SendGrid does. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
 
 ## Postmark
 
@@ -124,7 +127,7 @@ Like `POST /email`, but needs `TemplateId` or `TemplateAlias` instead of a body 
 
 ### POST /email/batch
 
-Sends up to 500 emails. The body is a JSON array of `POST /email` bodies. Returns `200` with an array of receipts. If any email fails a check, the whole batch is refused. Postmark itself sends the good ones and reports an error for each bad one.
+Sends up to 500 emails. The body is a JSON array of `POST /email` bodies. Returns `200` with one result per email, in order. An email that fails a check gets its `ErrorCode` and `Message` in its slot and is kept as a rejection. The others are still sent, as in Postmark.
 
 ### POST /email/batchWithTemplates
 
@@ -152,7 +155,13 @@ Sends an email from a `multipart/form-data` or `application/x-www-form-urlencode
 
 Also stored: `h:` fields as headers (`h:Reply-To` sets the reply-to), `v:` fields as `meta.customVariables`, `o:tag` as `meta.tags`, `o:deliverytime`, `attachment` and `inline` files, and the domain as `meta.domain`. `template` is stored as `meta.templateId`, and `t:variables` (or `h:X-Mailgun-Variables`) as `meta.variables`. A send with `o:testmode` set to `yes` is stored with `meta.sandbox` set to `true`.
 
-With `recipient-variables`, each `to` address gets its own message, and `%recipient.<key>%` in the subject and body is replaced with that address's value, as in a Mailgun batch send.
+### POST /v3/{domain}/messages.mime
+
+Sends a message you built yourself, for example with Nodemailer. The form needs `to` and a `message` field that holds the MIME message, as a file or a string. nid reads the subject, body, headers and attachments from the MIME message, and the `o:`, `v:` and `h:` fields as for `POST /v3/{domain}/messages`.
+
+### Batch sends
+
+With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message, and `%recipient.<key>%` in the subject and body is replaced with that address's value, as in a Mailgun batch send.
 
 ## SMTP
 

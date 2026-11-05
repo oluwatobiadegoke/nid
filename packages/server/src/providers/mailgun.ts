@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import type { Attachment, NewMessage, Recipient } from '../types.js'
+import { fromMime } from '../ingest/mime.js'
+import type { Attachment, Message, NewMessage, Recipient } from '../types.js'
 import { basic, isRecord, parseMailbox, recipientsFrom, splitAddresses, timestampId } from './shared.js'
-import { SendError, type Provider, type SendRoute } from './types.js'
+import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
 const name = 'mailgun'
 
@@ -64,17 +65,50 @@ function substitute(value: string | null, vars: Record<string, unknown>): string
   return value.replace(/%recipient\.([\w-]+)%/g, (whole, key: string) => (key in vars ? String(vars[key]) : whole))
 }
 
+function formBody(req: IncomingRequest): Record<string, Field> {
+  if (!isRecord(req.body) || !/multipart\/form-data|x-www-form-urlencoded/.test(req.contentType)) {
+    throw error(400, 'Expected multipart/form-data or application/x-www-form-urlencoded body')
+  }
+  return req.body as Record<string, Field>
+}
+
+function headerValue(headers: Record<string, string>, name: string): string | null {
+  return Object.entries(headers).find(([k]) => k.toLowerCase() === name)?.[1] ?? null
+}
+
+function options(body: Record<string, Field>, domain: string, to: string[]) {
+  const headers: Record<string, string> = {}
+  const custom: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    const value = text(body, key)
+    if (value === null) continue
+    if (key.startsWith('h:')) headers[key.slice(2)] = value
+    else if (key.startsWith('v:')) custom[key.slice(2)] = value
+  }
+  const meta: Record<string, unknown> = { domain }
+  const tags = texts(body, 'o:tag')
+  if (tags.length > 0) meta.tags = tags
+  if (Object.keys(custom).length > 0) meta.customVariables = custom
+  const deliveryTime = text(body, 'o:deliverytime')
+  if (deliveryTime) meta.scheduledAt = deliveryTime
+  if (/^(yes|true)$/i.test(text(body, 'o:testmode') ?? '')) meta.sandbox = true
+  const variables = jsonObject(headerValue(headers, 'x-mailgun-variables'), 'h:X-Mailgun-Variables', to)
+  return { headers, meta, variables, providerId: `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>` }
+}
+
+function toAddressesOf(body: Record<string, Field>) {
+  const list = addresses(body, 'to')
+  const to = list.map((v) => parseMailbox(v)?.address ?? v)
+  return { list, to }
+}
+
 const send: SendRoute = {
   kind: 'send',
   method: 'POST',
   path: '/v3/:domain/messages',
   async parse(req) {
-    if (!isRecord(req.body) || !/multipart\/form-data|x-www-form-urlencoded/.test(req.contentType)) {
-      throw error(400, 'Expected multipart/form-data or application/x-www-form-urlencoded body')
-    }
-    const body = req.body as Record<string, Field>
-    const toList = addresses(body, 'to')
-    const to = toList.map((v) => parseMailbox(v)?.address ?? v)
+    const body = formBody(req)
+    const { list: toList, to } = toAddressesOf(body)
     const from = text(body, 'from')
     if (!from) throw error(400, "'from' parameter is missing", to)
     if (!parseMailbox(from)) throw error(400, 'from parameter is not a valid address. please check documentation', to)
@@ -84,34 +118,15 @@ const send: SendRoute = {
     const plain = text(body, 'text')
     if (!html && !plain && !template) throw error(400, "Need at least one of 'text', 'html' or 'template' parameters specified", to)
 
-    const headers: Record<string, string> = {}
-    const custom: Record<string, string> = {}
-    for (const key of Object.keys(body)) {
-      const value = text(body, key)
-      if (value === null) continue
-      if (key.startsWith('h:')) headers[key.slice(2)] = value
-      else if (key.startsWith('v:')) custom[key.slice(2)] = value
-    }
-    const variables =
-      jsonObject(text(body, 't:variables'), 't:variables', to) ?? jsonObject(headers['X-Mailgun-Variables'] ?? null, 'h:X-Mailgun-Variables', to)
-    const perRecipient = jsonObject(text(body, 'recipient-variables'), 'recipient-variables', to)
-
-    const meta: Record<string, unknown> = { domain: req.params.domain }
+    const { headers, meta, variables, providerId } = options(body, req.params.domain ?? '', to)
+    const templateVariables = jsonObject(text(body, 't:variables'), 't:variables', to) ?? variables
     if (template) meta.templateId = template
-    if (variables) meta.variables = variables
-    const tags = texts(body, 'o:tag')
-    if (tags.length > 0) meta.tags = tags
-    if (Object.keys(custom).length > 0) meta.customVariables = custom
-    const deliveryTime = text(body, 'o:deliverytime')
-    if (deliveryTime) meta.scheduledAt = deliveryTime
-    if (/^(yes|true)$/i.test(text(body, 'o:testmode') ?? '')) meta.sandbox = true
-
-    const domain = req.params.domain ?? 'mailgun.org'
-    const providerId = `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>`
+    if (templateVariables) meta.variables = templateVariables
+    const perRecipient = jsonObject(text(body, 'recipient-variables'), 'recipient-variables', to)
     const cc = recipients(addresses(body, 'cc'), 'cc', to)
     const bcc = recipients(addresses(body, 'bcc'), 'bcc', to)
     const attachments = [...(await files(body, 'attachment', false)), ...(await files(body, 'inline', true))]
-    const replyTo = headers['Reply-To'] ? splitAddresses(headers['Reply-To']).map((v) => parseMailbox(v)?.address ?? v) : []
+    const replyTo = splitAddresses(headerValue(headers, 'reply-to') ?? '').map((v) => parseMailbox(v)?.address ?? v)
 
     const message = (toRecipients: Recipient[], vars: Record<string, unknown>): NewMessage => ({
       provider: name,
@@ -136,9 +151,31 @@ const send: SendRoute = {
       return message([r], isRecord(vars) ? vars : {})
     })
   },
-  reply(messages) {
-    return { status: 200, body: { id: messages[0]?.providerId, message: 'Queued. Thank you.' } }
+  reply,
+}
+
+const mime: SendRoute = {
+  kind: 'send',
+  method: 'POST',
+  path: '/v3/:domain/messages.mime',
+  async parse(req) {
+    const body = formBody(req)
+    const { list: toList, to } = toAddressesOf(body)
+    if (to.length === 0) throw error(400, "'to' parameter is missing", to)
+    recipients(toList, 'to', to)
+    const raw = values(body, 'message')[0]
+    if (raw === undefined) throw error(400, "'message' parameter is missing", to)
+    const content = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(await raw.arrayBuffer())
+    const message = await fromMime(content, to, name)
+    const { headers, meta, variables, providerId } = options(body, req.params.domain ?? '', to)
+    if (variables) meta.variables = variables
+    return [{ ...message, providerId, headers: { ...message.headers, ...headers }, meta }]
   },
+  reply,
+}
+
+function reply(messages: Message[]) {
+  return { status: 200, body: { id: messages[0]?.providerId, message: 'Queued. Thank you.' } }
 }
 
 export const mailgun: Provider = {
@@ -148,7 +185,7 @@ export const mailgun: Provider = {
   unauthorized() {
     return { status: 401, body: 'Forbidden' }
   },
-  routes: [send],
+  routes: [send, mime],
   setup: {
     env: "mailgun.client({ username: 'api', key, url: 'http://127.0.0.1:4400' })",
     note: 'Other SDKs: set the API base URL to http://127.0.0.1:4400 (no /v3).',

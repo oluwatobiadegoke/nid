@@ -108,13 +108,18 @@ function receipt(m: Message) {
   }
 }
 
-function batchItems(req: IncomingRequest, list: unknown, templated: boolean): NewMessage[] {
+function batchItems(req: IncomingRequest, list: unknown, templated: boolean): Array<NewMessage | SendError> {
   if (!Array.isArray(list)) throw error(402, 'Received invalid JSON input.')
   if (list.length > 500) throw error(300, 'Batch requests are limited to 500 messages.')
   return list.map((item, i) => {
-    const message = toMessage(item, templated, req, JSON.stringify(item))
-    message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
-    return message
+    try {
+      const message = toMessage(item, templated, req, JSON.stringify(item))
+      message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
+      return message
+    } catch (err) {
+      if (err instanceof SendError) return err
+      throw err
+    }
   })
 }
 
@@ -131,7 +136,11 @@ const batch = (path: string, templated: boolean): SendRoute => ({
   method: 'POST',
   path,
   parse: (req) => batchItems(req, templated && isRecord(req.body) ? req.body.Messages : req.body, templated),
-  reply: (messages) => ({ status: 200, body: messages.map(receipt) }),
+  reply(messages, _req, failed) {
+    const sent = messages.values()
+    const total = messages.length + failed.size
+    return { status: 200, body: Array.from({ length: total }, (_, i) => failed.get(i)?.reply.body ?? receipt(sent.next().value!)) }
+  },
 })
 
 export const postmark: Provider = {
