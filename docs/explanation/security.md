@@ -2,6 +2,10 @@
 
 nid holds email your app sent, which can include sign-in codes and reset links. This page explains what nid does to keep that mail on your machine, and what you need to do when you change the defaults.
 
+## Your mail stays with you
+
+nid keeps every email on your machine. By default, only your own computer can open the web view or the read API.
+
 ## Defaults
 
 - **It listens on 127.0.0.1 only.** Other machines on your network cannot reach it. Use `--host 0.0.0.0` only when you need to, such as inside a container.

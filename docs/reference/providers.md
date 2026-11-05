@@ -8,8 +8,6 @@ nid answers the HTTP APIs of these email providers, plus SMTP. Each one stores m
 | [Brevo](#brevo) | `brevo` | `POST /v3/smtp/email` |
 | [SMTP](#smtp) | `smtp` | Port 1025 |
 
-SendGrid, Postmark, Mailgun and Amazon SES are planned. They are not supported yet.
-
 All routes are on the HTTP port, 4400 by default. Any key value works, but it must be present and in the right place. A send that nid refuses gets the provider's own error status and body, and nid keeps it as a [rejection](read-api.md#get-apirejections).
 
 ## Resend

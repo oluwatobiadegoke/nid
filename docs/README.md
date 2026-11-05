@@ -1,6 +1,8 @@
 # nid documentation
 
-nid is a local inbox that stands in for your email provider. Your app sends email the way it always does, and nid keeps every message where your tests, the command line and other tools can read it.
+An email inbox that runs on your computer.
+
+While you build, your app sends its emails to nid instead of to real people. Open nid in your browser and read each email as it arrives: the message, its links and any sign-in code. The mail stays on your machine, and your tests can read it too.
 
 You need Node.js 22.13 or later for the npm packages, or Docker for the container image.
 
@@ -8,12 +10,13 @@ These docs describe the code on the `main` branch. The examples show output from
 
 ## New to nid
 
-Start with the tutorial. In about ten minutes you send an email to nid and read it back from a script.
+Start with the tutorial. In about ten minutes you send an email to nid, read it in the web view, and read it back from a script.
 
 - [Get started: catch your first email](tutorials/get-started.md)
 
 ## Get a task done
 
+- [See your mail in the web view](how-to/use-the-web-view.md) to read the emails your app sends in your browser.
 - [Run nid](how-to/run-nid.md) with npm, Docker, Playwright or GitHub Actions.
 - [Point your app at nid](how-to/connect-your-app.md) when it sends with Resend, Brevo or SMTP.
 - [Read mail in tests](how-to/read-mail-in-tests.md), with Playwright or any other test runner.
@@ -40,6 +43,7 @@ Start with the tutorial. In about ten minutes you send an email to nid and read 
 | Provider | A service your app calls to send email, such as Resend or Brevo. |
 | SDK | The library a provider publishes for calling its API, such as the `resend` npm package. |
 | Base URL | The address an SDK sends its requests to. Pointing it at nid is the only change your app needs. |
+| Web view | The page at nid's address, such as `http://127.0.0.1:4400`, where you read your mail in a browser. |
 | Read API | nid's own HTTP routes under `/api`, for reading the mail it holds. |
 | Client library | `@nid-inbox/client`, nid's JavaScript wrapper over the read API. |
 | Cursor | A message id. "After the cursor" means "newer than that message". |
