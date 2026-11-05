@@ -92,6 +92,11 @@ test('broken or hostile html is read quickly and still gives the code and link',
     assert.equal(result.code, '482913')
     assert.equal(result.link, 'https://app.acme.com/verify?t=1')
   }
+  const urls = Array.from({ length: 25_000 }, (_, i) => `https://app.acme.com/r/${i}`).join(' ')
+  const began = performance.now()
+  const templated = extract({ subject: 'Welcome', text: null, html: null, variables: { code: '482913', urls } })
+  assert.ok(performance.now() - began < 1000, `took ${Math.round(performance.now() - began)}ms`)
+  assert.equal(templated.links.length, 25_000)
   assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")'), 'Code 1234')
 })
 
@@ -101,11 +106,12 @@ test('links and codes survive the html quirks real templates produce', () => {
     text: null,
     html: [
       '<a class="btn"href="https://app.acme.com/verify?t=1">Verify</a >',
-      '<p>Expires in <10 min. Your code: 482913 &#99999999;</p>',
-      '<a href="https://app.acme.com/help">Help</a>',
+      '<p>Expires in <10 min. Your code &#99999999; is 482913</p>',
+      "<a href=https://app.acme.com/o'neil/help>Help",
+      '<a href="https://app.acme.com/more">More</a>',
     ].join(''),
   })
-  assert.equal(result.code, '482913')
+  assert.deepEqual(result.codes, ['482913'])
   assert.equal(result.link, 'https://app.acme.com/verify?t=1')
-  assert.deepEqual(result.links.map((l) => l.text), ['Verify', 'Help'])
+  assert.deepEqual(result.links.map((l) => l.href), ['https://app.acme.com/verify?t=1', "https://app.acme.com/o'neil/help", 'https://app.acme.com/more'])
 })

@@ -9,11 +9,11 @@ const windowBefore = 80
 const windowAfter = 40
 
 const anchorPattern = /<a\b([^<>]*)>((?:(?!<a\b)[\s\S])*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
-const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i
+const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
 
-function codePoint(value: number, entity: string): string {
-  return value <= 0x10ffff ? String.fromCodePoint(value) : entity
+function codePoint(value: number): string {
+  return value <= 0x10ffff ? String.fromCodePoint(value) : '\ufffd'
 }
 
 function decodeEntities(value: string): string {
@@ -24,8 +24,8 @@ function decodeEntities(value: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (entity, n: string) => codePoint(Number(n), entity))
-    .replace(/&#x([0-9a-f]+);/gi, (entity, n: string) => codePoint(parseInt(n, 16), entity))
+    .replace(/&#(\d+);/g, (_, n: string) => codePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => codePoint(parseInt(n, 16)))
 }
 
 export function htmlToText(html: string): string {
