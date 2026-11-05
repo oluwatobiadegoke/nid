@@ -195,7 +195,10 @@ function reply(messages: Message[]) {
 export const mailgun: Provider = {
   name,
   label: 'Mailgun',
-  credential: basic,
+  credential(req) {
+    const auth = basic(req)
+    return auth?.user === 'api' ? auth.password : null
+  },
   unauthorized() {
     return { status: 401, body: 'Forbidden' }
   },

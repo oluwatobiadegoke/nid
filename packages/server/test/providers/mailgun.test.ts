@@ -116,4 +116,7 @@ test('bad sends fail with Mailgun 400 messages and a missing key gets Forbidden'
   const noKey = await send(server, new URLSearchParams({ from: 'a@acme.com', to: 'x@inbox.test', text: 'Hi' }), {})
   assert.equal(noKey.status, 401)
   assert.equal(noKey.text, 'Forbidden')
+  const domainAsUser = { authorization: `Basic ${Buffer.from('mg.acme.com:key-test').toString('base64')}` }
+  const wrongUser = await send(server, new URLSearchParams({ from: 'a@acme.com', to: 'x@inbox.test', text: 'Hi' }), domainAsUser)
+  assert.equal(wrongUser.status, 401)
 })

@@ -12,35 +12,35 @@ function error(code: number, message: string, to: string[] = []): SendError {
 
 const emailSchema = z
   .object({
-    From: z.string().optional(),
-    To: z.string().optional(),
-    Cc: z.string().optional(),
-    Bcc: z.string().optional(),
-    Subject: z.string().optional(),
-    Tag: z.string().optional(),
-    HtmlBody: z.string().optional(),
-    TextBody: z.string().optional(),
-    ReplyTo: z.string().optional(),
-    Headers: z.array(z.object({ Name: z.string(), Value: z.string() })).optional(),
-    Metadata: z.record(z.string(), z.unknown()).optional(),
+    From: z.string().nullish(),
+    To: z.string().nullish(),
+    Cc: z.string().nullish(),
+    Bcc: z.string().nullish(),
+    Subject: z.string().nullish(),
+    Tag: z.string().nullish(),
+    HtmlBody: z.string().nullish(),
+    TextBody: z.string().nullish(),
+    ReplyTo: z.string().nullish(),
+    Headers: z.array(z.object({ Name: z.string(), Value: z.string() })).nullish(),
+    Metadata: z.record(z.string(), z.unknown()).nullish(),
     Attachments: z
       .array(
         z.object({
-          Name: z.string().optional(),
-          Content: z.string().optional(),
-          ContentType: z.string().optional(),
-          ContentID: z.string().nullable().optional(),
+          Name: z.string().nullish(),
+          Content: z.string().nullish(),
+          ContentType: z.string().nullish(),
+          ContentID: z.string().nullish(),
         }),
       )
-      .optional(),
-    MessageStream: z.string().optional(),
-    TemplateId: z.number().optional(),
-    TemplateAlias: z.string().optional(),
-    TemplateModel: z.record(z.string(), z.unknown()).optional(),
+      .nullish(),
+    MessageStream: z.string().nullish(),
+    TemplateId: z.number().nullish(),
+    TemplateAlias: z.string().nullish(),
+    TemplateModel: z.record(z.string(), z.unknown()).nullish(),
   })
   .passthrough()
 
-function addresses(value: string | undefined, kind: Recipient['kind'], to: string[]): Recipient[] {
+function addresses(value: string | null | undefined, kind: Recipient['kind'], to: string[]): Recipient[] {
   const parsed = splitAddresses(value ?? '').map((v) => {
     const mailbox = parseMailbox(v)
     if (!mailbox) {
@@ -64,7 +64,7 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
   if (!data.From || !parseMailbox(data.From)) {
     throw error(300, `Error parsing 'From': Illegal email address '${data.From ?? ''}'. It must contain the '@' symbol.`, to)
   }
-  if (templated && data.TemplateId === undefined && !data.TemplateAlias) {
+  if (templated && data.TemplateId == null && !data.TemplateAlias) {
     throw error(1101, "The 'TemplateId' or 'TemplateAlias' must be specified.", to)
   }
   if (!templated && !data.HtmlBody && !data.TextBody) {

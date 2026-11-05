@@ -11,7 +11,7 @@ function error(status: number, message: string, field: string | null, to: string
   return new SendError({ status, body: { errors: [{ message, field, help: field ? `${help}#message.${field}` : null }] } }, to, message)
 }
 
-const address = z.object({ email: z.string(), name: z.string().optional() })
+const address = z.object({ email: z.string(), name: z.string().nullish() })
 const addresses = z.array(address)
 
 const personalizationSchema = z.object({
@@ -87,7 +87,7 @@ function substitute(value: string | null | undefined, substitutions: Record<stri
   return out
 }
 
-function formatAddress(a: { email: string; name?: string | undefined }): string {
+function formatAddress(a: { email: string; name?: string | null | undefined }): string {
   return a.name ? `${a.name} <${normalizeAddress(a.email)}>` : normalizeAddress(a.email)
 }
 

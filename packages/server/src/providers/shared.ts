@@ -7,12 +7,12 @@ export function bearer(req: IncomingRequest): string | null {
   return match?.[1] ?? null
 }
 
-export function basic(req: IncomingRequest): string | null {
+export function basic(req: IncomingRequest): { user: string; password: string } | null {
   const match = (req.headers.get('authorization') ?? '').match(/^Basic\s+(\S+)$/i)
   if (!match?.[1]) return null
   const decoded = Buffer.from(match[1], 'base64').toString('utf8')
   const colon = decoded.indexOf(':')
-  return colon >= 0 && decoded.slice(colon + 1) ? decoded.slice(colon + 1) : null
+  return colon >= 0 && decoded.slice(colon + 1) ? { user: decoded.slice(0, colon), password: decoded.slice(colon + 1) } : null
 }
 
 export function header(req: IncomingRequest, name: string): string | null {

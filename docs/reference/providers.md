@@ -139,7 +139,7 @@ The Postmark routes also answer with a trailing slash, such as `/email/withTempl
 
 Point the SDK at nid with `mailgun.client({ username: 'api', key, url: 'http://127.0.0.1:4400' })`. Leave out `/v3`.
 
-**Key:** HTTP Basic auth with user `api` and any key as the password. Without it: `401 Forbidden` (plain text).
+**Key:** HTTP Basic auth with user `api` and any key as the password. Without it, or with another user name: `401 Forbidden` (plain text).
 
 ### POST /v3/{domain}/messages
 
