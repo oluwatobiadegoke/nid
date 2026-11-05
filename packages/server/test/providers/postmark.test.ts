@@ -127,4 +127,5 @@ test('every refused message in a large batch can still be found by its recipient
   const res = await send(server, '/email/batch', items)
   assert.equal(res.status, 200)
   assert.equal((await server.store.listRejections('default', { to: 'user_0@inbox.test', limit: 1 })).length, 1)
+  assert.equal((await server.store.listRejections('default', { to: 'userx0@inbox.test' })).length, 0)
 })
