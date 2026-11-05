@@ -100,6 +100,21 @@ test('POST /emails/batch stores every email and answers with their ids', async (
   assert.equal((await server.store.listMessages('default', {})).length, 2)
 })
 
+test('a refused batch is recorded against every recipient in it', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await server.app.request('/emails/batch', {
+    method: 'POST',
+    headers: resendHeaders,
+    body: JSON.stringify([
+      { from: 'a@acme.com', to: 'fine@inbox.test', subject: 'One', text: 'One' },
+      { from: 'a@acme.com', to: 'other@inbox.test', text: 'No subject' },
+    ]),
+  })
+  assert.equal(res.status, 422)
+  assert.equal((await server.store.listRejections('default', { to: 'fine@inbox.test' })).length, 1)
+})
+
 test('GET /emails/:id returns the email the way Resend does', async (t) => {
   const server = await createServer()
   t.after(() => server.close())

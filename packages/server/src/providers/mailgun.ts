@@ -117,7 +117,8 @@ function formRoute(path: string, build: Build): SendRoute {
     parse(req) {
       const body = formBody(req)
       const toList = addresses(body, 'to')
-      return rejectedFor(toList.map(looseAddress), () => {
+      const everyone = [...toList, ...addresses(body, 'cc'), ...addresses(body, 'bcc')]
+      return rejectedFor(everyone.map(looseAddress), () => {
         if (toList.length > 1000) throw error('Too many recipients. The maximum is 1000.')
         return build(req, body, toList)
       })

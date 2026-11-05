@@ -48,7 +48,7 @@ function addresses(value: string | null | undefined, kind: Recipient['kind'], fi
 
 function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
   if (!isRecord(body)) throw error(402, 'Received invalid JSON input.')
-  const to = [body.To, body.Cc, body.Bcc].flatMap((v) => (typeof v === 'string' ? looseAddresses(v) : []))
+  const to = rawTo(body)
   const result = emailSchema.safeParse(body)
   if (!result.success) throw error(300, `Invalid '${String(result.error.issues[0]?.path[0] ?? 'body')}' field.`, to)
   const data = result.data
@@ -106,9 +106,13 @@ function receipt(m: Message) {
   }
 }
 
+function rawTo(body: unknown): string[] {
+  return isRecord(body) ? [body.To, body.Cc, body.Bcc].flatMap((v) => (typeof v === 'string' ? looseAddresses(v) : [])) : []
+}
+
 function batchItems(list: unknown, templated: boolean): Array<NewMessage | SendError> {
   if (!Array.isArray(list)) throw error(402, 'Received invalid JSON input.')
-  if (list.length > 500) throw error(300, 'Batch requests are limited to 500 messages.')
+  if (list.length > 500) throw error(300, 'Batch requests are limited to 500 messages.', list.flatMap(rawTo))
   return list.map((item) => {
     try {
       return toMessage(item, templated, JSON.stringify(item))

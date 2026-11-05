@@ -10,6 +10,7 @@ import {
   keyPerItem,
   looseAddress,
   mailboxes,
+  rejectedFor,
   parseMailbox,
   stringHeaders,
   toAddresses,
@@ -18,8 +19,14 @@ import { SendError, type IncomingRequest, type Provider, type ProviderReply, typ
 
 const name = 'resend'
 
-function error(status: number, code: string, message: string, to: string[] = []): SendError {
-  return new SendError({ status, body: { statusCode: status, message, name: code } }, to.map(looseAddress), message)
+function error(status: number, code: string, message: string): SendError {
+  return new SendError({ status, body: { statusCode: status, message, name: code } }, [], message)
+}
+
+function rawRecipients(items: unknown[]): string[] {
+  return items
+    .flatMap((item) => (isRecord(item) ? [item.to, item.cc, item.bcc].flatMap((v) => addressList(v as string | string[] | undefined)) : []))
+    .map(looseAddress)
 }
 
 const addressField = z.union([z.string(), z.array(z.string()).max(50)])
@@ -62,9 +69,9 @@ const sendSchema = z
 
 type SendBody = z.infer<typeof sendSchema>
 
-function parseRecipients(values: string[], kind: Recipient['kind'], to: string[]): Recipient[] {
+function parseRecipients(values: string[], kind: Recipient['kind']): Recipient[] {
   return mailboxes(values, kind, () =>
-    error(422, 'validation_error', `Invalid \`${kind}\` field. The email address needs to follow the \`email@example.com\` or \`Name <email@example.com>\` format.`, to),
+    error(422, 'validation_error', `Invalid \`${kind}\` field. The email address needs to follow the \`email@example.com\` or \`Name <email@example.com>\` format.`),
   )
 }
 
@@ -74,25 +81,25 @@ function toMessage(body: unknown, req: IncomingRequest, raw: string): NewMessage
   if (!result.success) {
     const issue = result.error.issues[0]
     const field = issue?.path[0] ? String(issue.path[0]) : 'body'
-    throw error(422, 'validation_error', `Invalid \`${field}\` field.`, addressList((body as { to?: string | string[] }).to))
+    throw error(422, 'validation_error', `Invalid \`${field}\` field.`)
   }
   const data: SendBody = result.data
   const to = addressList(data.to)
   if (to.length === 0) throw error(422, 'validation_error', 'Missing `to` field.')
   const templated = !!data.template
-  if (!data.from && !templated) throw error(422, 'validation_error', 'Missing `from` field.', to)
-  if (!data.subject && !templated) throw error(422, 'validation_error', 'Missing `subject` field.', to)
+  if (!data.from && !templated) throw error(422, 'validation_error', 'Missing `from` field.')
+  if (!data.subject && !templated) throw error(422, 'validation_error', 'Missing `subject` field.')
   if (!data.html && !data.text && !templated && !('react' in body)) {
-    throw error(422, 'validation_error', 'Missing `html` or `text` field.', to)
+    throw error(422, 'validation_error', 'Missing `html` or `text` field.')
   }
   const from = data.from ? parseMailbox(data.from) : null
   if (data.from && !from) {
-    throw error(422, 'validation_error', 'Invalid `from` field. The email address needs to follow the `email@example.com` or `Name <email@example.com>` format.', to)
+    throw error(422, 'validation_error', 'Invalid `from` field. The email address needs to follow the `email@example.com` or `Name <email@example.com>` format.')
   }
   const recipients = [
-    ...parseRecipients(to, 'to', to),
-    ...parseRecipients(addressList(data.cc), 'cc', to),
-    ...parseRecipients(addressList(data.bcc), 'bcc', to),
+    ...parseRecipients(to, 'to'),
+    ...parseRecipients(addressList(data.cc), 'cc'),
+    ...parseRecipients(addressList(data.bcc), 'bcc'),
   ]
   const attachments = (data.attachments ?? []).map((a) =>
     attachmentFrom(
@@ -132,7 +139,7 @@ const send: SendRoute = {
   method: 'POST',
   path: '/emails',
   parse(req) {
-    return [toMessage(req.body, req, req.rawBody)]
+    return rejectedFor(rawRecipients([req.body]), () => [toMessage(req.body, req, req.rawBody)])
   },
   reply(messages) {
     return { status: 200, body: { id: messages[0]?.providerId } }
@@ -144,10 +151,13 @@ const batch: SendRoute = {
   method: 'POST',
   path: '/emails/batch',
   parse(req) {
-    if (!Array.isArray(req.body)) throw error(422, 'validation_error', 'Request body must be an array of emails.')
-    if (req.body.length === 0) throw error(422, 'validation_error', 'Request body must contain at least one email.')
-    if (req.body.length > 100) throw error(422, 'validation_error', 'Batch requests are limited to 100 emails.')
-    return keyPerItem(req.body.map((item) => toMessage(item, req, JSON.stringify(item))))
+    const items = req.body
+    if (!Array.isArray(items)) throw error(422, 'validation_error', 'Request body must be an array of emails.')
+    return rejectedFor(rawRecipients(items), () => {
+      if (items.length === 0) throw error(422, 'validation_error', 'Request body must contain at least one email.')
+      if (items.length > 100) throw error(422, 'validation_error', 'Batch requests are limited to 100 emails.')
+      return keyPerItem(items.map((item) => toMessage(item, req, JSON.stringify(item))))
+    })
   },
   reply(messages) {
     return { status: 200, body: { data: messages.map((m) => ({ id: m.providerId })) } }

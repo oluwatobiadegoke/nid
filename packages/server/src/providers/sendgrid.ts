@@ -151,7 +151,7 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
 function rawTo(body: Record<string, unknown>): string[] {
   const personalizations = Array.isArray(body.personalizations) ? body.personalizations : []
   return personalizations
-    .flatMap((p) => (isRecord(p) && Array.isArray(p.to) ? p.to : []))
+    .flatMap((p) => (isRecord(p) ? [p.to, p.cc, p.bcc].flatMap((list) => (Array.isArray(list) ? list : [])) : []))
     .flatMap((a) => (isRecord(a) && typeof a.email === 'string' ? [looseAddress(a.email)] : []))
 }
 

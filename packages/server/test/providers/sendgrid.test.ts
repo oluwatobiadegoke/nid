@@ -85,9 +85,10 @@ test('bad sends fail with SendGrid-shaped 400 errors and show up as rejections',
   const server = await createServer()
   t.after(() => server.close())
   const content = [{ type: 'text/plain', value: 'Hi' }]
-  const noFrom = await send(server, { personalizations: [{ to: [{ email: 'x@inbox.test' }] }], subject: 'Hi', content })
+  const noFrom = await send(server, { personalizations: [{ to: [{ email: 'x@inbox.test' }], bcc: [{ email: 'audit@acme.com' }] }], subject: 'Hi', content })
   assert.equal(noFrom.status, 400)
   assert.equal(noFrom.body.errors[0].field, 'from.email')
+  assert.equal((await server.store.listRejections('default', { to: 'audit@acme.com' })).length, 1)
   const noTo = await send(server, { personalizations: [{}], from: { email: 'a@acme.com' }, subject: 'Hi', content })
   assert.equal(noTo.body.errors[0].field, 'personalizations.0.to')
   const badTo = await send(server, { personalizations: [{ to: [{ email: 'nope' }] }], from: { email: 'a@acme.com' }, subject: 'Hi', content })
