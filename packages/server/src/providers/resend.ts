@@ -7,8 +7,8 @@ import {
   bearer,
   header,
   isRecord,
+  mailboxes,
   parseMailbox,
-  recipientsFrom,
   stringHeaders,
   toAddresses,
 } from './shared.js'
@@ -61,12 +61,9 @@ const sendSchema = z
 type SendBody = z.infer<typeof sendSchema>
 
 function parseRecipients(values: string[], kind: Recipient['kind'], to: string[]): Recipient[] {
-  const parsed = values.map((v) => {
-    const mailbox = parseMailbox(v)
-    if (!mailbox) throw error(422, 'validation_error', `Invalid \`${kind}\` field. The email address needs to follow the \`email@example.com\` or \`Name <email@example.com>\` format.`, to)
-    return mailbox
-  })
-  return recipientsFrom(parsed, kind)
+  return mailboxes(values, kind, () =>
+    error(422, 'validation_error', `Invalid \`${kind}\` field. The email address needs to follow the \`email@example.com\` or \`Name <email@example.com>\` format.`, to),
+  )
 }
 
 function toMessage(body: unknown, req: IncomingRequest, raw: string): NewMessage {

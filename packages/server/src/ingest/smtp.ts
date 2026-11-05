@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net'
 import { SMTPServer, type SMTPServerSession } from 'smtp-server'
 import type { NewMessage, Project } from '../types.js'
-import { fromMime } from './mime.js'
+import { fromMime } from '../providers/mime.js'
 import type { Ingest } from './types.js'
 
 export interface SmtpOptions {

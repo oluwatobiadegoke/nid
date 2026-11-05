@@ -1,6 +1,6 @@
 import { simpleParser, type AddressObject } from 'mailparser'
-import { normalizeAddress } from '../providers/shared.js'
 import type { Attachment, NewMessage, Recipient } from '../types.js'
+import { formatMailbox, normalizeAddress } from './shared.js'
 
 function addresses(value: AddressObject | AddressObject[] | undefined): string[] {
   const list = Array.isArray(value) ? value : value ? [value] : []
@@ -10,7 +10,7 @@ function addresses(value: AddressObject | AddressObject[] | undefined): string[]
 function formatFrom(value: AddressObject | undefined): string {
   const first = value?.value[0]
   if (!first?.address) return ''
-  return first.name ? `${first.name} <${normalizeAddress(first.address)}>` : normalizeAddress(first.address)
+  return formatMailbox(first.address, first.name)
 }
 
 export async function fromMime(raw: Buffer, rcptTo: string[], provider: string): Promise<NewMessage> {

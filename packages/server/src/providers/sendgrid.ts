@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, bearer, isRecord, normalizeAddress, parseMailbox, recipientsFrom, stringHeaders } from './shared.js'
+import { attachmentFrom, bearer, formatMailbox, isRecord, normalizeAddress, parseMailbox, recipientsFrom, stringHeaders } from './shared.js'
 import { SendError, type Provider, type SendRoute } from './types.js'
 
 const name = 'sendgrid'
@@ -87,9 +87,6 @@ function substitute(value: string | null | undefined, substitutions: Record<stri
   return out
 }
 
-function formatAddress(a: { email: string; name?: string | null | undefined }): string {
-  return a.name ? `${a.name} <${normalizeAddress(a.email)}>` : normalizeAddress(a.email)
-}
 
 function build(data: SendBody, p: Personalization, i: number, id: string, raw: string): NewMessage {
   const field = `personalizations.${i}`
@@ -135,7 +132,7 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   return {
     provider: name,
     providerId: `${id}.${i}`,
-    from: formatAddress(from),
+    from: formatMailbox(from.email, from.name),
     replyTo: replyTo.map((a) => normalizeAddress(a.email)),
     recipients: list,
     subject: substitute(subject, p.substitutions) ?? '',

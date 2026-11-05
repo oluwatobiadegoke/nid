@@ -73,40 +73,32 @@ async function handleSend(
   ingest: Ingest,
   store: Store,
 ) {
+  const reject = (err: SendError) =>
+    ingest.reject(project, { provider: provider.name, to: err.to, status: err.reply.status, error: err.message, raw: req.rawBody })
   let parsed
   try {
     parsed = await route.parse(req)
   } catch (err) {
     if (err instanceof SendError) {
-      await ingest.reject(project, {
-        provider: provider.name,
-        to: err.to,
-        status: err.reply.status,
-        error: err.message,
-        raw: req.rawBody,
-      })
+      await reject(err)
       return send(c, err.reply)
     }
     throw err
   }
-  const stored: Message[] = []
-  const failed = new Map<number, SendError>()
-  for (const [i, message] of parsed.entries()) {
+  const outcomes: Array<Message | SendError> = []
+  for (const message of parsed) {
     if (message instanceof SendError) {
-      await ingest.reject(project, { provider: provider.name, to: message.to, status: message.reply.status, error: message.message, raw: req.rawBody })
-      failed.set(i, message)
+      await reject(message)
+      outcomes.push(message)
       continue
     }
-    if (message.idempotencyKey) {
-      const existing = await store.findByIdempotencyKey(project.projectId, provider.name, message.idempotencyKey)
-      if (existing) {
-        stored.push(existing)
-        continue
-      }
-    }
-    stored.push(await ingest.accept(project, message))
+    const existing = message.idempotencyKey
+      ? await store.findByIdempotencyKey(project.projectId, provider.name, message.idempotencyKey)
+      : null
+    outcomes.push(existing ?? (await ingest.accept(project, message)))
   }
-  return send(c, route.reply(stored, req, failed))
+  const stored = outcomes.filter((o): o is Message => !(o instanceof SendError))
+  return send(c, route.reply(stored, req, outcomes))
 }
 
 async function handleRead(c: Context, route: ReadRoute, req: IncomingRequest, project: Project, store: Store) {

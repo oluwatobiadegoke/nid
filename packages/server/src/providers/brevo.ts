@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, header, isRecord, normalizeAddress, recipientsFrom, stringHeaders, timestampId } from './shared.js'
+import { attachmentFrom, formatMailbox, header, isRecord, normalizeAddress, recipientsFrom, stringHeaders, timestampId } from './shared.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
 const name = 'brevo'
@@ -83,11 +83,7 @@ function build(data: SendBody, version: Version | null, req: IncomingRequest, ra
       throw error(400, 'missing_parameter', 'htmlContent or textContent is missing', to)
     }
   }
-  const from = data.sender?.email
-    ? data.sender.name
-      ? `${data.sender.name} <${normalizeAddress(data.sender.email)}>`
-      : normalizeAddress(data.sender.email)
-    : ''
+  const from = data.sender?.email ? formatMailbox(data.sender.email, data.sender.name) : ''
   const meta: Record<string, unknown> = {}
   if (templated) {
     meta.templateId = data.templateId

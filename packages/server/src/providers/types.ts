@@ -35,7 +35,7 @@ export interface SendRoute {
   method: 'POST'
   path: string
   parse(req: IncomingRequest): Array<NewMessage | SendError> | Promise<Array<NewMessage | SendError>>
-  reply(messages: Message[], req: IncomingRequest, failed: Map<number, SendError>): ProviderReply
+  reply(messages: Message[], req: IncomingRequest, outcomes: Array<Message | SendError>): ProviderReply
 }
 
 export interface ReadContext {

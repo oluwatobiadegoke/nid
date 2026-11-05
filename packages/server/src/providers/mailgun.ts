@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
-import { fromMime } from '../ingest/mime.js'
 import type { Attachment, Message, NewMessage, Recipient } from '../types.js'
-import { basic, isRecord, parseMailbox, recipientsFrom, splitAddresses, timestampId } from './shared.js'
+import { basic, isRecord, looseAddresses, mailboxes, parseMailbox, splitAddresses, timestampId } from './shared.js'
+import { fromMime } from './mime.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
 const name = 'mailgun'
@@ -31,12 +31,7 @@ function addresses(body: Record<string, Field>, key: string): string[] {
 }
 
 function recipients(list: string[], kind: Recipient['kind'], to: string[]): Recipient[] {
-  const parsed = list.map((v) => {
-    const mailbox = parseMailbox(v)
-    if (!mailbox) throw error(400, `${kind} parameter is not a valid address. please check documentation`, to)
-    return mailbox
-  })
-  return recipientsFrom(parsed, kind)
+  return mailboxes(list, kind, () => error(400, `${kind} parameter is not a valid address. please check documentation`, to))
 }
 
 function jsonObject(value: string | null, field: string, to: string[]): Record<string, unknown> | null {
@@ -93,14 +88,13 @@ function options(body: Record<string, Field>, domain: string, to: string[]) {
   if (deliveryTime) meta.scheduledAt = deliveryTime
   if (/^(yes|true)$/i.test(text(body, 'o:testmode') ?? '')) meta.sandbox = true
   const variables = jsonObject(headerValue(headers, 'x-mailgun-variables'), 'h:X-Mailgun-Variables', to)
-  return { headers, meta, custom, variables, providerId: `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>` }
+  return { headers, meta, custom, variables }
 }
 
-function toAddressesOf(body: Record<string, Field>) {
-  const list = addresses(body, 'to')
-  const to = list.map((v) => parseMailbox(v)?.address ?? v)
-  return { list, to }
+function messageId(domain: string): string {
+  return `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>`
 }
+
 
 function substituteValues<T>(record: Record<string, T>, vars: Record<string, unknown>): Record<string, T> {
   return Object.fromEntries(Object.entries(record).map(([k, v]) => [k, typeof v === 'string' ? substitute(v, vars) : v])) as Record<string, T>
@@ -120,7 +114,8 @@ const send: SendRoute = {
   path: '/v3/:domain/messages',
   async parse(req) {
     const body = formBody(req)
-    const { list: toList, to } = toAddressesOf(body)
+    const toList = addresses(body, 'to')
+    const to = toList.flatMap(looseAddresses)
     const from = text(body, 'from')
     if (!from) throw error(400, "'from' parameter is missing", to)
     if (!parseMailbox(from)) throw error(400, 'from parameter is not a valid address. please check documentation', to)
@@ -130,7 +125,9 @@ const send: SendRoute = {
     const plain = text(body, 'text')
     if (!html && !plain && !template) throw error(400, "Need at least one of 'text', 'html' or 'template' parameters specified", to)
 
-    const { headers, meta, custom, variables, providerId } = options(body, req.params.domain ?? '', to)
+    const domain = req.params.domain ?? ''
+    const { headers, meta, custom, variables } = options(body, domain, to)
+    const providerId = messageId(domain)
     const templateVariables = jsonObject(text(body, 't:variables'), 't:variables', to)
     if (template) {
       meta.templateId = template
@@ -140,7 +137,7 @@ const send: SendRoute = {
     const cc = recipients(addresses(body, 'cc'), 'cc', to)
     const bcc = recipients(addresses(body, 'bcc'), 'bcc', to)
     const attachments = [...(await files(body, 'attachment', false)), ...(await files(body, 'inline', true))]
-    const replyTo = splitAddresses(headerValue(headers, 'reply-to') ?? '').map((v) => parseMailbox(v)?.address ?? v)
+    const replyTo = looseAddresses(headerValue(headers, 'reply-to'))
 
     const message = (toRecipients: Recipient[], vars: Record<string, unknown>): NewMessage => ({
       provider: name,
@@ -161,7 +158,7 @@ const send: SendRoute = {
     const toRecipients = recipients(toList, 'to', to)
     if (!perRecipient) return [message(toRecipients, {})]
     return toRecipients.map((r) => {
-      const vars = perRecipient[r.address] ?? Object.entries(perRecipient).find(([k]) => k.toLowerCase() === r.address)?.[1]
+      const vars = Object.entries(perRecipient).find(([k]) => k.toLowerCase() === r.address)?.[1]
       return message([r], isRecord(vars) ? vars : {})
     })
   },
@@ -174,16 +171,18 @@ const mime: SendRoute = {
   path: '/v3/:domain/messages.mime',
   async parse(req) {
     const body = formBody(req)
-    const { list: toList, to } = toAddressesOf(body)
+    const toList = addresses(body, 'to')
+    const to = toList.flatMap(looseAddresses)
     if (to.length === 0) throw error(400, "'to' parameter is missing", to)
     recipients(toList, 'to', to)
     const raw = values(body, 'message')[0]
     if (raw === undefined) throw error(400, "'message' parameter is missing", to)
     const content = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(await raw.arrayBuffer())
     const message = await fromMime(content, to, name)
-    const { headers, meta, variables, providerId } = options(body, req.params.domain ?? '', to)
+    const domain = req.params.domain ?? ''
+    const { headers, meta, variables } = options(body, domain, to)
     if (variables) meta.variables = variables
-    return [{ ...message, providerId, headers: { ...message.headers, ...headers }, meta }]
+    return [{ ...message, providerId: messageId(domain), headers: { ...message.headers, ...headers }, meta }]
   },
   reply,
 }

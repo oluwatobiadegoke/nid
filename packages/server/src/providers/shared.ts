@@ -34,6 +34,25 @@ export function parseMailbox(value: string): { address: string; name: string | n
   return { address: normalizeAddress(address), name }
 }
 
+export function formatMailbox(address: string, name: string | null | undefined): string {
+  return name ? `${name} <${normalizeAddress(address)}>` : normalizeAddress(address)
+}
+
+export function mailboxes(values: string[], kind: RecipientKind, invalid: (value: string) => Error): Recipient[] {
+  return recipientsFrom(
+    values.map((v) => {
+      const mailbox = parseMailbox(v)
+      if (!mailbox) throw invalid(v)
+      return mailbox
+    }),
+    kind,
+  )
+}
+
+export function looseAddresses(value: string | null | undefined): string[] {
+  return splitAddresses(value ?? '').map((v) => parseMailbox(v)?.address ?? v)
+}
+
 export function recipientsFrom(
   values: Array<{ address: string; name?: string | null | undefined }>,
   kind: RecipientKind,

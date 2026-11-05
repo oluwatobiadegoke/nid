@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { Message, NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, header, isRecord, parseMailbox, recipientsFrom, splitAddresses } from './shared.js'
-import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
+import { attachmentFrom, header, isRecord, looseAddresses, mailboxes, parseMailbox, splitAddresses, toAddresses } from './shared.js'
+import { SendError, type Provider, type SendRoute } from './types.js'
 
 const name = 'postmark'
 
@@ -41,17 +41,13 @@ const emailSchema = z
   .passthrough()
 
 function addresses(value: string | null | undefined, kind: Recipient['kind'], to: string[]): Recipient[] {
-  const parsed = splitAddresses(value ?? '').map((v) => {
-    const mailbox = parseMailbox(v)
-    if (!mailbox) {
-      throw error(300, `Error parsing '${kind[0]!.toUpperCase()}${kind.slice(1)}': Illegal email address '${v}'. It must contain the '@' symbol.`, to)
-    }
-    return mailbox
-  })
-  return recipientsFrom(parsed, kind)
+  const field = `${kind[0]!.toUpperCase()}${kind.slice(1)}`
+  return mailboxes(splitAddresses(value ?? ''), kind, (v) =>
+    error(300, `Error parsing '${field}': Illegal email address '${v}'. It must contain the '@' symbol.`, to),
+  )
 }
 
-function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw: string): NewMessage {
+function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
   if (!isRecord(body)) throw error(402, 'Received invalid JSON input.')
   const result = emailSchema.safeParse(body)
   if (!result.success) {
@@ -59,7 +55,7 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
     throw error(300, `Invalid '${field}' field.`)
   }
   const data = result.data
-  const to = [data.To, data.Cc, data.Bcc].flatMap((v) => splitAddresses(v ?? '')).map((v) => parseMailbox(v)?.address ?? v)
+  const to = [data.To, data.Cc, data.Bcc].flatMap(looseAddresses)
   if (to.length === 0) throw error(300, 'Zero recipients specified', to)
   if (!data.From || !parseMailbox(data.From)) {
     throw error(300, `Error parsing 'From': Illegal email address '${data.From ?? ''}'. It must contain the '@' symbol.`, to)
@@ -83,7 +79,7 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
     provider: name,
     providerId: randomUUID(),
     from: data.From,
-    replyTo: splitAddresses(data.ReplyTo ?? '').map((v) => parseMailbox(v)?.address ?? v),
+    replyTo: looseAddresses(data.ReplyTo),
     recipients,
     subject: data.Subject ?? '',
     text: data.TextBody ?? null,
@@ -94,12 +90,12 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
     ),
     raw,
     meta,
-    idempotencyKey: header(req, 'idempotency-key'),
+    idempotencyKey: null,
   }
 }
 
 function receipt(m: Message) {
-  const to = m.recipients.filter((r) => r.kind === 'to').map((r) => r.address)
+  const to = toAddresses(m.recipients, 'to')
   return {
     ...(to.length > 0 ? { To: to.join(', ') } : {}),
     SubmittedAt: m.createdAt,
@@ -109,14 +105,12 @@ function receipt(m: Message) {
   }
 }
 
-function batchItems(req: IncomingRequest, list: unknown, templated: boolean): Array<NewMessage | SendError> {
+function batchItems(list: unknown, templated: boolean): Array<NewMessage | SendError> {
   if (!Array.isArray(list)) throw error(402, 'Received invalid JSON input.')
   if (list.length > 500) throw error(300, 'Batch requests are limited to 500 messages.')
-  return list.map((item, i) => {
+  return list.map((item) => {
     try {
-      const message = toMessage(item, templated, req, JSON.stringify(item))
-      message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
-      return message
+      return toMessage(item, templated, JSON.stringify(item))
     } catch (err) {
       if (err instanceof SendError) return err
       throw err
@@ -128,7 +122,7 @@ const single = (path: string, templated: boolean): SendRoute => ({
   kind: 'send',
   method: 'POST',
   path,
-  parse: (req) => [toMessage(req.body, templated, req, req.rawBody)],
+  parse: (req) => [toMessage(req.body, templated, req.rawBody)],
   reply: (messages) => ({ status: 200, body: receipt(messages[0]!) }),
 })
 
@@ -136,12 +130,11 @@ const batch = (path: string, templated: boolean): SendRoute => ({
   kind: 'send',
   method: 'POST',
   path,
-  parse: (req) => batchItems(req, templated && isRecord(req.body) ? req.body.Messages : req.body, templated),
-  reply(messages, _req, failed) {
-    const sent = messages.values()
-    const total = messages.length + failed.size
-    return { status: 200, body: Array.from({ length: total }, (_, i) => failed.get(i)?.reply.body ?? receipt(sent.next().value!)) }
-  },
+  parse: (req) => batchItems(templated && isRecord(req.body) ? req.body.Messages : req.body, templated),
+  reply: (_messages, _req, outcomes) => ({
+    status: 200,
+    body: outcomes.map((o) => (o instanceof SendError ? o.reply.body : receipt(o))),
+  }),
 })
 
 export const postmark: Provider = {
