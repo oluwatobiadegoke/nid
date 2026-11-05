@@ -13,9 +13,10 @@ Usage:
   nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
+  nid mcp
   nid healthcheck
 
-Options for read, clear and healthcheck:
+Options for read, clear, mcp and healthcheck:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
@@ -164,6 +165,22 @@ async function clear(args: string[]) {
   process.stdout.write(`Deleted ${body.deleted ?? 0} message${body.deleted === 1 ? '' : 's'}\n`)
 }
 
+async function mcp(args: string[]) {
+  const { values } = parseArgs({ args, options: { url: { type: 'string' } } })
+  const url = baseUrl(values.url)
+  const [{ serveStdio }, { createMcpServer }] = await Promise.all([
+    import('@modelcontextprotocol/server/stdio'),
+    import('./mcp/tools.js'),
+  ])
+  serveStdio(() =>
+    createMcpServer((path, init) => {
+      const headers = new Headers(init?.headers)
+      if (process.env.NID_TOKEN) headers.set('authorization', `Bearer ${process.env.NID_TOKEN}`)
+      return fetch(`${url}${path}`, { ...init, headers })
+    }),
+  )
+}
+
 async function healthcheck(args: string[]) {
   const { values } = parseArgs({ args, options: { url: { type: 'string' } } })
   const response = await api(baseUrl(values.url), '/healthz')
@@ -183,6 +200,9 @@ switch (command) {
     break
   case 'clear':
     await clear(rest)
+    break
+  case 'mcp':
+    await mcp(rest)
     break
   case 'healthcheck':
     await healthcheck(rest)

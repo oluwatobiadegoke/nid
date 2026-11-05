@@ -21,6 +21,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 - [Point your app at nid](how-to/connect-your-app.md) when it sends with Resend, Brevo or SMTP.
 - [Read mail in tests](how-to/read-mail-in-tests.md), with Playwright or any other test runner.
 - [Use the command line](how-to/use-the-cli.md) to read and clear mail from a terminal.
+- [Let an AI agent read your mail](how-to/connect-an-ai-agent.md) over MCP.
 - [Embed nid in your own code](how-to/embed-nid.md) instead of running it as a command.
 
 ## Look something up
@@ -29,6 +30,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 - [Configuration](reference/configuration.md): environment variables and `createServer` options.
 - [Read API](reference/read-api.md): every HTTP route for reading mail.
 - [Client library](reference/client.md): every method of `@nid-inbox/client`.
+- [MCP](reference/mcp.md): every tool nid gives AI agents.
 - [Providers](reference/providers.md): what nid supports for each email provider.
 
 ## Understand how it works
@@ -47,6 +49,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 | Read API | nid's own HTTP routes under `/api`, for reading the mail it holds. |
 | Client library | `@nid-inbox/client`, nid's JavaScript wrapper over the read API. |
 | Cursor | A message id. "After the cursor" means "newer than that message". |
+| MCP | The Model Context Protocol, which AI agents use to call tools. nid's tools read mail. |
 | Rejection | A send that nid refused, kept with the error it returned. |
 
 ## Keeping these docs current

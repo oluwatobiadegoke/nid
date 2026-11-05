@@ -13,6 +13,7 @@ Run it with `npx nid-inbox <command>` when nid is not installed in your project,
 | [`serve`](#nid-serve) | Starts the server. |
 | [`read`](#nid-read) | Lists or prints mail for an address. |
 | [`clear`](#nid-clear) | Deletes mail. |
+| [`mcp`](#nid-mcp) | Serves nid's MCP tools over stdio, for AI agents. |
 | [`healthcheck`](#nid-healthcheck) | Checks that a server is answering. |
 | `help`, `--help`, `-h`, or no command | Prints usage. |
 | `--version`, `-v` | Prints the version. |
@@ -65,6 +66,16 @@ nid clear [<address>] [--url <url>]
 
 With an address, it deletes mail for that address only. Without one, it deletes every message.
 
+## nid mcp
+
+Serves nid's MCP tools over standard input and output, for an AI agent that starts nid as a command. It reads mail from a running server, so start `nid serve` first. See [Let an AI agent read your mail](../how-to/connect-an-ai-agent.md).
+
+```
+nid mcp [--url <url>]
+```
+
+It runs until the agent closes its input. The tools are listed in the [MCP reference](mcp.md).
+
 ## nid healthcheck
 
 Calls `GET /healthz` on a running server and prints `ok <version>`.
@@ -77,7 +88,7 @@ The Docker image uses this command for its health check.
 
 ## Choosing the server
 
-`read`, `clear` and `healthcheck` talk to the server at, in order:
+`read`, `clear`, `mcp` and `healthcheck` talk to the server at, in order:
 
 1. The `--url` option.
 2. The `NID_URL` environment variable.

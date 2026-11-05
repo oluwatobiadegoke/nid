@@ -51,6 +51,7 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 - Takes SMTP on port 1025 for everything else.
 - Shows the sends it refused, with the error your app got, so you can see why an email never arrived.
 - Lets tests and scripts read the same mail, and wait for the next email without polling.
+- Lets AI agents such as Claude Code sign up with a fresh address and read the sign-in code, over MCP.
 - Treats every address as an inbox. There is no "create inbox" step.
 - Keeps mail in memory by default. `--db mail.sqlite` keeps it across restarts.
 
