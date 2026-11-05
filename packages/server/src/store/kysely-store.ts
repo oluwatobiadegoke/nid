@@ -235,8 +235,7 @@ export class KyselyStore implements Store {
     if (query.since) q = q.where('created_at', '>=', query.since)
     const address = query.to?.trim().toLowerCase()
     if (address) {
-      const pattern = `%${JSON.stringify(address).replace(/[\\%_]/g, '\\$&')}%`
-      q = q.where(sql<boolean>`to_addresses like ${pattern} escape ${'\\'}`)
+      q = q.where(sql<boolean>`exists (select 1 from json_each(rejections.to_addresses) where lower(value) = ${address})`)
     }
     const limit = Math.min(query.limit ?? defaultLimit, maxLimit)
     const rows = await q.orderBy('id', 'desc').limit(limit).execute()
