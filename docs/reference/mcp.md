@@ -7,7 +7,7 @@ nid serves the same MCP tools in two ways:
 | Streamable HTTP | `http://127.0.0.1:4400/mcp` | Your agent can connect to a URL. |
 | stdio | [`nid mcp`](cli.md#nid-mcp) | Your agent can only start a command. |
 
-Both read mail through the [read API](read-api.md), so they see the same mail and give the same answers. Over HTTP, nid passes the request's `Authorization` header on to the read API. `nid mcp` sends `NID_TOKEN` when it is set.
+Both read mail through the [read API](read-api.md), so they see the same mail and give the same answers. Over HTTP, nid passes the request's `Authorization` header on to the read API. `nid mcp` sends `NID_TOKEN` as `Authorization: Bearer <token>` when it is set.
 
 `/mcp` refuses a request whose `Origin` header names a host nid does not accept, so a web page on another site cannot call it. See [Security](../explanation/security.md).
 
@@ -33,8 +33,10 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 | `subject` | Only email whose subject contains this text. |
 | `has_code` | `true` skips email with no code. |
 | `code_pattern` | A regular expression for the code. Its first group becomes `code`. |
-| `timeout` | Seconds to wait, from 0 to 120. The default is 30. |
+| `timeout` | Seconds to wait, from 0 to 55. The default is 30. Many MCP clients give up on a tool call after 60 seconds, so to wait longer, call the tool again with the same `after`. |
 
 `text` is the email's text part. When the email has only HTML, `text` is the HTML with its tags removed.
 
-Every tool except `clear` is marked read-only, so an agent can run them without asking you first. `clear` is marked destructive.
+Every tool except `clear` is marked read-only, and `clear` is marked destructive. An agent may still ask you before each call. In Claude Code, add `mcp__nid` to `permissions.allow` in its settings to let it call nid's tools without asking.
+
+When an agent cancels a wait, `nid mcp` stops it at once. Over HTTP, nid keeps waiting until the timeout, because each request stands alone.

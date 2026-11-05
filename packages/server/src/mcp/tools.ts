@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { McpServer, type CallToolResult } from '@modelcontextprotocol/server'
+import { McpServer, type CallToolResult, type ServerContext } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import type { SerializedMessage } from '../api/serialize.js'
 import { htmlToText } from '../extract/index.js'
@@ -36,35 +36,43 @@ function queryString(params: Record<string, string | number | boolean | undefine
 
 class ApiError extends Error {}
 
-async function call<T>(api: ApiFetch, path: string, init?: RequestInit): Promise<{ status: number; body: T }> {
+type Call = <T>(path: string, init?: RequestInit) => Promise<T>
+
+const wrongUrl = "Check that nid's URL is its address, such as http://127.0.0.1:4400, without /mcp."
+
+async function request<T>(api: ApiFetch, path: string, init: RequestInit): Promise<T> {
   let response: Response
   try {
     response = await api(path, init)
   } catch (err) {
+    if (init.signal?.aborted) throw err
     throw new ApiError(`Could not reach nid: ${(err as Error).message}. Is nid serve running?`)
   }
-  const body = (await response.json()) as T & { error?: string; details?: string[] }
-  if (!response.ok && response.status !== 404) {
-    throw new ApiError([body.error ?? `nid answered ${response.status}`, ...(body.details ?? [])].join('. '))
-  }
-  return { status: response.status, body }
+  const body = (await response.json().catch(() => null)) as (T & { error?: string; details?: string[]; timedOut?: boolean }) | null
+  if (!body) throw new ApiError(`The server answered ${response.status} and not like nid. ${wrongUrl}`)
+  if (response.ok || body.timedOut) return body
+  const hint = response.status === 404 ? [wrongUrl] : []
+  throw new ApiError([body.error ?? `nid answered ${response.status}`, ...(body.details ?? []), ...hint].join('. '))
 }
 
-async function latest(api: ApiFetch, to: string, hasCode?: boolean): Promise<SerializedMessage | undefined> {
-  const { body } = await call<{ messages: SerializedMessage[] }>(api, `/api/messages${queryString({ to, has_code: hasCode, limit: 1 })}`)
-  return body.messages[0]
-}
-
-function guarded<A>(handler: (args: A) => Promise<CallToolResult>) {
-  return async (args: A) => {
+function guarded<A>(api: ApiFetch, handler: (args: A, call: Call) => Promise<CallToolResult>) {
+  return async (args: A, ctx: ServerContext) => {
+    const call: Call = (path, init) => request(api, path, { ...init, signal: ctx.mcpReq.signal })
     try {
-      return await handler(args)
+      return await handler(args, call)
     } catch (err) {
       if (err instanceof ApiError) return problem(err.message)
       throw err
     }
   }
 }
+
+async function latest(call: Call, to: string, hasCode?: boolean): Promise<SerializedMessage | undefined> {
+  const body = await call<{ messages: SerializedMessage[] }>(`/api/messages${queryString({ to, has_code: hasCode, limit: 1 })}`)
+  return body.messages[0]
+}
+
+const maxWaitSeconds = 55
 
 const readOnly = { readOnlyHint: true }
 
@@ -80,9 +88,9 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ prefix: z.string().optional().describe('A word to start the address with, such as signup') }),
       annotations: readOnly,
     },
-    guarded(async ({ prefix }) => {
+    guarded(api, async ({ prefix }, call) => {
       const tag = (prefix ?? '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'test'
-      const { body } = await call<{ cursor: number }>(api, '/api/cursor')
+      const body = await call<{ cursor: number }>('/api/cursor')
       return reply({ address: `${tag}.${randomBytes(4).toString('hex')}@inbox.test`, cursor: body.cursor })
     }),
   )
@@ -98,14 +106,14 @@ export function createMcpServer(api: ApiFetch): McpServer {
         subject: z.string().optional().describe('Only return email whose subject contains this'),
         has_code: z.boolean().optional().describe('Skip email that has no code'),
         code_pattern: z.string().optional().describe('A regular expression for the code, when nid guesses it wrong. Its first group is returned'),
-        timeout: z.number().min(0).max(120).optional().describe('Seconds to wait. Default 30'),
+        timeout: z.number().min(0).max(maxWaitSeconds).optional().describe(`Seconds to wait, up to ${maxWaitSeconds}. Default 30. Call again to keep waiting`),
       }),
       annotations: readOnly,
     },
-    guarded(async ({ to, after, subject, has_code, code_pattern, timeout }) => {
+    guarded(api, async ({ to, after, subject, has_code, code_pattern, timeout }, call) => {
       const query = queryString({ to, after, subject, has_code, code_pattern, timeout })
-      const { status, body } = await call<{ message?: SerializedMessage; error?: string }>(api, `/api/wait${query}`)
-      if (status === 404 || !body.message) return problem(body.error ?? `No email arrived for ${to}`)
+      const body = await call<{ message?: SerializedMessage; error?: string }>(`/api/wait${query}`)
+      if (!body.message) return problem(body.error ?? `No email arrived for ${to}`)
       return reply(detail(body.message))
     }),
   )
@@ -117,8 +125,8 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address }),
       annotations: readOnly,
     },
-    guarded(async ({ to }) => {
-      const message = await latest(api, to, true)
+    guarded(api, async ({ to }, call) => {
+      const message = await latest(call, to, true)
       if (!message) return problem(`No email with a code has arrived for ${to}. Call wait_for_email to wait for one.`)
       return reply({ code: message.extracted.code, id: message.id, subject: message.subject })
     }),
@@ -131,8 +139,8 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address }),
       annotations: readOnly,
     },
-    guarded(async ({ to }) => {
-      const message = await latest(api, to)
+    guarded(api, async ({ to }, call) => {
+      const message = await latest(call, to)
       if (!message) return problem(`No email has arrived for ${to}. Call wait_for_email to wait for one.`)
       return reply({ link: message.extracted.link, links: message.extracted.links, id: message.id, subject: message.subject })
     }),
@@ -148,8 +156,8 @@ export function createMcpServer(api: ApiFetch): McpServer {
       }),
       annotations: readOnly,
     },
-    guarded(async ({ to, limit }) => {
-      const { body } = await call<{ messages: SerializedMessage[] }>(api, `/api/messages${queryString({ to, limit: limit ?? 20 })}`)
+    guarded(api, async ({ to, limit }, call) => {
+      const body = await call<{ messages: SerializedMessage[] }>(`/api/messages${queryString({ to, limit: limit ?? 20 })}`)
       return reply(body.messages.map(summary))
     }),
   )
@@ -161,8 +169,8 @@ export function createMcpServer(api: ApiFetch): McpServer {
       inputSchema: z.object({ to: address.optional() }),
       annotations: { destructiveHint: true, idempotentHint: true },
     },
-    guarded(async ({ to }) => {
-      const { body } = await call<{ deleted: number }>(api, `/api/messages${queryString({ to })}`, { method: 'DELETE' })
+    guarded(api, async ({ to }, call) => {
+      const body = await call<{ deleted: number }>(`/api/messages${queryString({ to })}`, { method: 'DELETE' })
       return reply({ deleted: body.deleted })
     }),
   )

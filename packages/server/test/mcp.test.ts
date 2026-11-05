@@ -3,19 +3,21 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
+import type { AuthHook } from '../src/index.js'
 import { sendResend, sleep, start, type Running } from './helpers.js'
 
 const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url))
 
-async function connectHttp(running: Running): Promise<Client> {
+async function connectHttp(running: Running, headers: Record<string, string> = {}): Promise<Client> {
   const client = new Client({ name: 'agent', version: '1.0.0' })
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${running.url}/mcp`)))
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${running.url}/mcp`), { requestInit: { headers } }))
   return client
 }
 
-async function connectStdio(url: string): Promise<Client> {
+async function connectStdio(url: string, env: Record<string, string> = {}): Promise<Client> {
   const client = new Client({ name: 'agent', version: '1.0.0' })
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: ['--import', 'tsx', cli, 'mcp', '--url', url] }))
+  const args = ['--import', 'tsx', cli, 'mcp', '--url', url]
+  await client.connect(new StdioClientTransport({ command: process.execPath, args, env: { ...process.env, ...env } as Record<string, string> }))
   return client
 }
 
@@ -113,4 +115,61 @@ test('nid mcp says so when no server is running', async (t) => {
   const result = await call(client, 'list_messages')
   assert.equal(result.isError, true)
   assert.match(result.text, /Could not reach nid: .*Is nid serve running\?/)
+})
+
+test('each agent token reads only its own project, over HTTP and stdio', async (t) => {
+  const auth: AuthHook = ({ value }) => (value === 'team-a' ? { projectId: 'a', plan: 'local' } : value === 'team-b' ? { projectId: 'b', plan: 'local' } : null)
+  const running = await start({ auth })
+  const teamA = await connectHttp(running, { authorization: 'Bearer team-a' })
+  const teamB = await connectStdio(running.url, { NID_TOKEN: 'team-b' })
+  const nobody = await connectHttp(running)
+  t.after(async () => {
+    await Promise.all([teamA.close(), teamB.close(), nobody.close()])
+    await running.close()
+  })
+  await sendResend(running.server, signInEmail('shared@inbox.test', '424242'), { authorization: 'Bearer team-a', 'content-type': 'application/json' })
+  assert.equal((await call(teamA, 'get_code', { to: 'shared@inbox.test' })).value.code, '424242')
+  assert.equal((await call(teamB, 'get_code', { to: 'shared@inbox.test' })).isError, true)
+  const refused = await call(nobody, 'list_messages')
+  assert.equal(refused.isError, true)
+  assert.match(refused.text, /Invalid or missing token/)
+})
+
+test('an agent that gives up on a wait stops nid polling for it', async (t) => {
+  const running = await start()
+  const client = await connectStdio(running.url)
+  t.after(async () => {
+    await client.close()
+    await running.close()
+  })
+  let polls = 0
+  const listMessages = running.server.store.listMessages.bind(running.server.store)
+  running.server.store.listMessages = (...args) => {
+    polls++
+    return listMessages(...args)
+  }
+  const controller = new AbortController()
+  const waiting = client.callTool({ name: 'wait_for_email', arguments: { to: 'late@inbox.test', timeout: 20 } }, { signal: controller.signal })
+  await sleep(600)
+  controller.abort()
+  await assert.rejects(waiting)
+  await sleep(400)
+  const afterCancel = polls
+  await sleep(1000)
+  assert.ok(polls > 0)
+  assert.equal(polls, afterCancel)
+})
+
+test('nid mcp pointed at the /mcp URL says the URL is wrong instead of pretending', async (t) => {
+  const running = await start()
+  const client = await connectStdio(`${running.url}/mcp`)
+  t.after(async () => {
+    await client.close()
+    await running.close()
+  })
+  for (const tool of ['new_address', 'clear', 'list_messages']) {
+    const result = await call(client, tool)
+    assert.equal(result.isError, true, tool)
+    assert.match(result.text, /without \/mcp/)
+  }
 })

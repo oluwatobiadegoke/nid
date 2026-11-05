@@ -42,7 +42,7 @@ In an agent that takes a JSON config, the entry looks like this:
 }
 ```
 
-`nid mcp` talks to `http://127.0.0.1:4400` unless you pass `--url` or set `NID_URL`. See [`nid mcp`](../reference/cli.md#nid-mcp).
+`nid mcp` talks to `http://127.0.0.1:4400` unless you pass `--url` or set `NID_URL`. Give it nid's address, not the `/mcp` URL. See [`nid mcp`](../reference/cli.md#nid-mcp).
 
 ## Ask the agent to test a sign-up
 
@@ -71,5 +71,7 @@ Once connected, ask in plain words, for example: "Sign up on http://127.0.0.1:30
 ```
 
 If no email comes, the tool says why, including any send nid refused and the error your app got.
+
+Claude Code asks before it calls each tool. To let it call nid's tools without asking, add `mcp__nid` to `permissions.allow` in `.claude/settings.json`.
 
 For every tool and its arguments, see the [MCP reference](../reference/mcp.md).
