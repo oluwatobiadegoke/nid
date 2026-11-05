@@ -52,7 +52,7 @@ test('missing fields fail with Resend-shaped 422 errors and are recorded', async
   const noFrom = await sendResend(server, { to: 'x@inbox.test', subject: 'Hi', text: 'Hi' })
   assert.equal(noFrom.status, 422)
   assert.deepEqual(noFrom.body, { statusCode: 422, message: 'Missing `from` field.', name: 'validation_error' })
-  const noBody = await sendResend(server, { from: 'a@acme.com', to: 'x@inbox.test', subject: 'Hi' })
+  const noBody = await sendResend(server, { from: 'a@acme.com', to: 'Ex <X@inbox.test>', subject: 'Hi' })
   assert.equal(noBody.status, 422)
   assert.equal(noBody.body.name, 'validation_error')
   const rejections = await server.store.listRejections('default', { to: 'x@inbox.test' })

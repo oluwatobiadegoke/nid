@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { Attachment, Message, NewMessage, Recipient } from '../types.js'
+import type { Attachment, NewMessage, Recipient } from '../types.js'
 import { basic, isRecord, looseAddress, looseAddresses, mailboxes, parseMailbox, rejectedFor, splitAddresses, timestampId } from './shared.js'
 import { fromMime } from './mime.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
@@ -107,16 +107,23 @@ function substituteMeta(meta: Record<string, unknown>, vars: Record<string, unkn
   return out
 }
 
-const send: SendRoute = {
-  kind: 'send',
-  method: 'POST',
-  path: '/v3/:domain/messages',
-  async parse(req) {
-    const body = formBody(req)
-    const toList = addresses(body, 'to')
-    return rejectedFor(toList.map(looseAddress), () => buildSend(req, body, toList))
-  },
-  reply,
+type Build = (req: IncomingRequest, body: Record<string, Field>, toList: string[]) => Promise<NewMessage[]>
+
+function formRoute(path: string, build: Build): SendRoute {
+  return {
+    kind: 'send',
+    method: 'POST',
+    path,
+    parse(req) {
+      const body = formBody(req)
+      const toList = addresses(body, 'to')
+      return rejectedFor(toList.map(looseAddress), () => {
+        if (toList.length > 1000) throw error('Too many recipients. The maximum is 1000.')
+        return build(req, body, toList)
+      })
+    },
+    reply: (messages) => ({ status: 200, body: { id: messages[0]?.providerId, message: 'Queued. Thank you.' } }),
+  }
 }
 
 async function buildSend(req: IncomingRequest, body: Record<string, Field>, toList: string[]): Promise<NewMessage[]> {
@@ -161,37 +168,24 @@ async function buildSend(req: IncomingRequest, body: Record<string, Field>, toLi
 
   const toRecipients = recipients(toList, 'to')
   if (!perRecipient) return [message(toRecipients, {})]
+  const byAddress = new Map(Object.entries(perRecipient).map(([k, v]) => [k.toLowerCase(), v]))
   return toRecipients.map((r) => {
-    const vars = Object.entries(perRecipient).find(([k]) => k.toLowerCase() === r.address)?.[1]
+    const vars = byAddress.get(r.address)
     return message([r], isRecord(vars) ? vars : {})
   })
 }
 
-const mime: SendRoute = {
-  kind: 'send',
-  method: 'POST',
-  path: '/v3/:domain/messages.mime',
-  async parse(req) {
-    const body = formBody(req)
-    const toList = addresses(body, 'to')
-    return rejectedFor(toList.map(looseAddress), async () => {
-      if (toList.length === 0) throw error("'to' parameter is missing")
-      const to = recipients(toList, 'to').map((r) => r.address)
-      const raw = values(body, 'message')[0]
-      if (raw === undefined) throw error("'message' parameter is missing")
-      const content = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(await raw.arrayBuffer())
-      const message = await fromMime(content, to, name)
-      const domain = req.params.domain ?? ''
-      const { headers, meta, variables } = options(body, domain)
-      if (variables) meta.variables = variables
-      return [{ ...message, providerId: messageId(domain), headers: { ...message.headers, ...headers }, meta }]
-    })
-  },
-  reply,
-}
-
-function reply(messages: Message[]) {
-  return { status: 200, body: { id: messages[0]?.providerId, message: 'Queued. Thank you.' } }
+async function buildMime(req: IncomingRequest, body: Record<string, Field>, toList: string[]): Promise<NewMessage[]> {
+  if (toList.length === 0) throw error("'to' parameter is missing")
+  const to = recipients(toList, 'to').map((r) => r.address)
+  const raw = values(body, 'message')[0]
+  if (raw === undefined) throw error("'message' parameter is missing")
+  const content = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(await raw.arrayBuffer())
+  const message = await fromMime(content, to, name)
+  const domain = req.params.domain ?? ''
+  const { headers, meta, variables } = options(body, domain)
+  if (variables) meta.variables = variables
+  return [{ ...message, providerId: messageId(domain), headers: { ...message.headers, ...headers }, meta }]
 }
 
 export const mailgun: Provider = {
@@ -204,7 +198,7 @@ export const mailgun: Provider = {
   unauthorized() {
     return { status: 401, body: 'Forbidden' }
   },
-  routes: [send, mime],
+  routes: [formRoute('/v3/:domain/messages', buildSend), formRoute('/v3/:domain/messages.mime', buildMime)],
   setup: {
     env: "mailgun.client({ username: 'api', key, url: 'http://127.0.0.1:4400' })",
     note: 'Other SDKs: set the API base URL to http://127.0.0.1:4400 (no /v3).',

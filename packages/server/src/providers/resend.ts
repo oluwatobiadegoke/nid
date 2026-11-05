@@ -8,6 +8,7 @@ import {
   header,
   isRecord,
   keyPerItem,
+  looseAddress,
   mailboxes,
   parseMailbox,
   stringHeaders,
@@ -18,7 +19,7 @@ import { SendError, type IncomingRequest, type Provider, type ProviderReply, typ
 const name = 'resend'
 
 function error(status: number, code: string, message: string, to: string[] = []): SendError {
-  return new SendError({ status, body: { statusCode: status, message, name: code } }, to, message)
+  return new SendError({ status, body: { statusCode: status, message, name: code } }, to.map(looseAddress), message)
 }
 
 const addressField = z.union([z.string(), z.array(z.string()).max(50)])

@@ -156,7 +156,7 @@ function rawTo(body: Record<string, unknown>): string[] {
 }
 
 function unwrapKeys(substitutions: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(substitutions).map(([k, v]) => [k.replace(/^\W+|\W+$/g, ''), v]))
+  return Object.fromEntries(Object.entries(substitutions).map(([k, v]) => [k.match(/\w(?:.*\w)?/s)?.[0] ?? k, v]))
 }
 
 const send: SendRoute = {

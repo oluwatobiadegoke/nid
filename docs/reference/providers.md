@@ -98,7 +98,7 @@ nid checks, in the same way SendGrid does:
 
 Errors have SendGrid's shape: `{"errors": [{"message", "field", "help"}]}`.
 
-Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data` becomes `meta.variables`. Its `substitutions` are replaced in the subject and body, as SendGrid does. For a legacy template send with no body, the substitutions become `meta.variables`, with wrappers such as `{{ }}` taken off the keys. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
+Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data` becomes `meta.variables`. Its `substitutions` are replaced in the subject and body, as SendGrid does. Without `dynamic_template_data`, the substitutions also become `meta.variables`, with wrappers such as `{{ }}` taken off the keys, so a legacy template send with no body still yields its code. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
 
 ## Postmark
 
@@ -156,6 +156,7 @@ Sends an email from a `multipart/form-data` or `application/x-www-form-urlencode
 | `text`, `html` or `template` is present | `400 {"message": "Need at least one of 'text', 'html' or 'template' parameters specified"}` |
 | Every address looks like an address | `400 {"message": "... is not a valid address ..."}` |
 | `t:variables`, `h:X-Mailgun-Variables` and `recipient-variables` are JSON objects | `400` |
+| `to` has at most 1,000 addresses | `400` |
 
 Also stored: `h:` fields as headers (`h:Reply-To` sets the reply-to), `v:` fields as `meta.customVariables`, `o:tag` as `meta.tags`, `o:deliverytime`, `attachment` and `inline` files, and the domain as `meta.domain`. `template` is stored as `meta.templateId`. For a template send, the `v:` fields, `h:X-Mailgun-Variables` and `t:variables` are merged into `meta.variables`, with `t:variables` winning. A send with `o:testmode` set to `yes` is stored with `meta.sandbox` set to `true`.
 
