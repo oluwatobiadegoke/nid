@@ -1,6 +1,8 @@
 # nid documentation
 
-nid is a local inbox that stands in for your email provider. Your app sends email the way it always does, and nid keeps every message where your tests, the command line and other tools can read it.
+Test the emails your app sends, without sending any.
+
+nid is a local inbox that takes the place of your email provider. Your tests can read every email your app sends.
 
 You need Node.js 22.13 or later for the npm packages, or Docker for the container image.
 

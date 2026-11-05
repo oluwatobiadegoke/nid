@@ -1,8 +1,8 @@
 # nid
 
-A local inbox that stands in for your email provider. Change one URL, and every email your app sends shows up in an inbox your tests can read.
+Test the emails your app sends, without sending any.
 
-Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and other tools then read the mail, with sign-in codes and links already pulled out.
+nid is a local inbox that takes the place of your email provider. Your tests can read every email your app sends.
 
 **[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
