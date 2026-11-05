@@ -101,7 +101,7 @@ A request with no key, or with the key in the wrong place, fails with the same s
 
 ## Check that it works
 
-Trigger an email in your app, then open the web view at [http://127.0.0.1:4400](http://127.0.0.1:4400). The email appears at the top of the list. See [See your mail in the web view](use-the-web-view.md).
+Trigger an email in your app, then open the web view at [http://127.0.0.1:4400](http://127.0.0.1:4400). The email appears at the top of the list. The [web view guide](use-the-web-view.md) explains the page.
 
 Or list what arrived from the command line:
 

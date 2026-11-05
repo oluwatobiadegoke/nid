@@ -1,8 +1,8 @@
 # See your mail in the web view
 
-This guide shows how to read the emails your app sends in a web page that nid serves from your own computer. Use it to check what your app sent and how the email looks, without a public inbox site such as Yopmail.
+This guide shows how to read the emails your app sends, in a page that nid serves on your computer. Use it to check what your app sent and how each email looks.
 
-The mail never leaves your machine. By default only you can open the page. See [Security](../explanation/security.md).
+The mail stays on your machine, and by default only your computer can open the page. See [Security](../explanation/security.md).
 
 Before you start, [run nid](run-nid.md) and [point your app at it](connect-your-app.md).
 
@@ -30,7 +30,7 @@ The web view has no search box. To find mail for one address, use the [command l
 
 Choose a row. The email opens with:
 
-- **The header:** subject, From, To, Cc, Bcc, Reply to, which provider it came through with the provider's id, and when it arrived.
+- **The header:** subject, From, To, Cc, Bcc, Reply to, the provider and its message id, and when it arrived.
 - **Code and link:** the sign-in code and the main link nid found, shown first. They appear only when nid found them.
 - **Links:** every link in the email.
 - **HTML:** the email as a reader would see it. It is shown in a sandboxed frame with scripts blocked, so an email cannot run code on the page.
@@ -44,9 +44,9 @@ Choose **All mail** to go back to the list.
 
 ## See why an email never arrived
 
-When nid refuses a send, the refused send appears in the same list. Its row starts with `Rejected with`, then the status and the error, such as `Rejected with 422: Missing from field.`, with the provider's name beside it.
+When nid refuses a send, the refused send appears in the same list. Its row shows the status and the error, such as ``Rejected with 422: Missing `from` field.``, with the provider's name beside it.
 
-Choose it to see the status, the error your app got back, and the request as received. This is usually the fastest way to find a missing field or a wrong key.
+Choose it to see the status, the error your app got back, and the request as received. The error tells you what to fix, such as a missing field or a missing key.
 
 ## Clear the list
 

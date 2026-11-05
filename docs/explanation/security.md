@@ -2,9 +2,9 @@
 
 nid holds email your app sent, which can include sign-in codes and reset links. This page explains what nid does to keep that mail on your machine, and what you need to do when you change the defaults.
 
-## Why a local inbox is safer than a public one
+## Your mail stays with you
 
-Public inbox sites let anyone read mail sent to an address they can guess. nid keeps the mail on your machine, where only you can open the web view by default.
+nid keeps every email on your machine. By default, only your own computer can open the web view or the read API.
 
 ## Defaults
 

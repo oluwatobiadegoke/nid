@@ -1,8 +1,8 @@
 # nid
 
-Your own inbox for the emails your app sends.
+An email inbox that runs on your computer.
 
-nid runs on your computer. Your app sends its emails to nid instead of to your email provider, and you read them in a web page that only you can see. You do not need a public inbox site such as Yopmail, and you do not sign up for anything. Your tests can read the same emails.
+While you build, your app sends its emails to nid instead of to real people. Open nid in your browser and read each email as it arrives: the message, its links and any sign-in code. The mail stays on your machine, and your tests can read it too.
 
 **[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
@@ -26,7 +26,7 @@ You need Node.js 22.13 or later.
 
 ## Read mail in tests
 
-The same emails are available to your tests. In Playwright:
+Your tests can read the same emails. In Playwright:
 
 ```ts
 import { test, expect } from '@nid-inbox/client/playwright'
@@ -50,7 +50,7 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 - Answers the provider's own API, so each SDK only needs a base URL. Resend and Brevo today. SendGrid, Postmark, Mailgun and SES are next.
 - Takes SMTP on port 1025 for everything else.
 - Shows the sends it refused, with the error your app got, so you can see why an email never arrived.
-- Lets tests and scripts read the same mail, with a `wait` request that returns as soon as the next email arrives.
+- Lets tests and scripts read the same mail, and wait for the next email without polling.
 - Treats every address as an inbox. There is no "create inbox" step.
 - Keeps mail in memory by default. `--db mail.sqlite` keeps it across restarts.
 

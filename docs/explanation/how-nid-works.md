@@ -1,6 +1,6 @@
 # How nid works
 
-This page explains the ideas behind nid: why it has a web view you run yourself, why it copies provider APIs, why any address is an inbox, how waiting works, and how it finds codes and links. You do not need it to use nid, but it helps when something surprises you.
+This page explains the ideas behind nid: why you run the inbox yourself, why it copies provider APIs, why any address is an inbox, how waiting works, and how it finds codes and links. You do not need it to use nid, but it helps when something surprises you.
 
 ## One process, two ways in, one way out
 
@@ -18,13 +18,11 @@ your app ──Resend/Brevo API──┐
 your app ──SMTP──────────────┼──> nid store ──> read API ──> tests, CLI, web view
 ```
 
-## Why there is a web view you run yourself
+## Why you run the inbox yourself
 
-While you build an app that sends email, you need to see those emails: the wording, the layout, the sign-in code, the link. A common shortcut is a public inbox site such as Yopmail, where anyone who guesses the address can read the mail. That puts your test data on someone else's server.
+When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, nothing leaves your machine, and you decide when to clear it.
 
-nid gives you that place on your own machine. The web view shows each email as it arrives, with the same detail the provider would have sent, and the sends your app got wrong. Nothing leaves your computer, no one else can read it, and you decide when to clear it. See [See your mail in the web view](../how-to/use-the-web-view.md).
-
-Tests read the same mail through the read API. The web view is for you, and the API is for code.
+You read the mail in the web view, and your tests read the same mail through the read API. The [web view guide](../how-to/use-the-web-view.md) shows what the page offers.
 
 ## Why it copies the provider's API
 

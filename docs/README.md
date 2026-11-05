@@ -1,8 +1,8 @@
 # nid documentation
 
-Your own inbox for the emails your app sends.
+An email inbox that runs on your computer.
 
-nid runs on your computer. Your app sends its emails to nid instead of to your email provider, and you read them in a web page that only you can see. You do not need a public inbox site such as Yopmail, and you do not sign up for anything. Your tests can read the same emails.
+While you build, your app sends its emails to nid instead of to real people. Open nid in your browser and read each email as it arrives: the message, its links and any sign-in code. The mail stays on your machine, and your tests can read it too.
 
 You need Node.js 22.13 or later for the npm packages, or Docker for the container image.
 
@@ -43,7 +43,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 | Provider | A service your app calls to send email, such as Resend or Brevo. |
 | SDK | The library a provider publishes for calling its API, such as the `resend` npm package. |
 | Base URL | The address an SDK sends its requests to. Pointing it at nid is the only change your app needs. |
-| Web view | The page nid serves at its HTTP address, where you read your mail in a browser. |
+| Web view | The page at nid's address, such as `http://127.0.0.1:4400`, where you read your mail in a browser. |
 | Read API | nid's own HTTP routes under `/api`, for reading the mail it holds. |
 | Client library | `@nid-inbox/client`, nid's JavaScript wrapper over the read API. |
 | Cursor | A message id. "After the cursor" means "newer than that message". |
