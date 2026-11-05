@@ -98,3 +98,16 @@ test('the SDK-style request is accepted with any key', async (t) => {
   const { status } = await sendBrevo(server, email, { ...brevoHeaders, 'api-key': 'anything' })
   assert.equal(status, 201)
 })
+
+test('a bad messageVersions entry is recorded against every version recipient', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const { status } = await sendBrevo(server, {
+    sender: { email: 'a@b.co' },
+    subject: 'Hello',
+    textContent: 'Hello',
+    messageVersions: [{ to: [{ email: 'good@inbox.test' }] }, { to: [{ email: 'bad' }] }],
+  })
+  assert.equal(status, 400)
+  assert.equal((await server.store.listRejections('default', { to: 'good@inbox.test' })).length, 1)
+})

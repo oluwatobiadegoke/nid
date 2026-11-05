@@ -1,6 +1,17 @@
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, formatMailbox, header, isRecord, normalizeAddress, recipientsFrom, stringHeaders, timestampId } from './shared.js'
+import {
+  attachmentFrom,
+  formatMailbox,
+  header,
+  isRecord,
+  keyPerItem,
+  normalizeAddress,
+  recipientsFrom,
+  rejectedFor,
+  stringHeaders,
+  timestampId,
+} from './shared.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
 const name = 'brevo'
@@ -51,7 +62,7 @@ type Version = z.infer<typeof versionSchema>
 
 function recipients(list: Array<{ email: string; name?: string | undefined }> | undefined, kind: Recipient['kind'], to: string[]) {
   for (const c of list ?? []) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) {
+    if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(c.email)) {
       throw error(400, 'invalid_parameter', `email is invalid in ${kind}`, to)
     }
   }
@@ -132,14 +143,10 @@ const send: SendRoute = {
       throw error(400, 'invalid_parameter', `${field} is invalid`)
     }
     const data = result.data
-    if (data.messageVersions && data.messageVersions.length > 0) {
-      return data.messageVersions.map((v, i) => {
-        const message = build(data, v, req, req.rawBody)
-        message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
-        return message
-      })
-    }
-    return [build(data, null, req, req.rawBody)]
+    const versions = data.messageVersions ?? []
+    if (versions.length === 0) return [build(data, null, req, req.rawBody)]
+    const to = [data, ...versions].flatMap((v) => v.to ?? []).map((c) => normalizeAddress(c.email))
+    return rejectedFor(to, () => keyPerItem(versions.map((v) => build(data, v, req, req.rawBody))))
   },
   reply(messages) {
     if (messages.length > 1) return { status: 201, body: { messageIds: messages.map((m) => m.providerId) } }

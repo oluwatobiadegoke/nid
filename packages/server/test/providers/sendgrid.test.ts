@@ -143,3 +143,17 @@ test('a missing API key gets the SendGrid 401', async (t) => {
   assert.equal(res.status, 401)
   assert.match(res.body.errors[0].message, /authorization grant is invalid/)
 })
+
+test('a padded junk address is refused quickly instead of stalling the server', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const started = Date.now()
+  const res = await send(server, {
+    personalizations: [{ to: [{ email: `${' '.repeat(20000)}x` }] }],
+    from: { email: `${' '.repeat(20000)}x` },
+    subject: 'Hi',
+    content: [{ type: 'text/plain', value: 'Hi' }],
+  })
+  assert.equal(res.status, 400)
+  assert.ok(Date.now() - started < 1000)
+})

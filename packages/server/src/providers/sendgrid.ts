@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, bearer, formatMailbox, isRecord, looseAddress, normalizeAddress, recipientsFrom, stringHeaders } from './shared.js'
+import { attachmentFrom, bearer, formatMailbox, isRecord, looseAddress, normalizeAddress, recipientsFrom, rejectedFor, stringHeaders } from './shared.js'
 import { SendError, type Provider, type SendRoute } from './types.js'
 
 const name = 'sendgrid'
@@ -60,7 +60,7 @@ type SendBody = z.infer<typeof sendSchema>
 type Personalization = z.infer<typeof personalizationSchema>
 
 function checkAddress(email: string, field: string) {
-  if (!/^[^\s@<>",]+@[^\s@<>",]+\.[^\s@<>",]+$/.test(email.trim())) throw error('Does not contain a valid address.', field)
+  if (!/^[^\s@<>",]+@[^\s@<>",.]+(?:\.[^\s@<>",.]+)+$/.test(email.trim())) throw error('Does not contain a valid address.', field)
 }
 
 function recipients(p: Personalization, field: string): Recipient[] {
@@ -164,10 +164,10 @@ const send: SendRoute = {
   method: 'POST',
   path: '/v3/mail/send',
   parse(req) {
-    if (!isRecord(req.body)) throw error('Bad Request', null)
-    const to = [...new Set(rawTo(req.body))]
-    try {
-      const result = sendSchema.safeParse(req.body)
+    const body = req.body
+    if (!isRecord(body)) throw error('Bad Request', null)
+    return rejectedFor(rawTo(body), () => {
+      const result = sendSchema.safeParse(body)
       if (!result.success) throw error('Invalid type.', result.error.issues[0]?.path.join('.') || null)
       const data = result.data
       if (!data.personalizations?.length) {
@@ -175,10 +175,7 @@ const send: SendRoute = {
       }
       const id = randomBytes(16).toString('base64url').slice(0, 22)
       return data.personalizations.map((p, i) => build(data, p, i, id, req.rawBody))
-    } catch (err) {
-      if (err instanceof SendError) throw new SendError(err.reply, to, err.message)
-      throw err
-    }
+    })
   },
   reply(messages) {
     const id = messages[0]?.providerId.split('.')[0] ?? ''

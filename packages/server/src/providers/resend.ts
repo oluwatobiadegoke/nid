@@ -7,6 +7,7 @@ import {
   bearer,
   header,
   isRecord,
+  keyPerItem,
   mailboxes,
   parseMailbox,
   stringHeaders,
@@ -145,11 +146,7 @@ const batch: SendRoute = {
     if (!Array.isArray(req.body)) throw error(422, 'validation_error', 'Request body must be an array of emails.')
     if (req.body.length === 0) throw error(422, 'validation_error', 'Request body must contain at least one email.')
     if (req.body.length > 100) throw error(422, 'validation_error', 'Batch requests are limited to 100 emails.')
-    return req.body.map((item, i) => {
-      const message = toMessage(item, req, JSON.stringify(item))
-      message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
-      return message
-    })
+    return keyPerItem(req.body.map((item) => toMessage(item, req, JSON.stringify(item))))
   },
   reply(messages) {
     return { status: 200, body: { data: messages.map((m) => ({ id: m.providerId })) } }
