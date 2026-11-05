@@ -29,7 +29,7 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 | Argument | What it does |
 | --- | --- |
 | `to` | The address to wait for. |
-| `after` | Only email newer than this message id. Pass the `cursor` from `new_address`, or the `id` of the last email you read. |
+| `after` | Only email newer than this message id. Pass the `cursor` from `new_address`, or the `id` of the last email you read. Without it, the tool returns the first email ever sent to the address. |
 | `subject` | Only email whose subject contains this text. |
 | `has_code` | `true` skips email with no code. |
 | `code_pattern` | A regular expression for the code. Its first group becomes `code`. |

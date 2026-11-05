@@ -89,7 +89,7 @@ export function createMcpServer(api: ApiFetch): McpServer {
       annotations: readOnly,
     },
     guarded(api, async ({ prefix }, call) => {
-      const tag = (prefix ?? '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'test'
+      const tag = (prefix ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'test'
       const body = await call<{ cursor: number }>('/api/cursor')
       return reply({ address: `${tag}.${randomBytes(4).toString('hex')}@inbox.test`, cursor: body.cursor })
     }),
@@ -99,7 +99,7 @@ export function createMcpServer(api: ApiFetch): McpServer {
     'wait_for_email',
     {
       description:
-        'Wait for the next email to an address and return it with its code, links and text. If none comes, explain why, including any send nid refused',
+        'Wait for an email to an address newer than after, and return it with its code, links and text. Without after it returns the first email ever sent to the address, so pass after to get a newer one, such as a resent code. If none comes, it explains why, including any send nid refused',
       inputSchema: z.object({
         to: address,
         after: z.number().int().min(0).optional().describe('Only return email newer than this id: the cursor from new_address, or the id of the last email you read'),
