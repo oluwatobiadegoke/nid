@@ -62,4 +62,8 @@ The docs follow the [Google developer documentation style guide](https://develop
 - **Every command must work** when pasted as is. Test it before you commit.
 - **Use `127.0.0.1:4400`** in examples, and `inbox.test` or `acme.com` for addresses.
 - **No marketing.** Say what it does. Avoid "simply", "just", "easy" and "powerful".
+- **Use the same word for the same thing.** The words in "Words these docs use" in `docs/README.md` are the agreed ones: "SDK" is the provider's library, "client library" is nid's. Add a new term there before you use it.
+- **Write examples that run as pasted.** Use `npx nid-inbox` in how-to guides and the tutorial, since a reader may not have nid installed.
+- **Show the result after each step** in the tutorial and how-to guides, so a reader knows it worked.
+- **Say where a link goes.** Write "see Security" as a link to that page, never "see below" or "click here".
 - **Link instead of repeating.** If two pages need the same detail, keep it in the reference and link to it.

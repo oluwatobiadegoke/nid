@@ -46,7 +46,7 @@ See [Providers](../reference/providers.md#resend) for details.
 
 ### Node.js, SDK version 6 and later
 
-Pass `baseUrl` when you create the client. The `/v3` is part of the base URL:
+Pass `baseUrl` when you create the Brevo client. The `/v3` is part of the base URL:
 
 ```js
 import { BrevoClient } from '@getbrevo/brevo'
