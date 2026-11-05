@@ -2,7 +2,7 @@
 
 A local inbox that stands in for your email provider. Change one URL, and every email your app sends shows up in an inbox your tests can read.
 
-Your app keeps its real code: the official Resend or Brevo SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and AI agents then read the mail, with sign-in codes and links already pulled out.
+Your app keeps its real code: the official Resend, Brevo, SendGrid, Postmark or Mailgun SDK, or any SMTP client. You point its base URL at nid, and every send lands here instead of at the provider. Tests, the CLI and AI agents then read the mail, with sign-in codes and links already pulled out.
 
 ```
 npx nid-inbox serve
@@ -29,7 +29,7 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 
 ## What it does
 
-- Answers the provider's own API on one port, so each SDK only needs a base URL. Resend and Brevo today; SendGrid, Postmark, Mailgun and SES are next.
+- Answers the provider's own API on one port, so each SDK only needs a base URL. Resend, Brevo, SendGrid, Postmark and Mailgun today; SES is next.
 - Takes SMTP on port 1025 for everything else.
 - Stores every email keyed by recipient address. There is no "create inbox" step: a test makes up an address and reads it, so parallel tests never share mail.
 - Pulls out one-time codes and links on arrival, and lets a test pass its own pattern when the guess is wrong.
@@ -63,6 +63,9 @@ Options: `--port 4400`, `--smtp-port 1025`, `--host 127.0.0.1`, `--db mail.sqlit
 | --- | --- |
 | Resend | `RESEND_BASE_URL=http://localhost:4400` (Node), `RESEND_API_URL` (Python) |
 | Brevo | `new BrevoClient({ apiKey, baseUrl: 'http://localhost:4400/v3' })`, or `api.basePath = 'http://localhost:4400/v3'` on older SDKs |
+| SendGrid | `sgMail.client.setDefaultRequest('baseUrl', 'http://localhost:4400')`, after `sgMail.setApiKey` |
+| Postmark | `new postmark.ServerClient(token, { useHttps: false, requestHost: 'localhost:4400' })` |
+| Mailgun | `mailgun.client({ username: 'api', key, url: 'http://localhost:4400' })` |
 | SMTP | Host `localhost`, port `1025`, no TLS, any username and password |
 
 Locally any API key works, but a request with no key, or the wrong kind of key, fails exactly as it would in production.

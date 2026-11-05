@@ -7,6 +7,14 @@ export function bearer(req: IncomingRequest): string | null {
   return match?.[1] ?? null
 }
 
+export function basic(req: IncomingRequest): string | null {
+  const match = (req.headers.get('authorization') ?? '').match(/^Basic\s+(\S+)$/i)
+  if (!match?.[1]) return null
+  const decoded = Buffer.from(match[1], 'base64').toString('utf8')
+  const colon = decoded.indexOf(':')
+  return colon >= 0 && decoded.slice(colon + 1) ? decoded.slice(colon + 1) : null
+}
+
 export function header(req: IncomingRequest, name: string): string | null {
   const value = req.headers.get(name)
   return value && value.trim() ? value.trim() : null
@@ -37,6 +45,26 @@ export function addressList(value: string | string[] | undefined | null): string
   if (!value) return []
   const list = Array.isArray(value) ? value : [value]
   return list.flatMap((v) => (typeof v === 'string' ? [v] : [])).map((v) => v.trim()).filter(Boolean)
+}
+
+export function splitAddresses(value: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let quoted = false
+  let angled = false
+  for (const ch of value) {
+    if (ch === '"') quoted = !quoted
+    else if (ch === '<' && !quoted) angled = true
+    else if (ch === '>' && !quoted) angled = false
+    if (ch === ',' && !quoted && !angled) {
+      out.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  out.push(current)
+  return out.map((v) => v.trim()).filter(Boolean)
 }
 
 export function toAddresses(recipients: Recipient[], kind: RecipientKind): string[] {

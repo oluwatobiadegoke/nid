@@ -34,7 +34,7 @@ export interface SendRoute {
   kind: 'send'
   method: 'POST'
   path: string
-  parse(req: IncomingRequest): NewMessage[]
+  parse(req: IncomingRequest): NewMessage[] | Promise<NewMessage[]>
   reply(messages: Message[], req: IncomingRequest): ProviderReply
 }
 

@@ -51,3 +51,78 @@ test('the official Brevo SDK sends and raises its own error on a bad request', a
     (err: unknown) => err instanceof BrevoError && err.statusCode === 400,
   )
 })
+
+test('the official SendGrid SDK sends and surfaces SendGrid errors', async (t) => {
+  const running = await start()
+  t.after(() => running.close())
+  const sgMail = (await import('@sendgrid/mail')).default
+  sgMail.setApiKey('SG.test')
+  sgMail.client.setDefaultRequest('baseUrl', running.url)
+  const [res] = await sgMail.send({
+    to: 'sg-sdk@inbox.test',
+    from: { email: 'hello@acme.com', name: 'Acme' },
+    subject: 'Your code',
+    text: 'Your code is 246810',
+    html: '<p>Your code is 246810</p>',
+  })
+  assert.equal(res.statusCode, 202)
+  assert.ok(res.headers['x-message-id'])
+  const stored = (await running.server.store.listMessages('default', { to: 'sg-sdk@inbox.test' }))[0]
+  assert.equal(stored?.extracted.code, '246810')
+  assert.equal(stored?.from, 'Acme <hello@acme.com>')
+
+  await assert.rejects(
+    sgMail.send({ to: 'sg-sdk@inbox.test', from: 'hello@acme.com', text: 'No subject' }),
+    (err: { code?: number; response?: { body?: { errors?: Array<{ field: string }> } } }) =>
+      err.code === 400 && err.response?.body?.errors?.[0]?.field === 'subject',
+  )
+})
+
+test('the official Postmark SDK sends single, template and batch mail', async (t) => {
+  const running = await start()
+  t.after(() => running.close())
+  const { ServerClient, Errors } = await import('postmark')
+  const client = new ServerClient('pm-test', { useHttps: false, requestHost: new URL(running.url).host })
+  const sent = await client.sendEmail({ From: 'hello@acme.com', To: 'pm-sdk@inbox.test', Subject: 'Code', TextBody: 'Code 135790' })
+  assert.equal(sent.ErrorCode, 0)
+  assert.ok(sent.MessageID)
+  const stored = (await running.server.store.listMessages('default', { to: 'pm-sdk@inbox.test' }))[0]
+  assert.equal(stored?.extracted.code, '135790')
+
+  await client.sendEmailWithTemplate({ From: 'hello@acme.com', To: 'pm-tpl@inbox.test', TemplateAlias: 'otp', TemplateModel: { code: '864200' } })
+  assert.equal((await running.server.store.listMessages('default', { to: 'pm-tpl@inbox.test' }))[0]?.extracted.code, '864200')
+
+  const batch = await client.sendEmailBatch([
+    { From: 'hello@acme.com', To: 'pm-b1@inbox.test', TextBody: 'One' },
+    { From: 'hello@acme.com', To: 'pm-b2@inbox.test', TextBody: 'Two' },
+  ])
+  assert.equal(batch.length, 2)
+
+  await assert.rejects(client.sendEmail({ From: 'hello@acme.com', To: 'pm-sdk@inbox.test' }), (err: unknown) => err instanceof Errors.ApiInputError)
+})
+
+test('the official Mailgun SDK sends with an attachment and sees Mailgun errors', async (t) => {
+  const running = await start()
+  t.after(() => running.close())
+  const Mailgun = (await import('mailgun.js')).default
+  const mg = new Mailgun(FormData).client({ username: 'api', key: 'key-test', url: running.url })
+  const sent = await mg.messages.create('mg.acme.com', {
+    from: 'Acme <hello@acme.com>',
+    to: ['mg-sdk@inbox.test'],
+    subject: 'Your code',
+    text: 'Your code is 975310',
+    'o:tag': ['auth'],
+    attachment: [{ filename: 'hello.txt', data: Buffer.from('hello') }],
+  })
+  assert.equal(sent.status, 200)
+  assert.match(String(sent.id), /@mg\.acme\.com>$/)
+  const stored = (await running.server.store.listMessages('default', { to: 'mg-sdk@inbox.test' }))[0]
+  assert.equal(stored?.extracted.code, '975310')
+  assert.equal(stored?.attachments[0]?.filename, 'hello.txt')
+  assert.equal(stored?.attachments[0]?.size, 5)
+
+  await assert.rejects(
+    mg.messages.create('mg.acme.com', { to: ['mg-sdk@inbox.test'], text: 'No from' } as never),
+    (err: { status?: number }) => err.status === 400,
+  )
+})
