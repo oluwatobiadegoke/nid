@@ -8,6 +8,8 @@ const urlPattern = /https?:\/\/[^\s<>"'`)\]]+/g
 const windowBefore = 80
 const windowAfter = 40
 
+const anchorPattern = /<a\b([^<>]*)>((?:(?!<a\b)[\s\S])*?)<\/a>/gi
+const hrefPattern = /(?:^|\s)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
 
 function decodeEntities(value: string): string {
@@ -25,10 +27,10 @@ function decodeEntities(value: string): string {
 export function htmlToText(html: string): string {
   return decodeEntities(
     html
-      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|tr|li|h[1-6]|td|th)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' '),
+      .replace(/<[^>]+(?:>|$)/g, ' '),
   )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n+/g, '\n')
@@ -36,7 +38,7 @@ export function htmlToText(html: string): string {
 }
 
 function trimUrl(url: string): string {
-  return url.replace(/[.,;:!?]+$/, '')
+  return url.replace(/(?<![.,;:!?])[.,;:!?]+$/, '')
 }
 
 function isYear(token: string): boolean {
@@ -87,9 +89,9 @@ function findLinks(html: string | null, text: string | null): Link[] {
     links.push({ href: clean, text: label.trim() })
   }
   if (html) {
-    for (const match of html.matchAll(/<a\b[^>]*?href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi)) {
-      const href = match[2] ?? match[3] ?? match[4] ?? ''
-      push(href, htmlToText(match[5] ?? ''))
+    for (const match of html.matchAll(anchorPattern)) {
+      const href = match[1]?.match(hrefPattern)
+      if (href) push(href[1] ?? href[2] ?? href[3] ?? '', htmlToText(match[2] ?? ''))
     }
   }
   if (text) {
