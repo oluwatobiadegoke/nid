@@ -30,6 +30,8 @@ packages/
       cli.ts        serve, read, clear, healthcheck
     test/
   client/           the npm package `@nid-inbox/client`: a tiny client and a Playwright fixture
+docs/               the documentation: tutorials, how-to guides, reference and explanation
+scripts/            the docs check
 ```
 
 ## Adding a provider
@@ -55,7 +57,13 @@ Rules every adapter follows:
 4. **Keep the raw request** on every message (`raw`).
 5. **Templates.** When a send has a template and no body, store the template id and variables in `meta.templateId` and `meta.variables`. Extraction runs over the variables.
 
-Then add it to the list in `providers/index.ts`, add a test in `test/providers/<name>.test.ts` with real request bodies, and add the official SDK to `devDependencies` with a case in `test/sdk.test.ts`.
+Then add it to the list in `providers/index.ts`, add a test in `test/providers/<name>.test.ts` with real request bodies, and add the official SDK to `devDependencies` with a case in `test/sdk.test.ts`. Finally, document it: see the provider row in [docs/contributing-docs.md](docs/contributing-docs.md#which-page-to-change).
+
+## Docs
+
+Docs change in the same pull request as the code. If a user can see the change (a command, an option, an environment variable, a route, a field, a client method, a provider or a default), the pull request also updates the page that describes it.
+
+[docs/contributing-docs.md](docs/contributing-docs.md) says which page to change for each kind of change, and the style to write in. `pnpm test` runs a docs check that fails when a route, option, variable, method or provider is missing from the reference, or when a link is broken.
 
 ## Style
 
