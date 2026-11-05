@@ -73,7 +73,7 @@ test('template sends without a body extract from params', async (t) => {
   assert.equal(stored?.extracted.link, 'https://getclinid.com/v/1')
 })
 
-test('messageVersions store one message per version', async (t) => {
+test('messageVersions store one message per version, even with an idempotency key', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
   const { status, body } = await sendBrevo(server, {
@@ -85,9 +85,10 @@ test('messageVersions store one message per version', async (t) => {
       { to: [{ email: 'v1@inbox.test' }], params: { name: 'One' } },
       { to: [{ email: 'v2@inbox.test' }], subject: 'Hello two' },
     ],
-  })
+  }, { ...brevoHeaders, 'idempotency-key': 'signup-42' })
   assert.equal(status, 201)
-  assert.equal((body.messageIds as string[]).length, 2)
+  const ids = body.messageIds as string[]
+  assert.equal(new Set(ids).size, 2)
   assert.equal((await server.store.listMessages('default', { to: 'v2@inbox.test' }))[0]?.subject, 'Hello two')
 })
 
@@ -96,4 +97,17 @@ test('the SDK-style request is accepted with any key', async (t) => {
   t.after(() => server.close())
   const { status } = await sendBrevo(server, email, { ...brevoHeaders, 'api-key': 'anything' })
   assert.equal(status, 201)
+})
+
+test('a bad messageVersions entry is recorded against every version recipient', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const { status } = await sendBrevo(server, {
+    sender: { email: 'a@b.co' },
+    subject: 'Hello',
+    textContent: 'Hello',
+    messageVersions: [{ to: [{ email: 'good@inbox.test' }] }, { to: [{ email: 'bad' }] }],
+  })
+  assert.equal(status, 400)
+  assert.equal((await server.store.listRejections('default', { to: 'good@inbox.test' })).length, 1)
 })

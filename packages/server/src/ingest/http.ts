@@ -18,7 +18,9 @@ async function readRequest(c: Context): Promise<IncomingRequest> {
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
     if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
       body = await c.req.parseBody({ all: true })
-      rawBody = contentType.includes('application/x-www-form-urlencoded') ? await c.req.text().catch(() => '') : ''
+      rawBody = contentType.includes('application/x-www-form-urlencoded')
+        ? await c.req.text().catch(() => '')
+        : JSON.stringify(body, (_, v) => (v instanceof File ? `(file ${v.name}, ${v.size} bytes)` : v))
     } else {
       rawBody = await c.req.text()
       if (rawBody.trim()) {
@@ -71,34 +73,32 @@ async function handleSend(
   ingest: Ingest,
   store: Store,
 ) {
+  const reject = (err: SendError) =>
+    ingest.reject(project, { provider: provider.name, to: err.to, status: err.reply.status, error: err.message, raw: req.rawBody })
   let parsed
   try {
-    parsed = route.parse(req)
+    parsed = await route.parse(req)
   } catch (err) {
     if (err instanceof SendError) {
-      await ingest.reject(project, {
-        provider: provider.name,
-        to: err.to,
-        status: err.reply.status,
-        error: err.message,
-        raw: req.rawBody,
-      })
+      await reject(err)
       return send(c, err.reply)
     }
     throw err
   }
-  const stored: Message[] = []
+  const outcomes: Array<Message | SendError> = []
   for (const message of parsed) {
-    if (message.idempotencyKey) {
-      const existing = await store.findByIdempotencyKey(project.projectId, provider.name, message.idempotencyKey)
-      if (existing) {
-        stored.push(existing)
-        continue
-      }
+    if (message instanceof SendError) {
+      await reject(message)
+      outcomes.push(message)
+      continue
     }
-    stored.push(await ingest.accept(project, message))
+    const existing = message.idempotencyKey
+      ? await store.findByIdempotencyKey(project.projectId, provider.name, message.idempotencyKey)
+      : null
+    outcomes.push(existing ?? (await ingest.accept(project, message)))
   }
-  return send(c, route.reply(stored, req))
+  const stored = outcomes.filter((o): o is Message => !(o instanceof SendError))
+  return send(c, route.reply(stored, outcomes))
 }
 
 async function handleRead(c: Context, route: ReadRoute, req: IncomingRequest, project: Project, store: Store) {

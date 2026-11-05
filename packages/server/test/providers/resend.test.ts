@@ -52,7 +52,7 @@ test('missing fields fail with Resend-shaped 422 errors and are recorded', async
   const noFrom = await sendResend(server, { to: 'x@inbox.test', subject: 'Hi', text: 'Hi' })
   assert.equal(noFrom.status, 422)
   assert.deepEqual(noFrom.body, { statusCode: 422, message: 'Missing `from` field.', name: 'validation_error' })
-  const noBody = await sendResend(server, { from: 'a@acme.com', to: 'x@inbox.test', subject: 'Hi' })
+  const noBody = await sendResend(server, { from: 'a@acme.com', to: 'Ex <X@inbox.test>', subject: 'Hi' })
   assert.equal(noBody.status, 422)
   assert.equal(noBody.body.name, 'validation_error')
   const rejections = await server.store.listRejections('default', { to: 'x@inbox.test' })
@@ -98,6 +98,22 @@ test('POST /emails/batch stores every email and answers with their ids', async (
   const body = (await res.json()) as { data: { id: string }[] }
   assert.equal(body.data.length, 2)
   assert.equal((await server.store.listMessages('default', {})).length, 2)
+})
+
+test('a refused batch is recorded against every recipient in it', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await server.app.request('/emails/batch', {
+    method: 'POST',
+    headers: resendHeaders,
+    body: JSON.stringify([
+      { from: 'a@acme.com', to: 'fine@inbox.test', subject: 'One', text: 'One' },
+      { from: 'a@acme.com', to: 'other@inbox.test', cc: 'team@acme.com', text: 'No subject' },
+    ]),
+  })
+  assert.equal(res.status, 422)
+  assert.equal((await server.store.listRejections('default', { to: 'fine@inbox.test' })).length, 1)
+  assert.equal((await server.store.listRejections('default', { to: 'team@acme.com' })).length, 1)
 })
 
 test('GET /emails/:id returns the email the way Resend does', async (t) => {

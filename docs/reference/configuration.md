@@ -37,7 +37,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `store` | `Store` | In-memory SQLite | Where mail lives. Make one with `createSqliteStore({ path })`. |
 | `auth` | `(credential) => Project \| null` | Every credential maps to the `default` project | Maps a provider key, read API token or SMTP username to a project. Return `null` to refuse. Can return a promise. |
 | `limits` | `(project) => Limits` | `{ maxBodyBytes: 52428800, retentionHours: null }` | Per-project limits. Can return a promise. See the note below. |
-| `providers` | `Provider[]` | Resend and Brevo | Which provider APIs to answer. |
+| `providers` | `Provider[]` | All five: Resend, Brevo, SendGrid, Postmark and Mailgun | Which provider APIs to answer. |
 | `allowHosts` | `string[]` | `[]` | Extra `Host` names to accept. Same as `--allow-host`. |
 | `cors` | `boolean` | `false` | Sends CORS headers. Same as `--cors`. |
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
@@ -45,7 +45,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `onMessage` | `(message) => void` | none | Called after each message is stored. |
 | `onError` | `(error) => void` | none | Called on unexpected server errors. |
 
-A `credential` has `kind` (`http` or `smtp`), `provider` (`resend`, `brevo`, `smtp` or `api` for the read API) and `value` (the key, token or username). A `Project` has `projectId` and `plan`.
+A `credential` has `kind` (`http` or `smtp`), `provider` (`resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `smtp` or `api` for the read API) and `value` (the key, token or username; for Mailgun, the Basic auth password). A `Project` has `projectId` and `plan`.
 
 Note on `limits.retentionHours`: when set, nid stamps each new message with an `expiresAt` time. Nothing deletes expired messages yet, so they stay until you clear them or stop the server.
 

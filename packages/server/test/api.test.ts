@@ -126,7 +126,7 @@ test('healthz, providers and the openapi document are served', async (t) => {
   t.after(() => server.close())
   assert.equal((await get(server, '/healthz')).body.ok, true)
   const providers = (await get(server, '/api/providers')).body.providers as { name: string }[]
-  assert.deepEqual(providers.map((p) => p.name), ['resend', 'brevo'])
+  assert.deepEqual(providers.map((p) => p.name), ['resend', 'brevo', 'sendgrid', 'postmark', 'mailgun'])
   const spec = await get(server, '/api/openapi.json')
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')

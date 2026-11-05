@@ -34,8 +34,8 @@ export interface SendRoute {
   kind: 'send'
   method: 'POST'
   path: string
-  parse(req: IncomingRequest): NewMessage[]
-  reply(messages: Message[], req: IncomingRequest): ProviderReply
+  parse(req: IncomingRequest): Array<NewMessage | SendError> | Promise<Array<NewMessage | SendError>>
+  reply(messages: Message[], outcomes: Array<Message | SendError>): ProviderReply
 }
 
 export interface ReadContext {

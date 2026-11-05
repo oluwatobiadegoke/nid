@@ -52,7 +52,7 @@ Holds the request open until a message that matches arrives, then returns the ol
 | `to` | Yes | Recipient address. |
 | `after` | No | Only messages with an id greater than this. Without it, any message matches, including old ones. |
 | `subject` | No | Part of the subject, in any case. |
-| `provider` | No | `resend`, `brevo` or `smtp`. |
+| `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `has_code` | No | Skip messages with no extracted code. |
 | `code_pattern` | No | A regular expression, run without case, over the subject and plain text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
 | `timeout` | No | Seconds to wait, from 0 to 120. Default 30. |
@@ -83,7 +83,7 @@ Lists messages, newest first.
 | --- | --- |
 | `to` | Recipient address. |
 | `subject` | Part of the subject, in any case. |
-| `provider` | `resend`, `brevo` or `smtp`. |
+| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `after` | Only messages with an id greater than this. |
 | `has_code` | Only messages with an extracted code. |
 | `limit` | How many, from 1 to 500. Default 50. |
@@ -156,7 +156,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | Field | Type | What it is |
 | --- | --- | --- |
 | `id` | integer | nid's id. Use it as a cursor. |
-| `provider` | string | `resend`, `brevo` or `smtp`. |
+| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `providerId` | string | The id nid returned to your app, in the provider's format. |
 | `from` | string | Sender, such as `Acme <hello@acme.com>`. |
 | `replyTo` | string[] | Reply-to addresses. |
