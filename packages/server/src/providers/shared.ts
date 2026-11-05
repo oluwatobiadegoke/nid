@@ -49,8 +49,12 @@ export function mailboxes(values: string[], kind: RecipientKind, invalid: (value
   )
 }
 
+export function looseAddress(value: string): string {
+  return parseMailbox(value)?.address ?? normalizeAddress(value)
+}
+
 export function looseAddresses(value: string | null | undefined): string[] {
-  return splitAddresses(value ?? '').map((v) => parseMailbox(v)?.address ?? v)
+  return splitAddresses(value ?? '').map(looseAddress)
 }
 
 export function recipientsFrom(

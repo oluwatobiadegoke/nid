@@ -48,14 +48,10 @@ function addresses(value: string | null | undefined, kind: Recipient['kind'], fi
 
 function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
   if (!isRecord(body)) throw error(402, 'Received invalid JSON input.')
+  const to = [body.To, body.Cc, body.Bcc].flatMap((v) => (typeof v === 'string' ? looseAddresses(v) : []))
   const result = emailSchema.safeParse(body)
-  if (!result.success) {
-    const field = String(result.error.issues[0]?.path[0] ?? 'body')
-    const to = [body.To, body.Cc, body.Bcc].flatMap((v) => (typeof v === 'string' ? looseAddresses(v) : []))
-    throw error(300, `Invalid '${field}' field.`, to)
-  }
+  if (!result.success) throw error(300, `Invalid '${String(result.error.issues[0]?.path[0] ?? 'body')}' field.`, to)
   const data = result.data
-  const to = [data.To, data.Cc, data.Bcc].flatMap(looseAddresses)
   if (to.length === 0) throw error(300, 'Zero recipients specified', to)
   if (!data.From || !parseMailbox(data.From)) {
     throw error(300, `Error parsing 'From': Illegal email address '${data.From ?? ''}'. It must contain the '@' symbol.`, to)

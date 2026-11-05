@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import type { Attachment, Message, NewMessage, Recipient } from '../types.js'
-import { basic, isRecord, looseAddresses, mailboxes, parseMailbox, splitAddresses, timestampId } from './shared.js'
+import { basic, isRecord, looseAddress, looseAddresses, mailboxes, parseMailbox, splitAddresses, timestampId } from './shared.js'
 import { fromMime } from './mime.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
@@ -8,8 +8,8 @@ const name = 'mailgun'
 
 type Field = string | File | Array<string | File>
 
-function error(status: number, message: string, to: string[] = []): SendError {
-  return new SendError({ status, body: { message } }, to, message)
+function error(message: string, to: string[] = []): SendError {
+  return new SendError({ status: 400, body: { message } }, to, message)
 }
 
 function values(body: Record<string, Field>, key: string): Array<string | File> {
@@ -31,7 +31,7 @@ function addresses(body: Record<string, Field>, key: string): string[] {
 }
 
 function recipients(list: string[], kind: Recipient['kind'], to: string[]): Recipient[] {
-  return mailboxes(list, kind, () => error(400, `${kind} parameter is not a valid address. please check documentation`, to))
+  return mailboxes(list, kind, () => error(`${kind} parameter is not a valid address. please check documentation`, to))
 }
 
 function jsonObject(value: string | null, field: string, to: string[]): Record<string, unknown> | null {
@@ -40,7 +40,7 @@ function jsonObject(value: string | null, field: string, to: string[]): Record<s
     const parsed: unknown = JSON.parse(value)
     if (isRecord(parsed)) return parsed
   } catch {}
-  throw error(400, `${field} parameter should be a valid JSON`, to)
+  throw error(`${field} parameter should be a valid JSON`, to)
 }
 
 async function files(body: Record<string, Field>, key: string, inline: boolean): Promise<Attachment[]> {
@@ -62,7 +62,7 @@ function substitute(value: string | null, vars: Record<string, unknown>): string
 
 function formBody(req: IncomingRequest): Record<string, Field> {
   if (!isRecord(req.body) || !/multipart\/form-data|x-www-form-urlencoded/.test(req.contentType)) {
-    throw error(400, 'Expected multipart/form-data or application/x-www-form-urlencoded body')
+    throw error('Expected multipart/form-data or application/x-www-form-urlencoded body')
   }
   return req.body as Record<string, Field>
 }
@@ -114,15 +114,15 @@ const send: SendRoute = {
   async parse(req) {
     const body = formBody(req)
     const toList = addresses(body, 'to')
-    const to = toList.map((v) => parseMailbox(v)?.address ?? v)
+    const to = toList.map(looseAddress)
     const from = text(body, 'from')
-    if (!from) throw error(400, "'from' parameter is missing", to)
-    if (!parseMailbox(from)) throw error(400, 'from parameter is not a valid address. please check documentation', to)
-    if (to.length === 0) throw error(400, "'to' parameter is missing", to)
+    if (!from) throw error("'from' parameter is missing", to)
+    if (!parseMailbox(from)) throw error('from parameter is not a valid address. please check documentation', to)
+    if (to.length === 0) throw error("'to' parameter is missing", to)
     const template = text(body, 'template')
     const html = text(body, 'html')
     const plain = text(body, 'text')
-    if (!html && !plain && !template) throw error(400, "Need at least one of 'text', 'html' or 'template' parameters specified", to)
+    if (!html && !plain && !template) throw error("Need at least one of 'text', 'html' or 'template' parameters specified", to)
 
     const domain = req.params.domain ?? ''
     const { headers, meta, custom, variables } = options(body, domain, to)
@@ -171,11 +171,11 @@ const mime: SendRoute = {
   async parse(req) {
     const body = formBody(req)
     const toList = addresses(body, 'to')
-    const to = toList.map((v) => parseMailbox(v)?.address ?? v)
-    if (to.length === 0) throw error(400, "'to' parameter is missing", to)
+    const to = toList.map(looseAddress)
+    if (to.length === 0) throw error("'to' parameter is missing", to)
     recipients(toList, 'to', to)
     const raw = values(body, 'message')[0]
-    if (raw === undefined) throw error(400, "'message' parameter is missing", to)
+    if (raw === undefined) throw error("'message' parameter is missing", to)
     const content = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(await raw.arrayBuffer())
     const message = await fromMime(content, to, name)
     const domain = req.params.domain ?? ''

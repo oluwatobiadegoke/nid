@@ -133,7 +133,11 @@ const send: SendRoute = {
     }
     const data = result.data
     if (data.messageVersions && data.messageVersions.length > 0) {
-      return data.messageVersions.map((v) => build(data, v, req, req.rawBody))
+      return data.messageVersions.map((v, i) => {
+        const message = build(data, v, req, req.rawBody)
+        message.idempotencyKey = message.idempotencyKey ? `${message.idempotencyKey}:${i}` : null
+        return message
+      })
     }
     return [build(data, null, req, req.rawBody)]
   },
