@@ -85,6 +85,21 @@ test('a template send reads its code from t:variables', async (t) => {
   assert.equal(stored?.extracted.code, '665544')
 })
 
+test('a template batch reads each person\'s code from v: fields filled by recipient-variables', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const form = new URLSearchParams({
+    from: 'hello@acme.com',
+    to: 'p1@inbox.test, p2@inbox.test',
+    template: 'otp',
+    'v:code': '%recipient.code%',
+    'recipient-variables': JSON.stringify({ 'p1@inbox.test': { code: '135791' }, 'p2@inbox.test': { code: '246802' } }),
+  })
+  assert.equal((await send(server, form)).status, 200)
+  assert.equal((await server.store.listMessages('default', { to: 'p1@inbox.test' }))[0]?.extracted.code, '135791')
+  assert.equal((await server.store.listMessages('default', { to: 'p2@inbox.test' }))[0]?.extracted.code, '246802')
+})
+
 test('bad sends fail with Mailgun 400 messages and a missing key gets Forbidden', async (t) => {
   const server = await createServer()
   t.after(() => server.close())

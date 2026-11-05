@@ -48,10 +48,20 @@ test('POST /email answers with a Postmark receipt and stores the message', async
   assert.equal(stored.attachments[0]?.contentId, 'logo')
 })
 
+test('a Bcc-only send is accepted and its receipt has no To', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await send(server, '/email', { From: 'a@acme.com', Bcc: 'list@inbox.test', TextBody: 'Code 777111' })
+  assert.equal(res.status, 200)
+  assert.equal(res.body.To, undefined)
+  const stored = (await server.store.listMessages('default', { to: 'list@inbox.test' }))[0]
+  assert.equal(stored?.recipients[0]?.kind, 'bcc')
+})
+
 test('a template send reads its code and link from the TemplateModel', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
-  const res = await send(server, '/email/withTemplate', {
+  const res = await send(server, '/email/withTemplate/', {
     From: 'hello@acme.com',
     To: 'tpl@inbox.test',
     TemplateAlias: 'welcome',

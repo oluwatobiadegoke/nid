@@ -93,13 +93,25 @@ function options(body: Record<string, Field>, domain: string, to: string[]) {
   if (deliveryTime) meta.scheduledAt = deliveryTime
   if (/^(yes|true)$/i.test(text(body, 'o:testmode') ?? '')) meta.sandbox = true
   const variables = jsonObject(headerValue(headers, 'x-mailgun-variables'), 'h:X-Mailgun-Variables', to)
-  return { headers, meta, variables, providerId: `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>` }
+  return { headers, meta, custom, variables, providerId: `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>` }
 }
 
 function toAddressesOf(body: Record<string, Field>) {
   const list = addresses(body, 'to')
   const to = list.map((v) => parseMailbox(v)?.address ?? v)
   return { list, to }
+}
+
+function substituteValues<T>(record: Record<string, T>, vars: Record<string, unknown>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).map(([k, v]) => [k, typeof v === 'string' ? substitute(v, vars) : v])) as Record<string, T>
+}
+
+function substituteMeta(meta: Record<string, unknown>, vars: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...meta, recipientVariables: vars }
+  for (const key of ['variables', 'customVariables']) {
+    if (isRecord(meta[key])) out[key] = substituteValues(meta[key], vars)
+  }
+  return out
 }
 
 const send: SendRoute = {
@@ -118,10 +130,12 @@ const send: SendRoute = {
     const plain = text(body, 'text')
     if (!html && !plain && !template) throw error(400, "Need at least one of 'text', 'html' or 'template' parameters specified", to)
 
-    const { headers, meta, variables, providerId } = options(body, req.params.domain ?? '', to)
-    const templateVariables = jsonObject(text(body, 't:variables'), 't:variables', to) ?? variables
-    if (template) meta.templateId = template
-    if (templateVariables) meta.variables = templateVariables
+    const { headers, meta, custom, variables, providerId } = options(body, req.params.domain ?? '', to)
+    const templateVariables = jsonObject(text(body, 't:variables'), 't:variables', to)
+    if (template) {
+      meta.templateId = template
+      meta.variables = { ...custom, ...variables, ...templateVariables }
+    }
     const perRecipient = jsonObject(text(body, 'recipient-variables'), 'recipient-variables', to)
     const cc = recipients(addresses(body, 'cc'), 'cc', to)
     const bcc = recipients(addresses(body, 'bcc'), 'bcc', to)
@@ -137,10 +151,10 @@ const send: SendRoute = {
       subject: substitute(text(body, 'subject'), vars) ?? '',
       text: substitute(plain, vars),
       html: substitute(html, vars),
-      headers,
+      headers: substituteValues(headers, vars),
       attachments,
       raw: req.rawBody,
-      meta: Object.keys(vars).length > 0 ? { ...meta, recipientVariables: vars } : meta,
+      meta: Object.keys(vars).length > 0 ? substituteMeta(meta, vars) : meta,
       idempotencyKey: null,
     })
 

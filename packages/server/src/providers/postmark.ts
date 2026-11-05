@@ -59,7 +59,7 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
     throw error(300, `Invalid '${field}' field.`)
   }
   const data = result.data
-  const to = splitAddresses(data.To ?? '').map((v) => parseMailbox(v)?.address ?? v)
+  const to = [data.To, data.Cc, data.Bcc].flatMap((v) => splitAddresses(v ?? '')).map((v) => parseMailbox(v)?.address ?? v)
   if (to.length === 0) throw error(300, 'Zero recipients specified', to)
   if (!data.From || !parseMailbox(data.From)) {
     throw error(300, `Error parsing 'From': Illegal email address '${data.From ?? ''}'. It must contain the '@' symbol.`, to)
@@ -99,8 +99,9 @@ function toMessage(body: unknown, templated: boolean, req: IncomingRequest, raw:
 }
 
 function receipt(m: Message) {
+  const to = m.recipients.filter((r) => r.kind === 'to').map((r) => r.address)
   return {
-    To: m.recipients.filter((r) => r.kind === 'to').map((r) => r.address).join(', '),
+    ...(to.length > 0 ? { To: to.join(', ') } : {}),
     SubmittedAt: m.createdAt,
     MessageID: m.providerId,
     ErrorCode: 0,

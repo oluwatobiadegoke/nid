@@ -91,7 +91,7 @@ nid checks, in the same way SendGrid does:
 | `subject` is present, at the top or in the personalization, unless `template_id` is set | `400`, field `subject` |
 | `content` has a value, unless `template_id` is set | `400`, field `content` |
 | Every `email` is a bare address, without a display name | `400 Does not contain a valid address.` |
-| No address appears twice across `to`, `cc` and `bcc` of one personalization | `400`, field `personalizations.{n}.cc` |
+| No address appears twice across `to`, `cc` and `bcc` of one personalization | `400`, field `personalizations.{n}.to`, `.cc` or `.bcc` |
 | `reply_to` and `reply_to_list` are not both set | `400`, field `reply_to` |
 | A `text/plain` block, if any, comes first in `content` | `400`, field `content.0.type` |
 
@@ -114,7 +114,7 @@ Sends one email. Returns `200 {"To", "SubmittedAt", "MessageID", "ErrorCode": 0,
 | Check | Error |
 | --- | --- |
 | The body is a JSON object | `422 {"ErrorCode": 402}` |
-| `To` has at least one address | `422 {"ErrorCode": 300, "Message": "Zero recipients specified"}` |
+| `To`, `Cc` or `Bcc` has at least one address | `422 {"ErrorCode": 300, "Message": "Zero recipients specified"}` |
 | `From` is an address | `422 {"ErrorCode": 300}` |
 | `HtmlBody` or `TextBody` is present | `422 {"ErrorCode": 300}` |
 | Every address looks like an address | `422 {"ErrorCode": 300}` |
@@ -132,6 +132,8 @@ Sends up to 500 emails. The body is a JSON array of `POST /email` bodies. Return
 ### POST /email/batchWithTemplates
 
 Like `POST /email/batch`, with `{"Messages": [...]}` of `POST /email/withTemplate` bodies.
+
+The Postmark routes also answer with a trailing slash, such as `/email/withTemplate/`, which some clients send. The bulk API (`POST /email/bulk`) is not supported yet.
 
 ## Mailgun
 
@@ -151,9 +153,9 @@ Sends an email from a `multipart/form-data` or `application/x-www-form-urlencode
 | `to` has at least one address | `400 {"message": "'to' parameter is missing"}` |
 | `text`, `html` or `template` is present | `400 {"message": "Need at least one of 'text', 'html' or 'template' parameters specified"}` |
 | Every address looks like an address | `400 {"message": "... is not a valid address ..."}` |
-| `t:variables` and `recipient-variables` are JSON objects | `400` |
+| `t:variables`, `h:X-Mailgun-Variables` and `recipient-variables` are JSON objects | `400` |
 
-Also stored: `h:` fields as headers (`h:Reply-To` sets the reply-to), `v:` fields as `meta.customVariables`, `o:tag` as `meta.tags`, `o:deliverytime`, `attachment` and `inline` files, and the domain as `meta.domain`. `template` is stored as `meta.templateId`, and `t:variables` (or `h:X-Mailgun-Variables`) as `meta.variables`. A send with `o:testmode` set to `yes` is stored with `meta.sandbox` set to `true`.
+Also stored: `h:` fields as headers (`h:Reply-To` sets the reply-to), `v:` fields as `meta.customVariables`, `o:tag` as `meta.tags`, `o:deliverytime`, `attachment` and `inline` files, and the domain as `meta.domain`. `template` is stored as `meta.templateId`. For a template send, the `v:` fields, `h:X-Mailgun-Variables` and `t:variables` are merged into `meta.variables`, with `t:variables` winning. A send with `o:testmode` set to `yes` is stored with `meta.sandbox` set to `true`.
 
 ### POST /v3/{domain}/messages.mime
 
@@ -161,7 +163,7 @@ Sends a message you built yourself, for example with Nodemailer. The form needs 
 
 ### Batch sends
 
-With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message, and `%recipient.<key>%` in the subject and body is replaced with that address's value, as in a Mailgun batch send.
+With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
 
 ## SMTP
 
