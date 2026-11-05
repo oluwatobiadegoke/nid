@@ -219,7 +219,7 @@ export class KyselyStore implements Store {
       .values({
         project_id: projectId,
         provider: rejection.provider,
-        to_addresses: JSON.stringify(rejection.to),
+        to_addresses: JSON.stringify(rejection.to.map((a) => a.toLowerCase())),
         status: rejection.status,
         error: rejection.error,
         raw: rejection.raw,
@@ -233,9 +233,13 @@ export class KyselyStore implements Store {
     let q = this.db.selectFrom('rejections').selectAll().where('project_id', '=', projectId)
     if (query.after !== undefined) q = q.where('id', '>', query.after)
     if (query.since) q = q.where('created_at', '>=', query.since)
-    const limit = Math.min(query.limit ?? defaultLimit, maxLimit)
-    const rows = await q.orderBy('id', 'desc').limit(limit * 4).execute()
     const address = query.to?.trim().toLowerCase()
+    if (address) {
+      const pattern = `%${JSON.stringify(address).replace(/[\\%_]/g, '\\$&')}%`
+      q = q.where(sql<boolean>`to_addresses like ${pattern} escape ${'\\'}`)
+    }
+    const limit = Math.min(query.limit ?? defaultLimit, maxLimit)
+    const rows = await q.orderBy('id', 'desc').limit(limit).execute()
     return rows
       .map((row) => ({
         id: row.id,
@@ -247,8 +251,6 @@ export class KyselyStore implements Store {
         raw: row.raw,
         createdAt: row.created_at,
       }))
-      .filter((r) => !address || r.to.some((t) => t.toLowerCase() === address))
-      .slice(0, limit)
   }
 
   async deleteExpired(now: string) {

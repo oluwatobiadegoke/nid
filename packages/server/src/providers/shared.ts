@@ -80,7 +80,7 @@ export function recipientsFrom(
   return values.map((v) => ({ address: normalizeAddress(v.address), name: v.name?.trim() || null, kind }))
 }
 
-export function addressList(value: string | string[] | undefined | null): string[] {
+export function addressList(value: unknown): string[] {
   if (!value) return []
   const list = Array.isArray(value) ? value : [value]
   return list.flatMap((v) => (typeof v === 'string' ? [v] : [])).map((v) => v.trim()).filter(Boolean)

@@ -119,3 +119,13 @@ test('bad sends fail with Postmark 422 errors and a missing token gets the 401',
   assert.equal(noToken.status, 401)
   assert.equal(noToken.body.ErrorCode, 10)
 })
+
+test('every refused message in a large batch can still be found by its recipient', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const items = Array.from({ length: 60 }, (_, i) => ({ From: 'noreply', To: `user_${i}@inbox.test`, TextBody: 'Hi' }))
+  const res = await send(server, '/email/batch', items)
+  assert.equal(res.status, 200)
+  assert.equal((await server.store.listRejections('default', { to: 'user_0@inbox.test', limit: 1 })).length, 1)
+  assert.equal((await server.store.listRejections('default', { to: 'userx0@inbox.test' })).length, 0)
+})

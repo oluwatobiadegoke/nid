@@ -108,11 +108,12 @@ test('a refused batch is recorded against every recipient in it', async (t) => {
     headers: resendHeaders,
     body: JSON.stringify([
       { from: 'a@acme.com', to: 'fine@inbox.test', subject: 'One', text: 'One' },
-      { from: 'a@acme.com', to: 'other@inbox.test', text: 'No subject' },
+      { from: 'a@acme.com', to: 'other@inbox.test', cc: 'team@acme.com', text: 'No subject' },
     ]),
   })
   assert.equal(res.status, 422)
   assert.equal((await server.store.listRejections('default', { to: 'fine@inbox.test' })).length, 1)
+  assert.equal((await server.store.listRejections('default', { to: 'team@acme.com' })).length, 1)
 })
 
 test('GET /emails/:id returns the email the way Resend does', async (t) => {

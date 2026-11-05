@@ -103,9 +103,10 @@ test('a template batch reads each person\'s code from v: fields filled by recipi
 test('bad sends fail with Mailgun 400 messages and a missing key gets Forbidden', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
-  const noFrom = await send(server, new URLSearchParams({ to: 'x@inbox.test', text: 'Hi' }))
+  const noFrom = await send(server, new URLSearchParams({ to: 'x@inbox.test', bcc: 'audit@acme.com', text: 'Hi' }))
   assert.equal(noFrom.status, 400)
   assert.deepEqual(noFrom.body, { message: "'from' parameter is missing" })
+  assert.equal((await server.store.listRejections('default', { to: 'audit@acme.com' })).length, 1)
   const noTo = await send(server, new URLSearchParams({ from: 'a@acme.com', text: 'Hi' }))
   assert.equal(noTo.body.message, "'to' parameter is missing")
   const noBody = await send(server, new URLSearchParams({ from: 'a@acme.com', to: 'x@inbox.test' }))

@@ -23,10 +23,8 @@ function error(status: number, code: string, message: string): SendError {
   return new SendError({ status, body: { statusCode: status, message, name: code } }, [], message)
 }
 
-function rawRecipients(items: unknown[]): string[] {
-  return items
-    .flatMap((item) => (isRecord(item) ? [item.to, item.cc, item.bcc].flatMap((v) => addressList(v as string | string[] | undefined)) : []))
-    .map(looseAddress)
+function rawTo(body: unknown): string[] {
+  return isRecord(body) ? [body.to, body.cc, body.bcc].flatMap(addressList).map(looseAddress) : []
 }
 
 const addressField = z.union([z.string(), z.array(z.string()).max(50)])
@@ -139,7 +137,7 @@ const send: SendRoute = {
   method: 'POST',
   path: '/emails',
   parse(req) {
-    return rejectedFor(rawRecipients([req.body]), () => [toMessage(req.body, req, req.rawBody)])
+    return rejectedFor(rawTo(req.body), () => [toMessage(req.body, req, req.rawBody)])
   },
   reply(messages) {
     return { status: 200, body: { id: messages[0]?.providerId } }
@@ -153,7 +151,7 @@ const batch: SendRoute = {
   parse(req) {
     const items = req.body
     if (!Array.isArray(items)) throw error(422, 'validation_error', 'Request body must be an array of emails.')
-    return rejectedFor(rawRecipients(items), () => {
+    return rejectedFor(items.flatMap(rawTo), () => {
       if (items.length === 0) throw error(422, 'validation_error', 'Request body must contain at least one email.')
       if (items.length > 100) throw error(422, 'validation_error', 'Batch requests are limited to 100 emails.')
       return keyPerItem(items.map((item) => toMessage(item, req, JSON.stringify(item))))
