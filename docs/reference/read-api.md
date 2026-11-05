@@ -167,7 +167,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | `html` | string or null | HTML body. |
 | `headers` | object | Headers from the send. For SMTP, every header of the message. |
 | `attachments` | object[] | Each as `{n, filename, contentType, contentId, size, url}`. |
-| `extracted` | object | `{code, codes, link, links}`. See below. |
+| `extracted` | object | `{code, codes, link, links}`. See the next table. |
 | `meta` | object | Extra details, such as `templateId`, `variables`, `tags`, `scheduledAt`, or the SMTP `envelope`. |
 | `createdAt` | string | ISO 8601 time nid stored it. |
 | `expiresAt` | string or null | Set only when a retention limit applies. |

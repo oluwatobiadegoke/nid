@@ -22,7 +22,7 @@ You need Node.js 22.13 or later.
    RESEND_BASE_URL=http://127.0.0.1:4400 npm run dev
    ```
 
-3. Read the mail in a test:
+3. Read the mail in a Playwright test:
 
    ```ts
    import { test, expect } from '@nid-inbox/client/playwright'
