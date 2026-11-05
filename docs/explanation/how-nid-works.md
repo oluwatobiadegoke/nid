@@ -92,7 +92,7 @@ Every stored message and every query carries a project id. On your machine there
 
 Today:
 
-- Only Resend, Brevo and SMTP are supported. SendGrid, Postmark, Mailgun and Amazon SES are planned.
+- Only Resend, Brevo and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
 - There is no MCP server for AI agents yet.
 - There are no delivery webhooks, so nid never calls your app back with "delivered" or "bounced" events.
 - `retentionHours` stamps an expiry time on messages, but nothing deletes expired messages yet.

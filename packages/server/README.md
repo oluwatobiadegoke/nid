@@ -45,9 +45,9 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 
 ## What it does
 
-- Shows every email your app sends in a web page, as it arrives. You see the sender, the recipients, the HTML, the text, the attachments, and the sign-in code and link nid found.
+- Shows every email your app sends in the web view, a page in your browser, as it arrives. You see the sender, the recipients, the HTML, the text, the attachments, and the sign-in code and link nid found.
 - Keeps your mail on your machine. It listens on 127.0.0.1 only and sends nothing out, so no one else can read it.
-- Answers the provider's own API, so each SDK only needs a base URL. Resend and Brevo today. SendGrid, Postmark, Mailgun and SES are next.
+- Works with Resend and Brevo. Point your email SDK's base URL at nid, and your app's code stays the same.
 - Takes SMTP on port 1025 for everything else.
 - Shows the sends it refused, with the error your app got, so you can see why an email never arrived.
 - Lets tests and scripts read the same mail, and wait for the next email without polling.
