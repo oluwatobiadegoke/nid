@@ -69,6 +69,64 @@ api.basePath = 'http://127.0.0.1:4400/v3'
 
 Send `POST /v3/smtp/email` to `http://127.0.0.1:4400` with the same body as the Brevo API. Put your key in the `api-key` header.
 
+## SendGrid
+
+### Node.js
+
+Set the base URL on the SDK's client after you set the key. `setApiKey` resets the base URL, so the order matters:
+
+```js
+import sgMail from '@sendgrid/mail'
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+sgMail.client.setDefaultRequest('baseUrl', 'http://127.0.0.1:4400')
+```
+
+### Any other language
+
+Send `POST /v3/mail/send` to `http://127.0.0.1:4400` with the same body as the SendGrid API. Put your key in `Authorization: Bearer <key>`.
+
+## Postmark
+
+### Node.js
+
+Pass `useHttps` and `requestHost` when you create the client. `requestHost` is a host and port, not a URL:
+
+```js
+import { ServerClient } from 'postmark'
+
+const postmark = new ServerClient(process.env.POSTMARK_SERVER_TOKEN, {
+  useHttps: false,
+  requestHost: '127.0.0.1:4400',
+})
+```
+
+### Any other language
+
+Send to `http://127.0.0.1:4400` with the same paths and bodies as the Postmark API. Put your token in the `X-Postmark-Server-Token` header. nid supports:
+
+- `POST /email`
+- `POST /email/batch`
+- `POST /email/withTemplate`
+- `POST /email/batchWithTemplates`
+
+## Mailgun
+
+### Node.js
+
+Pass `url` when you create the client. Leave out `/v3`. Node.js 18 and later have `FormData` built in:
+
+```js
+import Mailgun from 'mailgun.js'
+
+const mailgun = new Mailgun(FormData)
+const mg = mailgun.client({ username: 'api', key: process.env.MAILGUN_API_KEY, url: 'http://127.0.0.1:4400' })
+```
+
+### Any other language
+
+Send `POST /v3/<your domain>/messages` to `http://127.0.0.1:4400` as a form, with Basic auth user `api` and your key as the password.
+
 ## SMTP
 
 Use SMTP for any library or framework that sends mail over SMTP, such as Nodemailer, Django, Rails Action Mailer or Laravel.
@@ -96,6 +154,9 @@ Locally, any API key value works. But nid checks that a key is there and that it
 
 - Resend needs `Authorization: Bearer <key>`.
 - Brevo needs an `api-key` header.
+- SendGrid needs `Authorization: Bearer <key>`.
+- Postmark needs an `X-Postmark-Server-Token` header.
+- Mailgun needs Basic auth with user `api` and the key as the password.
 
 A request with no key, or with the key in the wrong place, fails with the same status and body the real provider returns. This means a missing key in your config shows up in tests, not in production.
 

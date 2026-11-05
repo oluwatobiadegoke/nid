@@ -65,7 +65,7 @@ Waits for the next message to `address` that matches, and returns it as an `Emai
 | --- | --- |
 | `after` | Only messages with an id greater than this. Overrides the remembered cursor. |
 | `subject` | Part of the subject, in any case. |
-| `provider` | `resend`, `brevo` or `smtp`. |
+| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `hasCode` | Skip messages with no code. |
 | `codePattern` | A `RegExp` or string. Skips messages it does not match. Its first group, or the whole match, becomes `code`. Flags on a `RegExp` are dropped; matching ignores case. |
 | `timeout` | Seconds to wait, from 0 to 120. Default 30. |

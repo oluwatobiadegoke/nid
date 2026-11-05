@@ -73,7 +73,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes
   const ingest = createIngest({ store, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
 
-  const app = new Hono()
+  const app = new Hono({ strict: false })
   app.use('*', hostCheck(options.allowHosts ?? []))
   if (options.cors) app.use('*', cors())
   app.use(

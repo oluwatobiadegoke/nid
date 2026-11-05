@@ -1,12 +1,24 @@
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, header, isRecord, normalizeAddress, recipientsFrom, stringHeaders, timestampId } from './shared.js'
+import {
+  attachmentFrom,
+  formatMailbox,
+  header,
+  isRecord,
+  keyPerItem,
+  looseAddress,
+  normalizeAddress,
+  recipientsFrom,
+  rejectedFor,
+  stringHeaders,
+  timestampId,
+} from './shared.js'
 import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
 
 const name = 'brevo'
 
-function error(status: number, code: string, message: string, to: string[] = []): SendError {
-  return new SendError({ status, body: { code, message } }, to, message)
+function error(code: string, message: string): SendError {
+  return new SendError({ status: 400, body: { code, message } }, [], message)
 }
 
 const contact = z.object({ email: z.string(), name: z.string().optional() })
@@ -49,10 +61,10 @@ const sendSchema = z
 type SendBody = z.infer<typeof sendSchema>
 type Version = z.infer<typeof versionSchema>
 
-function recipients(list: Array<{ email: string; name?: string | undefined }> | undefined, kind: Recipient['kind'], to: string[]) {
+function recipients(list: Array<{ email: string; name?: string | undefined }> | undefined, kind: Recipient['kind']) {
   for (const c of list ?? []) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) {
-      throw error(400, 'invalid_parameter', `email is invalid in ${kind}`, to)
+    if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(c.email)) {
+      throw error('invalid_parameter', `email is invalid in ${kind}`)
     }
   }
   return recipientsFrom((list ?? []).map((c) => ({ address: c.email, name: c.name })), kind)
@@ -73,21 +85,16 @@ function build(data: SendBody, version: Version | null, req: IncomingRequest, ra
     textContent: version?.textContent ?? data.textContent,
     params: version?.params ?? data.params,
   }
-  const to = (merged.to ?? []).map((c) => normalizeAddress(c.email))
-  if (to.length === 0) throw error(400, 'missing_parameter', 'to is missing')
+  if (!merged.to?.length) throw error('missing_parameter', 'to is missing')
   const templated = data.templateId !== undefined
   if (!templated) {
-    if (!data.sender?.email) throw error(400, 'missing_parameter', 'sender is missing', to)
-    if (!merged.subject) throw error(400, 'missing_parameter', 'subject is missing', to)
+    if (!data.sender?.email) throw error('missing_parameter', 'sender is missing')
+    if (!merged.subject) throw error('missing_parameter', 'subject is missing')
     if (!merged.htmlContent && !merged.textContent) {
-      throw error(400, 'missing_parameter', 'htmlContent or textContent is missing', to)
+      throw error('missing_parameter', 'htmlContent or textContent is missing')
     }
   }
-  const from = data.sender?.email
-    ? data.sender.name
-      ? `${data.sender.name} <${normalizeAddress(data.sender.email)}>`
-      : normalizeAddress(data.sender.email)
-    : ''
+  const from = data.sender?.email ? formatMailbox(data.sender.email, data.sender.name) : ''
   const meta: Record<string, unknown> = {}
   if (templated) {
     meta.templateId = data.templateId
@@ -106,9 +113,9 @@ function build(data: SendBody, version: Version | null, req: IncomingRequest, ra
     from,
     replyTo: merged.replyTo?.email ? [normalizeAddress(merged.replyTo.email)] : [],
     recipients: [
-      ...recipients(merged.to, 'to', to),
-      ...recipients(merged.cc, 'cc', to),
-      ...recipients(merged.bcc, 'bcc', to),
+      ...recipients(merged.to, 'to'),
+      ...recipients(merged.cc, 'cc'),
+      ...recipients(merged.bcc, 'bcc'),
     ],
     subject: merged.subject ?? '',
     text: merged.textContent ?? null,
@@ -123,23 +130,28 @@ function build(data: SendBody, version: Version | null, req: IncomingRequest, ra
   }
 }
 
+function rawTo(body: Record<string, unknown>): string[] {
+  const versions = Array.isArray(body.messageVersions) ? body.messageVersions : []
+  return [body, ...versions]
+    .flatMap((v) => (isRecord(v) ? ['to', 'cc', 'bcc'].flatMap((k) => (Array.isArray(v[k]) ? v[k] : [])) : []))
+    .flatMap((c) => (isRecord(c) && typeof c.email === 'string' ? [looseAddress(c.email)] : []))
+}
+
 const send: SendRoute = {
   kind: 'send',
   method: 'POST',
   path: '/v3/smtp/email',
   parse(req) {
-    if (!isRecord(req.body)) throw error(400, 'invalid_parameter', 'Invalid request body')
-    const result = sendSchema.safeParse(req.body)
-    if (!result.success) {
-      const issue = result.error.issues[0]
-      const field = issue?.path[0] ? String(issue.path[0]) : 'body'
-      throw error(400, 'invalid_parameter', `${field} is invalid`)
-    }
-    const data = result.data
-    if (data.messageVersions && data.messageVersions.length > 0) {
-      return data.messageVersions.map((v) => build(data, v, req, req.rawBody))
-    }
-    return [build(data, null, req, req.rawBody)]
+    const body = req.body
+    if (!isRecord(body)) throw error('invalid_parameter', 'Invalid request body')
+    return rejectedFor(rawTo(body), () => {
+      const result = sendSchema.safeParse(body)
+      if (!result.success) throw error('invalid_parameter', `${String(result.error.issues[0]?.path[0] ?? 'body')} is invalid`)
+      const data = result.data
+      const versions = data.messageVersions ?? []
+      if (versions.length === 0) return [build(data, null, req, req.rawBody)]
+      return keyPerItem(versions.map((v) => build(data, v, req, req.rawBody)))
+    })
   },
   reply(messages) {
     if (messages.length > 1) return { status: 201, body: { messageIds: messages.map((m) => m.providerId) } }

@@ -1,0 +1,201 @@
+import { randomBytes } from 'node:crypto'
+import { z } from 'zod'
+import type { NewMessage, Recipient } from '../types.js'
+import { attachmentFrom, bearer, formatMailbox, isRecord, looseAddress, normalizeAddress, recipientsFrom, rejectedFor, stringHeaders } from './shared.js'
+import { SendError, type Provider, type SendRoute } from './types.js'
+
+const name = 'sendgrid'
+const help = 'http://sendgrid.com/docs/API_Reference/Web_API_v3/Mail/errors.html'
+
+function error(message: string, field: string | null): SendError {
+  return new SendError({ status: 400, body: { errors: [{ message, field, help: field ? `${help}#message.${field}` : null }] } }, [], message)
+}
+
+const address = z.object({ email: z.string(), name: z.string().nullish() })
+const addresses = z.array(address)
+
+const personalizationSchema = z.object({
+  to: addresses.optional(),
+  cc: addresses.optional(),
+  bcc: addresses.optional(),
+  from: address.optional(),
+  subject: z.string().optional(),
+  headers: z.record(z.string(), z.unknown()).optional(),
+  substitutions: z.record(z.string(), z.unknown()).optional(),
+  dynamic_template_data: z.record(z.string(), z.unknown()).optional(),
+  custom_args: z.record(z.string(), z.unknown()).optional(),
+  send_at: z.number().optional(),
+})
+
+const sendSchema = z
+  .object({
+    personalizations: z.array(personalizationSchema).max(1000).optional(),
+    from: address.optional(),
+    reply_to: address.optional(),
+    reply_to_list: addresses.optional(),
+    subject: z.string().optional(),
+    content: z.array(z.object({ type: z.string(), value: z.string() })).optional(),
+    attachments: z
+      .array(
+        z.object({
+          content: z.string(),
+          filename: z.string(),
+          type: z.string().optional(),
+          disposition: z.string().optional(),
+          content_id: z.string().optional(),
+        }),
+      )
+      .optional(),
+    template_id: z.string().optional(),
+    headers: z.record(z.string(), z.unknown()).optional(),
+    categories: z.array(z.string()).optional(),
+    custom_args: z.record(z.string(), z.unknown()).optional(),
+    send_at: z.number().optional(),
+    batch_id: z.string().optional(),
+    mail_settings: z.object({ sandbox_mode: z.object({ enable: z.boolean().optional() }).optional() }).passthrough().optional(),
+  })
+  .passthrough()
+
+type SendBody = z.infer<typeof sendSchema>
+type Personalization = z.infer<typeof personalizationSchema>
+
+function checkAddress(email: string, field: string) {
+  if (!/^[^\s@<>",]+@[^\s@<>",.]+(?:\.[^\s@<>",.]+)+$/.test(email.trim())) throw error('Does not contain a valid address.', field)
+}
+
+function recipients(p: Personalization, field: string): Recipient[] {
+  const seen = new Set<string>()
+  return (['to', 'cc', 'bcc'] as const).flatMap((kind) => {
+    const list = p[kind] ?? []
+    for (const [j, a] of list.entries()) {
+      checkAddress(a.email, `${field}.${kind}.${j}.email`)
+      const address = normalizeAddress(a.email)
+      if (seen.has(address)) {
+        const message = `Each email address in the personalization block should be unique between to, cc, and bcc. We found the first duplicate instance of [${address}] in the ${field}.${kind} field.`
+        throw error(message, `${field}.${kind}`)
+      }
+      seen.add(address)
+    }
+    return recipientsFrom(list.map((a) => ({ address: a.email, name: a.name })), kind)
+  })
+}
+
+function substitute(value: string | null | undefined, substitutions: Record<string, unknown> | undefined): string | null {
+  if (value === null || value === undefined) return null
+  let out = value
+  for (const [key, replacement] of Object.entries(substitutions ?? {})) out = out.split(key).join(String(replacement))
+  return out
+}
+
+function build(data: SendBody, p: Personalization, i: number, id: string, raw: string): NewMessage {
+  const field = `personalizations.${i}`
+  if (!p.to?.length) {
+    throw error('The to array is required for all personalization objects, and must have at least one email object with a valid email address.', `${field}.to`)
+  }
+  const from = p.from ?? data.from
+  if (!from?.email) {
+    throw error('The from object must be provided for every email send. It is an object that requires the email parameter, but may also contain a name parameter.', 'from.email')
+  }
+  checkAddress(from.email, 'from.email')
+  const list = recipients(p, field)
+  if (data.reply_to && data.reply_to_list) {
+    throw error('The reply_to and reply_to_list parameters cannot be used together.', 'reply_to')
+  }
+  const replyTo = data.reply_to_list ?? (data.reply_to ? [data.reply_to] : [])
+  for (const [j, a] of replyTo.entries()) checkAddress(a.email, data.reply_to_list ? `reply_to_list.${j}.email` : 'reply_to.email')
+  const subject = p.subject ?? data.subject
+  if (!subject && !data.template_id) {
+    throw error('The subject is required. You can get around this requirement if you use a template with a subject defined or if every personalization has a subject defined.', 'subject')
+  }
+  if (!data.template_id && !data.content?.some((c) => c.value)) {
+    throw error('Unless a valid template_id is provided, the content parameter is required. There must be at least one defined content block. We typically suggest both text/plain and text/html blocks are included, but only one block is required.', 'content')
+  }
+  const empty = data.content?.findIndex((c) => c.value === '') ?? -1
+  if (empty >= 0) throw error('The content value must be a string at least one character in length.', `content.${empty}.value`)
+  const plainAt = data.content?.findIndex((c) => c.type === 'text/plain') ?? -1
+  if (plainAt > 0) {
+    throw error('If present, text/plain content must be first, followed by text/html, followed by any other content.', 'content.0.type')
+  }
+  const text = data.content?.[plainAt]?.value
+  const html = data.content?.find((c) => c.type === 'text/html')?.value
+  const meta: Record<string, unknown> = {}
+  if (data.template_id) meta.templateId = data.template_id
+  const variables = p.dynamic_template_data ?? (p.substitutions && unwrapKeys(p.substitutions))
+  if (variables) meta.variables = variables
+  if (data.categories) meta.tags = data.categories
+  const customArgs = { ...data.custom_args, ...p.custom_args }
+  if (Object.keys(customArgs).length > 0) meta.customArgs = customArgs
+  const sendAt = p.send_at ?? data.send_at
+  if (sendAt) meta.scheduledAt = new Date(sendAt * 1000).toISOString()
+  if (data.batch_id) meta.batchId = data.batch_id
+  if (data.mail_settings?.sandbox_mode?.enable) meta.sandbox = true
+  return {
+    provider: name,
+    providerId: `${id}.${i}`,
+    from: formatMailbox(from.email, from.name),
+    replyTo: replyTo.map((a) => normalizeAddress(a.email)),
+    recipients: list,
+    subject: substitute(subject, p.substitutions) ?? '',
+    text: substitute(text, p.substitutions),
+    html: substitute(html, p.substitutions),
+    headers: { ...stringHeaders(data.headers), ...stringHeaders(p.headers) },
+    attachments: (data.attachments ?? []).map((a) =>
+      attachmentFrom(a.filename, a.content, a.type, a.disposition === 'inline' ? a.content_id : null),
+    ),
+    raw,
+    meta,
+    idempotencyKey: null,
+  }
+}
+
+function rawTo(body: Record<string, unknown>): string[] {
+  const personalizations = Array.isArray(body.personalizations) ? body.personalizations : []
+  return personalizations
+    .flatMap((p) => (isRecord(p) ? [p.to, p.cc, p.bcc].flatMap((list) => (Array.isArray(list) ? list : [])) : []))
+    .flatMap((a) => (isRecord(a) && typeof a.email === 'string' ? [looseAddress(a.email)] : []))
+}
+
+function unwrapKeys(substitutions: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(substitutions).map(([k, v]) => [k.match(/\w(?:.*\w)?/s)?.[0] ?? k, v]))
+}
+
+const send: SendRoute = {
+  kind: 'send',
+  method: 'POST',
+  path: '/v3/mail/send',
+  parse(req) {
+    const body = req.body
+    if (!isRecord(body)) throw error('Bad Request', null)
+    return rejectedFor(rawTo(body), () => {
+      const result = sendSchema.safeParse(body)
+      if (!result.success) throw error('Invalid type.', result.error.issues[0]?.path.join('.') || null)
+      const data = result.data
+      if (!data.personalizations?.length) {
+        throw error('The personalizations field is required and must have at least one personalization.', 'personalizations')
+      }
+      const id = randomBytes(16).toString('base64url').slice(0, 22)
+      return data.personalizations.map((p, i) => build(data, p, i, id, req.rawBody))
+    })
+  },
+  reply(messages) {
+    const id = messages[0]?.providerId.split('.')[0] ?? ''
+    return { status: 202, body: null, headers: { 'x-message-id': id } }
+  },
+}
+
+export const sendgrid: Provider = {
+  name,
+  label: 'SendGrid',
+  credential: bearer,
+  unauthorized() {
+    return {
+      status: 401,
+      body: { errors: [{ message: 'The provided authorization grant is invalid, expired, or revoked', field: null, help: null }] },
+    }
+  },
+  routes: [send],
+  setup: {
+    env: "sgMail.client.setDefaultRequest('baseUrl', 'http://127.0.0.1:4400')",
+    note: 'Call it after sgMail.setApiKey. Other SDKs: set the API host to http://127.0.0.1:4400.',
+  },
+}
