@@ -87,7 +87,6 @@ function substitute(value: string | null | undefined, substitutions: Record<stri
   return out
 }
 
-
 function build(data: SendBody, p: Personalization, i: number, id: string, raw: string): NewMessage {
   const field = `personalizations.${i}`
   const to = (p.to ?? []).map((a) => parseMailbox(a.email)?.address ?? normalizeAddress(a.email))
@@ -112,6 +111,8 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   if (!data.template_id && !data.content?.some((c) => c.value)) {
     throw error(400, 'Unless a valid template_id is provided, the content parameter is required. There must be at least one defined content block. We typically suggest both text/plain and text/html blocks are included, but only one block is required.', 'content', to)
   }
+  const empty = data.content?.findIndex((c) => c.value === '') ?? -1
+  if (empty >= 0) throw error(400, 'The content value must be a string at least one character in length.', `content.${empty}.value`, to)
   const plainAt = data.content?.findIndex((c) => c.type === 'text/plain') ?? -1
   if (plainAt > 0) {
     throw error(400, 'If present, text/plain content must be first, followed by text/html, followed by any other content.', 'content.0.type', to)
@@ -120,7 +121,7 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   const html = data.content?.find((c) => c.type === 'text/html')?.value
   const meta: Record<string, unknown> = {}
   if (data.template_id) meta.templateId = data.template_id
-  const variables = p.dynamic_template_data ?? p.substitutions
+  const variables = p.dynamic_template_data ?? (p.substitutions && unwrapKeys(p.substitutions))
   if (variables) meta.variables = variables
   if (data.categories) meta.tags = data.categories
   const customArgs = { ...data.custom_args, ...p.custom_args }
@@ -148,6 +149,17 @@ function build(data: SendBody, p: Personalization, i: number, id: string, raw: s
   }
 }
 
+function rawTo(body: Record<string, unknown>): string[] {
+  const personalizations = Array.isArray(body.personalizations) ? body.personalizations : []
+  return personalizations
+    .flatMap((p) => (isRecord(p) && Array.isArray(p.to) ? p.to : []))
+    .flatMap((a) => (isRecord(a) && typeof a.email === 'string' ? [normalizeAddress(a.email)] : []))
+}
+
+function unwrapKeys(substitutions: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(substitutions).map(([k, v]) => [k.replace(/^\W+|\W+$/g, ''), v]))
+}
+
 const send: SendRoute = {
   kind: 'send',
   method: 'POST',
@@ -157,7 +169,7 @@ const send: SendRoute = {
     const result = sendSchema.safeParse(req.body)
     if (!result.success) {
       const field = result.error.issues[0]?.path.join('.') || null
-      throw error(400, 'Invalid type.', field)
+      throw error(400, 'Invalid type.', field, rawTo(req.body))
     }
     const data = result.data
     if (!data.personalizations?.length) {

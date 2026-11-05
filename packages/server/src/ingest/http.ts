@@ -98,7 +98,7 @@ async function handleSend(
     outcomes.push(existing ?? (await ingest.accept(project, message)))
   }
   const stored = outcomes.filter((o): o is Message => !(o instanceof SendError))
-  return send(c, route.reply(stored, req, outcomes))
+  return send(c, route.reply(stored, outcomes))
 }
 
 async function handleRead(c: Context, route: ReadRoute, req: IncomingRequest, project: Project, store: Store) {

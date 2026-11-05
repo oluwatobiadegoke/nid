@@ -95,7 +95,6 @@ function messageId(domain: string): string {
   return `<${timestampId()}.${randomBytes(8).toString('hex')}@${domain}>`
 }
 
-
 function substituteValues<T>(record: Record<string, T>, vars: Record<string, unknown>): Record<string, T> {
   return Object.fromEntries(Object.entries(record).map(([k, v]) => [k, typeof v === 'string' ? substitute(v, vars) : v])) as Record<string, T>
 }
@@ -115,7 +114,7 @@ const send: SendRoute = {
   async parse(req) {
     const body = formBody(req)
     const toList = addresses(body, 'to')
-    const to = toList.flatMap(looseAddresses)
+    const to = toList.map((v) => parseMailbox(v)?.address ?? v)
     const from = text(body, 'from')
     if (!from) throw error(400, "'from' parameter is missing", to)
     if (!parseMailbox(from)) throw error(400, 'from parameter is not a valid address. please check documentation', to)
@@ -172,7 +171,7 @@ const mime: SendRoute = {
   async parse(req) {
     const body = formBody(req)
     const toList = addresses(body, 'to')
-    const to = toList.flatMap(looseAddresses)
+    const to = toList.map((v) => parseMailbox(v)?.address ?? v)
     if (to.length === 0) throw error(400, "'to' parameter is missing", to)
     recipients(toList, 'to', to)
     const raw = values(body, 'message')[0]

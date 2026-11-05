@@ -40,8 +40,7 @@ const emailSchema = z
   })
   .passthrough()
 
-function addresses(value: string | null | undefined, kind: Recipient['kind'], to: string[]): Recipient[] {
-  const field = `${kind[0]!.toUpperCase()}${kind.slice(1)}`
+function addresses(value: string | null | undefined, kind: Recipient['kind'], field: string, to: string[]): Recipient[] {
   return mailboxes(splitAddresses(value ?? ''), kind, (v) =>
     error(300, `Error parsing '${field}': Illegal email address '${v}'. It must contain the '@' symbol.`, to),
   )
@@ -52,7 +51,8 @@ function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
   const result = emailSchema.safeParse(body)
   if (!result.success) {
     const field = String(result.error.issues[0]?.path[0] ?? 'body')
-    throw error(300, `Invalid '${field}' field.`)
+    const to = [body.To, body.Cc, body.Bcc].flatMap((v) => (typeof v === 'string' ? looseAddresses(v) : []))
+    throw error(300, `Invalid '${field}' field.`, to)
   }
   const data = result.data
   const to = [data.To, data.Cc, data.Bcc].flatMap(looseAddresses)
@@ -66,7 +66,12 @@ function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
   if (!templated && !data.HtmlBody && !data.TextBody) {
     throw error(300, 'Provide either email TextBody or HtmlBody or both.', to)
   }
-  const recipients = [...addresses(data.To, 'to', to), ...addresses(data.Cc, 'cc', to), ...addresses(data.Bcc, 'bcc', to)]
+  const recipients = [
+    ...addresses(data.To, 'to', 'To', to),
+    ...addresses(data.Cc, 'cc', 'Cc', to),
+    ...addresses(data.Bcc, 'bcc', 'Bcc', to),
+  ]
+  const replyTo = addresses(data.ReplyTo, 'to', 'ReplyTo', to).map((r) => r.address)
   const meta: Record<string, unknown> = {}
   if (templated) {
     meta.templateId = data.TemplateId ?? data.TemplateAlias
@@ -79,7 +84,7 @@ function toMessage(body: unknown, templated: boolean, raw: string): NewMessage {
     provider: name,
     providerId: randomUUID(),
     from: data.From,
-    replyTo: looseAddresses(data.ReplyTo),
+    replyTo,
     recipients,
     subject: data.Subject ?? '',
     text: data.TextBody ?? null,
@@ -130,8 +135,8 @@ const batch = (path: string, templated: boolean): SendRoute => ({
   kind: 'send',
   method: 'POST',
   path,
-  parse: (req) => batchItems(templated && isRecord(req.body) ? req.body.Messages : req.body, templated),
-  reply: (_messages, _req, outcomes) => ({
+  parse: (req) => batchItems(templated ? (isRecord(req.body) ? req.body.Messages : undefined) : req.body, templated),
+  reply: (_messages, outcomes) => ({
     status: 200,
     body: outcomes.map((o) => (o instanceof SendError ? o.reply.body : receipt(o))),
   }),

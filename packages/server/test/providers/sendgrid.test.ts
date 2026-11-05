@@ -69,6 +69,18 @@ test('each personalization of a template send becomes its own message with its o
   assert.equal(one?.recipients.length, 1)
 })
 
+test('a legacy template send reads its code from the substitutions', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await send(server, {
+    from: { email: 'hello@acme.com' },
+    template_id: '1234-legacy',
+    personalizations: [{ to: [{ email: 'legacy@inbox.test' }], substitutions: { '{{code}}': '778899' } }],
+  })
+  assert.equal(res.status, 202)
+  assert.equal((await server.store.listMessages('default', { to: 'legacy@inbox.test' }))[0]?.extracted.code, '778899')
+})
+
 test('bad sends fail with SendGrid-shaped 400 errors and show up as rejections', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
@@ -91,8 +103,23 @@ test('bad sends fail with SendGrid-shaped 400 errors and show up as rejections',
     content,
   })
   assert.equal(duplicate.body.errors[0].field, 'personalizations.0.cc')
+  const emptyText = await send(server, {
+    personalizations: [{ to: [{ email: 'x@inbox.test' }] }],
+    from: { email: 'a@acme.com' },
+    subject: 'Hi',
+    content: [{ type: 'text/plain', value: '' }, { type: 'text/html', value: '<p>Hi</p>' }],
+  })
+  assert.equal(emptyText.body.errors[0].field, 'content.0.value')
+  const noFilename = await send(server, {
+    personalizations: [{ to: [{ email: 'x@inbox.test' }] }],
+    from: { email: 'a@acme.com' },
+    subject: 'Hi',
+    content,
+    attachments: [{ content: 'aGk=' }],
+  })
+  assert.equal(noFilename.status, 400)
   const rejections = await server.store.listRejections('default', { to: 'x@inbox.test' })
-  assert.equal(rejections.length, 4)
+  assert.equal(rejections.length, 6)
   assert.equal(rejections[0]?.provider, 'sendgrid')
 })
 

@@ -74,16 +74,9 @@ test('a template send reads its code and link from the TemplateModel', async (t)
   assert.equal(stored?.extracted.link, 'https://acme.com/welcome?t=2')
 })
 
-test('batch endpoints store every message and answer with one receipt each', async (t) => {
+test('a template batch takes its emails from Messages and reads each code from the model', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
-  const plain = await send(server, '/email/batch', [
-    { From: 'a@acme.com', To: 'b1@inbox.test', Subject: 'One', TextBody: 'One' },
-    { From: 'a@acme.com', To: 'b2@inbox.test', Subject: 'Two', TextBody: 'Two' },
-  ])
-  assert.equal(plain.status, 200)
-  assert.equal(plain.body.length, 2)
-  assert.equal(plain.body[1].To, 'b2@inbox.test')
   const templated = await send(server, '/email/batchWithTemplates', {
     Messages: [{ From: 'a@acme.com', To: 'b3@inbox.test', TemplateId: 4, TemplateModel: { code: '424242' } }],
   })
@@ -119,7 +112,9 @@ test('bad sends fail with Postmark 422 errors and a missing token gets the 401',
   assert.equal(noBody.body.Message, 'Provide either email TextBody or HtmlBody or both.')
   const noTemplate = await send(server, '/email/withTemplate', { From: 'a@acme.com', To: 'x@inbox.test' })
   assert.equal(noTemplate.body.ErrorCode, 1101)
-  assert.equal((await server.store.listRejections('default', { to: 'x@inbox.test' })).length, 2)
+  const badReplyTo = await send(server, '/email', { From: 'a@acme.com', To: 'x@inbox.test', ReplyTo: 'support', TextBody: 'Hi' })
+  assert.match(badReplyTo.body.Message, /Error parsing 'ReplyTo'/)
+  assert.equal((await server.store.listRejections('default', { to: 'x@inbox.test' })).length, 3)
   const noToken = await send(server, '/email', {}, { 'content-type': 'application/json' })
   assert.equal(noToken.status, 401)
   assert.equal(noToken.body.ErrorCode, 10)

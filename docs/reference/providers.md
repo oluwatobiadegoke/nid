@@ -94,10 +94,11 @@ nid checks, in the same way SendGrid does:
 | No address appears twice across `to`, `cc` and `bcc` of one personalization | `400`, field `personalizations.{n}.to`, `.cc` or `.bcc` |
 | `reply_to` and `reply_to_list` are not both set | `400`, field `reply_to` |
 | A `text/plain` block, if any, comes first in `content` | `400`, field `content.0.type` |
+| No `content` block has an empty `value` | `400`, field `content.{n}.value` |
 
 Errors have SendGrid's shape: `{"errors": [{"message", "field", "help"}]}`.
 
-Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data` becomes `meta.variables`. Its `substitutions` are replaced in the subject and body, as SendGrid does. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
+Also stored: `cc`, `bcc`, `reply_to` or `reply_to_list`, `headers` (personalization headers win), `attachments` (with `content_id` when `disposition` is `inline`), `categories` as `meta.tags`, `custom_args`, `send_at`, `batch_id`, and `template_id`. A personalization's `dynamic_template_data` becomes `meta.variables`. Its `substitutions` are replaced in the subject and body, as SendGrid does. For a legacy template send with no body, the substitutions become `meta.variables`, with wrappers such as `{{ }}` taken off the keys. A send with `mail_settings.sandbox_mode.enable` is stored with `meta.sandbox` set to `true`.
 
 ## Postmark
 
@@ -109,7 +110,7 @@ Point the SDK at nid with `new postmark.ServerClient(token, { useHttps: false, r
 
 Sends one email. Returns `200 {"To", "SubmittedAt", "MessageID", "ErrorCode": 0, "Message": "OK"}`.
 
-`To`, `Cc`, `Bcc` and `ReplyTo` are comma-separated strings, as in Postmark. nid checks:
+`To`, `Cc`, `Bcc` and `ReplyTo` are comma-separated strings, as in Postmark. A field set to `null` counts as not set. nid checks:
 
 | Check | Error |
 | --- | --- |
@@ -117,7 +118,7 @@ Sends one email. Returns `200 {"To", "SubmittedAt", "MessageID", "ErrorCode": 0,
 | `To`, `Cc` or `Bcc` has at least one address | `422 {"ErrorCode": 300, "Message": "Zero recipients specified"}` |
 | `From` is an address | `422 {"ErrorCode": 300}` |
 | `HtmlBody` or `TextBody` is present | `422 {"ErrorCode": 300}` |
-| Every address looks like an address | `422 {"ErrorCode": 300}` |
+| Every address in `To`, `Cc`, `Bcc` and `ReplyTo` looks like an address | `422 {"ErrorCode": 300}` |
 
 Also stored: `Headers`, `Attachments` (a `cid:` prefix on `ContentID` is dropped), `Tag` as `meta.tags`, `Metadata` and `MessageStream`.
 
