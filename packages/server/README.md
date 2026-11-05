@@ -1,8 +1,8 @@
 # nid
 
-Test the emails your app sends, without sending any.
+Your own inbox for the emails your app sends.
 
-nid is a local inbox that takes the place of your email provider. Your tests can read every email your app sends.
+nid runs on your computer. Your app sends its emails to nid instead of to your email provider, and you read them in a web page that only you can see. You do not need a public inbox site such as Yopmail, and you do not sign up for anything. Your tests can read the same emails.
 
 **[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
@@ -16,41 +16,43 @@ You need Node.js 22.13 or later.
    npx nid-inbox serve
    ```
 
-2. Start your app with its provider pointed at nid. For Resend:
+2. Start your app with its email provider pointed at nid. For Resend:
 
    ```sh
    RESEND_BASE_URL=http://127.0.0.1:4400 npm run dev
    ```
 
-3. Read the mail in a Playwright test:
+3. Open [http://127.0.0.1:4400](http://127.0.0.1:4400) in your browser. Every email your app sends appears there as it arrives.
 
-   ```ts
-   import { test, expect } from '@nid-inbox/client/playwright'
+## Read mail in tests
 
-   test('sign up, then resend the code', async ({ page, inbox }) => {
-     const email = inbox.address('signup')
-     await page.fill('#email', email)
-     await page.click('text=Send code')
-     const first = await inbox.waitFor(email, { hasCode: true })
-     await page.click('text=Resend code')
-     const second = await inbox.waitFor(email, { hasCode: true })
-     expect(second.code).not.toBe(first.code)
-     await page.fill('#code', second.code!)
-   })
-   ```
+The same emails are available to your tests. In Playwright:
 
-Or open the web view at [http://127.0.0.1:4400](http://127.0.0.1:4400) to see the mail.
+```ts
+import { test, expect } from '@nid-inbox/client/playwright'
+
+test('sign up, then resend the code', async ({ page, inbox }) => {
+  const email = inbox.address('signup')
+  await page.fill('#email', email)
+  await page.click('text=Send code')
+  const first = await inbox.waitFor(email, { hasCode: true })
+  await page.click('text=Resend code')
+  const second = await inbox.waitFor(email, { hasCode: true })
+  expect(second.code).not.toBe(first.code)
+  await page.fill('#code', second.code!)
+})
+```
 
 ## What it does
 
+- Shows every email your app sends in a web page, as it arrives. You see the sender, the recipients, the HTML, the text, the attachments, and the sign-in code and link nid found.
+- Keeps your mail on your machine. It listens on 127.0.0.1 only and sends nothing out, so no one else can read it.
 - Answers the provider's own API, so each SDK only needs a base URL. Resend and Brevo today. SendGrid, Postmark, Mailgun and SES are next.
 - Takes SMTP on port 1025 for everything else.
-- Treats every address as an inbox. There is no "create inbox" step, so parallel tests never share mail.
-- Pulls out one-time codes and links when mail arrives, and lets a test pass its own pattern.
-- Holds a `wait` request open until the next matching email arrives, so tests have no polling loops or sleeps.
-- Answers bad requests the way the real provider does, and keeps every refused send so a timed-out wait can explain itself.
+- Shows the sends it refused, with the error your app got, so you can see why an email never arrived.
+- Lets tests and scripts read the same mail, with a `wait` request that returns as soon as the next email arrives.
+- Treats every address as an inbox. There is no "create inbox" step.
 - Keeps mail in memory by default. `--db mail.sqlite` keeps it across restarts.
-- Listens on 127.0.0.1 only, and sends nothing out.
 
 ## Packages
 
@@ -65,7 +67,7 @@ Or open the web view at [http://127.0.0.1:4400](http://127.0.0.1:4400) to see th
 | Kind | Pages |
 | --- | --- |
 | Tutorial | [Get started](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md) |
-| How-to guides | [Run nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/run-nid.md) (npm, Docker, Playwright, GitHub Actions), [Point your app at nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-your-app.md), [Read mail in tests](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/read-mail-in-tests.md), [Use the command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-cli.md), [Embed nid in your own code](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/embed-nid.md) |
+| How-to guides | [See your mail in the web view](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-web-view.md), [Run nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/run-nid.md) (npm, Docker, Playwright, GitHub Actions), [Point your app at nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-your-app.md), [Read mail in tests](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/read-mail-in-tests.md), [Use the command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-cli.md), [Embed nid in your own code](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/embed-nid.md) |
 | Reference | [Command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/cli.md), [Configuration](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/configuration.md), [Read API](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/read-api.md), [Client library](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/client.md), [Providers](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/providers.md) |
 | Explanation | [How nid works](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/how-nid-works.md), [Security](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/security.md) |
 

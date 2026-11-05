@@ -1,7 +1,7 @@
 {
   "name": "nid-inbox",
   "version": "0.2.0",
-  "description": "A local inbox that takes the place of your email provider. Your tests can read every email your app sends.",
+  "description": "Your own inbox for the emails your app sends, with a web page to read them. Tests can read them too.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

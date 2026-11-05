@@ -1,6 +1,6 @@
 # Get started: catch your first email
 
-In this tutorial you start nid, send it an email, read that email in three ways, and then write a short script that sends a sign-in code and reads it back. By the end you know the loop that every nid test uses.
+In this tutorial you start nid, send it an email, and read that email in three ways: in the web view, from the command line and over HTTP. Then you write a short script that sends a sign-in code and reads it back. By the end you can see every email your app sends, and you know the loop that tests use to read them.
 
 It takes about ten minutes.
 
@@ -34,7 +34,7 @@ nid 0.2.0
 
 Leave this terminal open. nid keeps running until you press Ctrl+C.
 
-Open [http://127.0.0.1:4400](http://127.0.0.1:4400) in a browser. You see the web view. It is empty for now.
+Open [http://127.0.0.1:4400](http://127.0.0.1:4400) in a browser. You see the web view, the page where you read your mail. It says `Nothing has arrived yet.`
 
 ## Step 2: Send an email
 
@@ -62,11 +62,11 @@ nid answers like Resend does:
 
 Your id is different. Any API key works locally, so `re_test` is fine.
 
-Look at the web view again. The email is there.
+Look at the web view again. The email is at the top of the list, with the subject, the recipient and the code `482913`. Choose it to read the whole email: the header, the code and link nid found, the text, and the request your app sent.
 
 ## Step 3: Read the email from the command line
 
-The `nid` command also reads mail. Run:
+The web view is for you. The `nid` command reads the same mail, for scripts and terminals. Run:
 
 ```sh
 npx nid-inbox read ada@inbox.test --latest

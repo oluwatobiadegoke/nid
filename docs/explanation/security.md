@@ -2,6 +2,10 @@
 
 nid holds email your app sent, which can include sign-in codes and reset links. This page explains what nid does to keep that mail on your machine, and what you need to do when you change the defaults.
 
+## Why a local inbox is safer than a public one
+
+Public inbox sites let anyone read mail sent to an address they can guess. nid keeps the mail on your machine, where only you can open the web view by default.
+
 ## Defaults
 
 - **It listens on 127.0.0.1 only.** Other machines on your network cannot reach it. Use `--host 0.0.0.0` only when you need to, such as inside a container.
