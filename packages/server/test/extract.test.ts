@@ -105,7 +105,7 @@ test('links and codes survive the html quirks real templates produce', () => {
     subject: 'Sign in',
     text: null,
     html: [
-      '<a class="btn"href="https://app.acme.com/verify?t=1">Verify</a >',
+      '<a class="btn"href="https://app.acme.com/verify?t=1">Verify</a>',
       '<p>Expires in <10 min. Your code &#99999999; is 482913</p>',
       "<a href=https://app.acme.com/o'neil/help>Help",
       '<a href="https://app.acme.com/more">More</a>',

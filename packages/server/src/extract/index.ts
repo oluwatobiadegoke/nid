@@ -9,7 +9,7 @@ const windowBefore = 80
 const windowAfter = 40
 
 const anchorPattern = /<a\b([^<>]*)>([\s\S]*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
-const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/i
+const hrefPattern = /[\s"'/]href\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
 
 function codePoint(value: number): string {
