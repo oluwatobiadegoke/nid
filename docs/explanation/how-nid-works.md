@@ -74,7 +74,7 @@ When a message arrives, nid pulls out codes and links once and stores them with 
 
 and it sits near a word such as code, OTP, PIN, verify, confirm, login, sign in, 2FA or security. nid skips years, phone numbers and anything inside a URL. The first code found is `code`. All of them are in `codes`.
 
-**Links.** nid collects every `<a href>` in the HTML and every URL in the text. The first one that is not `mailto:`, `tel:`, an image or an unsubscribe link becomes `link`.
+**Links.** nid collects every `<a href>` in the HTML and every URL in the text. It leaves out `javascript:`, `vbscript:` and `data:` links. The first one that is not `mailto:`, `tel:`, an image or an unsubscribe link becomes `link`.
 
 **Templates.** When a send uses a provider template and has no body, nid reads the template variables instead. See [Templates](../reference/providers.md#templates).
 

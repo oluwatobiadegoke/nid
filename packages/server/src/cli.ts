@@ -111,15 +111,21 @@ async function serve(args: string[]) {
   process.once('SIGTERM', stop)
 }
 
+const controlCharacters = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g
+
+function print(text: string) {
+  process.stdout.write(`${text.replace(controlCharacters, '')}\n`)
+}
+
 function printMessage(message: SerializedMessage, flags: { code: boolean; links: boolean; json: boolean }) {
   if (flags.json) return process.stdout.write(`${JSON.stringify(message, null, 2)}\n`)
   if (flags.code) {
     if (!message.extracted.code) fail('No code found in the message', 1)
-    return process.stdout.write(`${message.extracted.code}\n`)
+    return print(message.extracted.code)
   }
   if (flags.links) {
     if (message.extracted.links.length === 0) fail('No links found in the message', 1)
-    return process.stdout.write(`${message.extracted.links.map((l) => l.href).join('\n')}\n`)
+    return print(message.extracted.links.map((l) => l.href).join('\n'))
   }
   const lines = [
     `#${message.id}  ${message.provider}  ${message.createdAt}`,
@@ -130,7 +136,7 @@ function printMessage(message: SerializedMessage, flags: { code: boolean; links:
   if (message.extracted.code) lines.push(`Code:    ${message.extracted.code}`)
   if (message.extracted.link) lines.push(`Link:    ${message.extracted.link}`)
   lines.push('', message.text ?? message.html ?? '')
-  process.stdout.write(`${lines.join('\n')}\n`)
+  print(lines.join('\n'))
 }
 
 async function read(args: string[]) {
@@ -169,7 +175,7 @@ async function read(args: string[]) {
   if (values.json) return process.stdout.write(`${JSON.stringify(body.messages, null, 2)}\n`)
   for (const m of body.messages) {
     const code = m.extracted.code ? `  code ${m.extracted.code}` : ''
-    process.stdout.write(`#${m.id}  ${m.createdAt}  ${m.provider}  ${m.subject}${code}\n`)
+    print(`#${m.id}  ${m.createdAt}  ${m.provider}  ${m.subject}${code}`)
   }
 }
 
