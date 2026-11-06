@@ -150,3 +150,21 @@ export function timestampId(): string {
     `${pad(now.getUTCMilliseconds(), 3)}`
   )
 }
+
+export function webhookSecret(secret: string | undefined, provider: string, label: string): string {
+  if (secret) return secret
+  throw new Error(
+    `nid signs ${label} webhooks with the secret your app checks. Set NID_${provider.toUpperCase()}_WEBHOOK_SECRET, or webhooks.${provider}.secret when you embed nid.`,
+  )
+}
+
+export function findHeader(headers: Record<string, string>, name: string): string | undefined {
+  return Object.entries(headers).find(([key]) => key.toLowerCase() === name)?.[1]
+}
+
+export function senderAddress(from: string): string {
+  return parseMailbox(from)?.address ?? from
+}
+
+export const bounceReason = '550 5.1.1 The email account that you tried to reach does not exist.'
+export const deferReason = '421 4.7.0 The receiving server is busy. Try again later.'

@@ -52,6 +52,23 @@ export interface ReadRoute {
 
 export type ProviderRoute = SendRoute | ReadRoute
 
+export const webhookEvents = ['delivered', 'deferred', 'bounced', 'complained', 'opened', 'clicked'] as const
+
+export type WebhookEvent = (typeof webhookEvents)[number]
+
+export interface WebhookInput {
+  message: Message
+  event: WebhookEvent
+  recipient: string
+  secret: string | undefined
+  now: Date
+}
+
+export interface WebhookRequest {
+  body: string
+  headers: Record<string, string>
+}
+
 export interface Provider {
   name: string
   label: string
@@ -59,4 +76,5 @@ export interface Provider {
   unauthorized(): ProviderReply
   routes: ProviderRoute[]
   setup: { env: string; note: string }
+  webhook?(input: WebhookInput): WebhookRequest
 }

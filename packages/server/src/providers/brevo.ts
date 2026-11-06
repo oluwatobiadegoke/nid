@@ -2,6 +2,9 @@ import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
 import {
   attachmentFrom,
+  bounceReason,
+  deferReason,
+  findHeader,
   formatMailbox,
   header,
   isRecord,
@@ -13,7 +16,7 @@ import {
   stringHeaders,
   timestampId,
 } from './shared.js'
-import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
+import { SendError, type IncomingRequest, type Provider, type SendRoute, type WebhookEvent, type WebhookInput } from './types.js'
 
 const name = 'brevo'
 
@@ -159,6 +162,38 @@ const send: SendRoute = {
   },
 }
 
+const webhookTypes: Record<WebhookEvent, string> = {
+  delivered: 'delivered',
+  deferred: 'deferred',
+  bounced: 'hard_bounce',
+  complained: 'spam',
+  opened: 'opened',
+  clicked: 'click',
+}
+
+function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
+  const seconds = Math.floor(now.getTime() / 1000)
+  const payload: Record<string, unknown> = {
+    event: webhookTypes[event],
+    email: recipient,
+    id: 1,
+    date: now.toISOString().slice(0, 19).replace('T', ' '),
+    ts: seconds,
+    'message-id': m.providerId,
+    ts_event: seconds,
+    ts_epoch: now.getTime(),
+    subject: m.subject,
+    tags: (m.meta.tags as string[] | undefined) ?? [],
+    sending_ip: '127.0.0.1',
+  }
+  const custom = findHeader(m.headers, 'x-mailin-custom')
+  if (custom !== undefined) payload['X-Mailin-custom'] = custom
+  if (event === 'bounced') payload.reason = bounceReason
+  if (event === 'deferred') payload.reason = deferReason
+  if (event === 'clicked') payload.link = m.extracted.link ?? ''
+  return { body: JSON.stringify(payload), headers: secret ? { authorization: `Bearer ${secret}` } : {} }
+}
+
 export const brevo: Provider = {
   name,
   label: 'Brevo',
@@ -173,4 +208,5 @@ export const brevo: Provider = {
     env: "new BrevoClient({ apiKey, baseUrl: 'http://localhost:4400/v3' })",
     note: 'Older SDKs: api.basePath = "http://localhost:4400/v3". The /v3 is part of the base URL.',
   },
+  webhook,
 }

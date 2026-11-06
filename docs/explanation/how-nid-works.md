@@ -93,6 +93,6 @@ Every stored message and every query carries a project id. On your machine there
 Today:
 
 - Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
-- There are no delivery webhooks, so nid never calls your app back with "delivered" or "bounced" events.
+- nid calls your app's webhook route only when you [ask it to](../how-to/test-webhooks.md). It never sends "delivered" or "bounced" by itself after a send.
 - `retentionHours` stamps an expiry time on messages, but nothing deletes expired messages yet.
 - The only built-in store is SQLite.

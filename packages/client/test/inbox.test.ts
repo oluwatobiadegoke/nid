@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createServer as createHttpServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { test } from 'node:test'
 import { createServer } from 'nid-inbox'
 import { InboxTimeoutError, createInbox } from '../src/index.js'
@@ -84,4 +86,35 @@ test('a code pattern of the test\'s own is honoured', async (t) => {
   await send(email, 'Key', 'Your access key is ACME-77')
   const found = await inbox.waitFor(email, { codePattern: /key is ([A-Z0-9-]+)/, timeout: 2 })
   assert.equal(found.code, 'ACME-77')
+})
+
+test('triggerWebhook sends a bounce for the email and returns what the app answered', async (t) => {
+  const answers: string[] = []
+  const app = createHttpServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', () => {
+      answers.push(body)
+      res.writeHead(422).end('unknown message')
+    })
+  })
+  await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => app.close(() => resolve())))
+  const server = await createServer({ webhooks: { resend: { url: `http://127.0.0.1:${(app.address() as AddressInfo).port}`, secret: 'whsec_dGVzdA==' } } })
+  const listening = await server.listen({ port: 0, smtpPort: 0 })
+  t.after(() => server.close())
+  const inbox = createInbox({ url: listening.url })
+  const email = inbox.address('bounce')
+  await fetch(`${listening.url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer re_x', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: email, subject: 'Welcome', text: 'Hi' }),
+  })
+  const sent = await inbox.waitFor(email, { timeout: 5 })
+  const result = await inbox.triggerWebhook(sent.id, 'bounced')
+  assert.equal(result.delivered, false)
+  assert.equal(result.appStatus, 422)
+  assert.equal(result.appBody, 'unknown message')
+  assert.equal(JSON.parse(answers[0] ?? '').type, 'email.bounced')
+  await assert.rejects(inbox.triggerWebhook(sent.id, 'bounce' as never), /type must be one of/)
 })

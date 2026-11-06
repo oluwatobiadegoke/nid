@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { Message, NewMessage, Recipient } from '../types.js'
 import {
   addressList,
   attachmentFrom,
   bearer,
+  bounceReason,
   header,
   isRecord,
   keyPerItem,
@@ -14,8 +15,18 @@ import {
   parseMailbox,
   stringHeaders,
   toAddresses,
+  webhookSecret,
 } from './shared.js'
-import { SendError, type IncomingRequest, type Provider, type ProviderReply, type ReadRoute, type SendRoute } from './types.js'
+import {
+  SendError,
+  type IncomingRequest,
+  type Provider,
+  type ProviderReply,
+  type ReadRoute,
+  type SendRoute,
+  type WebhookEvent,
+  type WebhookInput,
+} from './types.js'
 
 const name = 'resend'
 
@@ -197,6 +208,38 @@ const get: ReadRoute = {
   },
 }
 
+const webhookTypes: Record<WebhookEvent, string> = {
+  delivered: 'email.delivered',
+  deferred: 'email.delivery_delayed',
+  bounced: 'email.bounced',
+  complained: 'email.complained',
+  opened: 'email.opened',
+  clicked: 'email.clicked',
+}
+
+function webhook({ message: m, event, secret, now }: WebhookInput) {
+  const key = Buffer.from(webhookSecret(secret, name, 'Resend').replace(/^whsec_/, ''), 'base64')
+  const tags = (m.meta.tags as Array<{ name: string; value: string }> | undefined) ?? []
+  const data: Record<string, unknown> = {
+    email_id: m.providerId,
+    message_id: `<${m.providerId}@nid.local>`,
+    from: m.from,
+    to: toAddresses(m.recipients, 'to'),
+    subject: m.subject,
+    created_at: m.createdAt,
+  }
+  if (tags.length > 0) data.tags = Object.fromEntries(tags.map((t) => [t.name, t.value]))
+  if (event === 'bounced') data.bounce = { message: bounceReason, subType: 'General', type: 'Permanent' }
+  if (event === 'clicked') {
+    data.click = { ipAddress: '127.0.0.1', link: m.extracted.link ?? '', timestamp: now.toISOString(), userAgent: 'nid' }
+  }
+  const body = JSON.stringify({ type: webhookTypes[event], created_at: now.toISOString(), data })
+  const id = `msg_${randomBytes(12).toString('hex')}`
+  const timestamp = String(Math.floor(now.getTime() / 1000))
+  const signature = createHmac('sha256', key).update(`${id}.${timestamp}.${body}`).digest('base64')
+  return { body, headers: { 'svix-id': id, 'svix-timestamp': timestamp, 'svix-signature': `v1,${signature}` } }
+}
+
 export const resend: Provider = {
   name,
   label: 'Resend',
@@ -209,4 +252,5 @@ export const resend: Provider = {
     env: 'RESEND_BASE_URL=http://localhost:4400',
     note: 'Node SDK reads RESEND_BASE_URL. Python reads RESEND_API_URL.',
   },
+  webhook,
 }

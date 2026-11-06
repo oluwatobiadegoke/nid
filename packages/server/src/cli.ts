@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
+import type { WebhookResult } from './api/webhook.js'
 
 const defaultPort = 4400
 const defaultSmtpPort = 1025
@@ -13,14 +14,16 @@ Usage:
   nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
+  nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked>
   nid mcp
   nid healthcheck
 
-Options for read, clear, mcp and healthcheck:
+Options for read, clear, webhook, mcp and healthcheck:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
   NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB
+  NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
 
 function fail(message: string, code = 1): never {
@@ -56,12 +59,24 @@ async function serve(args: string[]) {
       quiet: { type: 'boolean', default: false },
     },
   })
-  const [{ createServer }, { createSqliteStore }] = await Promise.all([import('./server.js'), import('./store/index.js')])
+  const [{ createServer }, { createSqliteStore }, { providers }] = await Promise.all([
+    import('./server.js'),
+    import('./store/index.js'),
+    import('./providers/index.js'),
+  ])
   const store = await createSqliteStore(values.db ? { path: values.db } : {})
+  const webhooks = Object.fromEntries(
+    providers.flatMap((p) => {
+      const env = `NID_${p.name.toUpperCase()}_WEBHOOK`
+      const url = process.env[`${env}_URL`]
+      return url ? [[p.name, { url, secret: process.env[`${env}_SECRET`] }]] : []
+    }),
+  )
   const server = await createServer({
     store,
     cors: values.cors,
     allowHosts: values['allow-host'],
+    webhooks,
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   })
   const listening = await server.listen({
@@ -77,6 +92,7 @@ async function serve(args: string[]) {
         `  web view    ${listening.url}`,
         `  provider APIs and read API on ${listening.url}`,
         `  SMTP        ${listening.host}:${listening.smtpPort}`,
+        ...Object.entries(webhooks).map(([name, target]) => `  webhooks    ${name} to ${target.url}`),
         `  mail is ${where}`,
         '',
       ].join('\n'),
@@ -165,6 +181,26 @@ async function clear(args: string[]) {
   process.stdout.write(`Deleted ${body.deleted ?? 0} message${body.deleted === 1 ? '' : 's'}\n`)
 }
 
+async function webhook(args: string[]) {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { url: { type: 'string' } },
+  })
+  const [id, type] = positionals
+  if (!id || !type) fail('Usage: nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked>')
+  const response = await api(baseUrl(values.url), `/api/messages/${encodeURIComponent(id)}/events`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type }),
+  })
+  const body = (await response.json()) as WebhookResult & { error?: string }
+  if (!response.ok) fail(body.error ?? 'Request failed', 1)
+  if (body.appStatus === null) fail(body.error ?? 'Could not reach your app', 1)
+  process.stdout.write(`Your app answered ${body.appStatus} in ${body.durationMs} ms\n${body.appBody ? `${body.appBody}\n` : ''}`)
+  if (!body.delivered) process.exit(1)
+}
+
 async function mcp(args: string[]) {
   const { values } = parseArgs({ args, options: { url: { type: 'string' } } })
   const url = baseUrl(values.url)
@@ -195,6 +231,9 @@ switch (command) {
     break
   case 'clear':
     await clear(rest)
+    break
+  case 'webhook':
+    await webhook(rest)
     break
   case 'mcp':
     await mcp(rest)

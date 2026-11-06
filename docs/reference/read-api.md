@@ -28,6 +28,7 @@ The server also describes these routes as an OpenAPI 3 document at `GET /api/ope
 | [`GET /api/messages`](#get-apimessages) | Lists messages. |
 | [`DELETE /api/messages`](#delete-apimessages) | Deletes messages. |
 | [`GET /api/messages/{id}`](#get-apimessagesid) | One message in full. |
+| [`POST /api/messages/{id}/events`](#post-apimessagesidevents) | Sends a provider webhook to your app. |
 | [`GET /api/messages/{id}/attachments/{n}`](#get-apimessagesidattachmentsn) | Downloads an attachment. |
 | [`GET /api/rejections`](#get-apirejections) | Sends nid refused. |
 | [`GET /api/stream`](#get-apistream) | Live events. |
@@ -101,6 +102,29 @@ Returns `200 {"deleted": 3}`.
 Returns one message with its raw request: `200 {"message": Message}`, where the message also has `raw`. For HTTP sends, `raw` is the request body as received. For SMTP, it is the whole message source.
 
 Returns `404` when there is no such message.
+
+### POST /api/messages/{id}/events
+
+Sends the webhook the message's provider would send to your app, signed the provider's way, and waits up to 10 seconds for your app's answer. The body names the event:
+
+```json
+{"type": "bounced"}
+```
+
+`type` is `delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`. The URL and secret come from `NID_<PROVIDER>_WEBHOOK_URL` and `NID_<PROVIDER>_WEBHOOK_SECRET`. See [Test your webhook handler](../how-to/test-webhooks.md) and the [payloads](providers.md#webhooks).
+
+Returns `200` with your app's answer, whatever status your app gave:
+
+| Field | What it is |
+| --- | --- |
+| `url` | Where nid sent it, without any user and password. |
+| `delivered` | `true` when your app answered 2xx. |
+| `appStatus` | Your app's status, or `null` when nid could not reach it. |
+| `appBody` | Your app's response body. |
+| `durationMs` | How long your app took. |
+| `error` | Only when nid could not reach your app: why. |
+
+Returns `400` for an unknown `type`, for mail sent over SMTP, or when the provider has no URL set, or needs a secret and has none. Returns `404` when there is no such message.
 
 ### GET /api/messages/{id}/attachments/{n}
 

@@ -1,8 +1,20 @@
-import { randomBytes } from 'node:crypto'
+import { createECDH, createHash, createPrivateKey, createPublicKey, randomBytes, sign } from 'node:crypto'
 import { z } from 'zod'
 import type { NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, bearer, formatMailbox, isRecord, looseAddress, normalizeAddress, recipientsFrom, rejectedFor, stringHeaders } from './shared.js'
-import { SendError, type Provider, type SendRoute } from './types.js'
+import {
+  attachmentFrom,
+  bearer,
+  bounceReason,
+  deferReason,
+  formatMailbox,
+  isRecord,
+  looseAddress,
+  normalizeAddress,
+  recipientsFrom,
+  rejectedFor,
+  stringHeaders,
+} from './shared.js'
+import { SendError, type Provider, type SendRoute, type WebhookEvent, type WebhookInput } from './types.js'
 
 const name = 'sendgrid'
 const help = 'http://sendgrid.com/docs/API_Reference/Web_API_v3/Mail/errors.html'
@@ -183,6 +195,49 @@ const send: SendRoute = {
   },
 }
 
+const signingKey = (() => {
+  const ecdh = createECDH('prime256v1')
+  ecdh.setPrivateKey(createHash('sha256').update('nid sendgrid webhook test key').digest())
+  const point = ecdh.getPublicKey()
+  const jwk = { kty: 'EC', crv: 'P-256', d: ecdh.getPrivateKey().toString('base64url'), x: point.subarray(1, 33).toString('base64url'), y: point.subarray(33).toString('base64url') }
+  return createPrivateKey({ key: jwk, format: 'jwk' })
+})()
+
+export const sendgridWebhookPublicKey = createPublicKey(signingKey).export({ type: 'spki', format: 'der' }).toString('base64')
+
+const webhookTypes: Record<WebhookEvent, string> = {
+  delivered: 'delivered',
+  deferred: 'deferred',
+  bounced: 'bounce',
+  complained: 'spamreport',
+  opened: 'open',
+  clicked: 'click',
+}
+
+function webhook({ message: m, event, recipient, now }: WebhookInput) {
+  const timestamp = String(Math.floor(now.getTime() / 1000))
+  const payload: Record<string, unknown> = {
+    ...(m.meta.customArgs as Record<string, unknown> | undefined),
+    email: recipient,
+    timestamp: Number(timestamp),
+    'smtp-id': `<${m.providerId}@nid.local>`,
+    event: webhookTypes[event],
+    sg_event_id: randomBytes(16).toString('base64url'),
+    sg_message_id: m.providerId,
+  }
+  if (m.meta.tags) payload.category = m.meta.tags
+  if (event === 'bounced') Object.assign(payload, { type: 'bounce', status: '5.1.1', reason: bounceReason })
+  if (event === 'deferred') Object.assign(payload, { attempt: '1', response: deferReason })
+  if (event === 'opened' || event === 'clicked') Object.assign(payload, { ip: '127.0.0.1', useragent: 'nid' })
+  if (event === 'clicked') payload.url = m.extracted.link ?? ''
+  const body = JSON.stringify([payload])
+  const signature = sign('sha256', Buffer.from(timestamp + body), signingKey).toString('base64')
+  return {
+    body,
+    headers: { 'x-twilio-email-event-webhook-signature': signature, 'x-twilio-email-event-webhook-timestamp': timestamp },
+  }
+}
+
 export const sendgrid: Provider = {
   name,
   label: 'SendGrid',
@@ -198,4 +253,5 @@ export const sendgrid: Provider = {
     env: "sgMail.client.setDefaultRequest('baseUrl', 'http://127.0.0.1:4400')",
     note: 'Call it after sgMail.setApiKey. Other SDKs: set the API host to http://127.0.0.1:4400.',
   },
+  webhook,
 }

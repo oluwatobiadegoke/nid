@@ -11,6 +11,7 @@ import { createSmtpServer, listenSmtp } from './ingest/smtp.js'
 import { providers as builtInProviders, type Provider } from './providers/index.js'
 import { hostCheck } from './security/host.js'
 import { mcpRoutes } from './mcp/http.js'
+import type { WebhookTarget } from './api/webhook.js'
 import { createSqliteStore, type Store } from './store/index.js'
 import type { AuthHook, LimitsHook, Message } from './types.js'
 import { webView } from './ui/index.js'
@@ -25,6 +26,7 @@ export interface ServerOptions {
   cors?: boolean
   ui?: boolean
   maxBodyBytes?: number
+  webhooks?: Record<string, WebhookTarget>
   onMessage?: (message: Message) => void
   onError?: (error: Error) => void
 }
@@ -85,7 +87,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     }),
   )
   app.get('/healthz', (c) => c.json({ ok: true, version }))
-  app.route('/api', readApi({ store, ingest, providers, version }))
+  app.route('/api', readApi({ store, ingest, providers, webhooks: options.webhooks ?? {}, version }))
   app.route('/mcp', mcpRoutes(async (path, init) => app.request(path, init), options.allowHosts ?? []))
   if (options.ui !== false) app.route('/', webView())
   app.route('/', providerRoutes({ providers, ingest, store }))

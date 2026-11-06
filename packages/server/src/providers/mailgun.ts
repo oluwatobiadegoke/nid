@@ -1,8 +1,22 @@
-import { randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import type { Attachment, NewMessage, Recipient } from '../types.js'
-import { basic, isRecord, looseAddress, looseAddresses, mailboxes, parseMailbox, rejectedFor, splitAddresses, timestampId } from './shared.js'
+import {
+  basic,
+  bounceReason,
+  deferReason,
+  isRecord,
+  looseAddress,
+  looseAddresses,
+  mailboxes,
+  parseMailbox,
+  rejectedFor,
+  senderAddress,
+  splitAddresses,
+  timestampId,
+  webhookSecret,
+} from './shared.js'
 import { fromMime } from './mime.js'
-import { SendError, type IncomingRequest, type Provider, type SendRoute } from './types.js'
+import { SendError, type IncomingRequest, type Provider, type SendRoute, type WebhookEvent, type WebhookInput } from './types.js'
 
 const name = 'mailgun'
 
@@ -189,6 +203,42 @@ async function buildMime(req: IncomingRequest, body: Record<string, Field>, toLi
   return [{ ...message, providerId: messageId(domain), headers: { ...message.headers, ...headers }, meta }]
 }
 
+const webhookTypes: Record<WebhookEvent, string> = {
+  delivered: 'delivered',
+  deferred: 'failed',
+  bounced: 'failed',
+  complained: 'complained',
+  opened: 'opened',
+  clicked: 'clicked',
+}
+
+function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
+  const key = webhookSecret(secret, name, 'Mailgun')
+  const timestamp = String(Math.floor(now.getTime() / 1000))
+  const token = randomBytes(25).toString('hex')
+  const data: Record<string, unknown> = {
+    id: randomBytes(11).toString('base64url'),
+    timestamp: now.getTime() / 1000,
+    event: webhookTypes[event],
+    recipient,
+    'recipient-domain': recipient.split('@')[1] ?? '',
+    tags: (m.meta.tags as string[] | undefined) ?? [],
+    'user-variables': (m.meta.customVariables as Record<string, unknown> | undefined) ?? {},
+    envelope: { sender: senderAddress(m.from), targets: recipient, transport: 'smtp' },
+    message: { headers: { 'message-id': m.providerId.replace(/^<|>$/g, ''), from: m.from, to: recipient, subject: m.subject } },
+  }
+  if (event === 'delivered') data['delivery-status'] = { code: 250, message: 'OK', description: '' }
+  if (event === 'bounced') {
+    Object.assign(data, { severity: 'permanent', reason: 'bounce', 'delivery-status': { code: 550, message: bounceReason, description: '' } })
+  }
+  if (event === 'deferred') {
+    Object.assign(data, { severity: 'temporary', reason: 'generic', 'delivery-status': { code: 421, message: deferReason, description: '' } })
+  }
+  if (event === 'clicked') data.url = m.extracted.link ?? ''
+  const signature = createHmac('sha256', key).update(timestamp + token).digest('hex')
+  return { body: JSON.stringify({ signature: { timestamp, token, signature }, 'event-data': data }), headers: {} }
+}
+
 export const mailgun: Provider = {
   name,
   label: 'Mailgun',
@@ -204,4 +254,5 @@ export const mailgun: Provider = {
     env: "mailgun.client({ username: 'api', key, url: 'http://127.0.0.1:4400' })",
     note: 'Other SDKs: set the API base URL to http://127.0.0.1:4400 (no /v3).',
   },
+  webhook,
 }

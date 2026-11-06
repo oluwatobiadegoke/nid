@@ -3,7 +3,19 @@ export type { ServerOptions, ListenOptions, Listening, NidServer } from './serve
 export { createSqliteStore, KyselyStore, NodeSqliteDialect } from './store/index.js'
 export type { Store, MessageQuery, RejectionQuery, Database, SqliteStoreOptions } from './store/index.js'
 export { providers, resend, brevo, sendgrid, postmark, mailgun, SendError } from './providers/index.js'
-export type { Provider, ProviderRoute, SendRoute, ReadRoute, IncomingRequest, ProviderReply } from './providers/index.js'
+export type {
+  Provider,
+  ProviderRoute,
+  SendRoute,
+  ReadRoute,
+  IncomingRequest,
+  ProviderReply,
+  WebhookEvent,
+  WebhookInput,
+  WebhookRequest,
+} from './providers/index.js'
+export { webhookEvents, sendgridWebhookPublicKey } from './providers/index.js'
+export type { WebhookTarget, WebhookResult } from './api/webhook.js'
 export { extract, htmlToText, matchesPattern } from './extract/index.js'
 export type { ExtractInput } from './extract/index.js'
 export { defaultLimits, defaultProject } from './ingest/index.js'

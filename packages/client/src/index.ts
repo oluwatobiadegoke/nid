@@ -91,6 +91,17 @@ export interface ListOptions {
   limit?: number | undefined
 }
 
+export type WebhookEvent = 'delivered' | 'deferred' | 'bounced' | 'complained' | 'opened' | 'clicked'
+
+export interface WebhookResult {
+  url: string
+  delivered: boolean
+  appStatus: number | null
+  appBody: string
+  durationMs: number
+  error?: string
+}
+
 export interface AddressOptions {
   domain?: string | undefined
 }
@@ -226,6 +237,14 @@ export class Inbox {
     if (address) this.#cursors.delete(address.trim().toLowerCase())
     else this.#cursors.clear()
     return body.deleted
+  }
+
+  async triggerWebhook(id: number, type: WebhookEvent): Promise<WebhookResult> {
+    return this.#request<WebhookResult>(`/api/messages/${id}/events`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type }),
+    })
   }
 
   async #raw(path: string, init: RequestInit = {}): Promise<Response> {
