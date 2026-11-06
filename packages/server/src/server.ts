@@ -23,7 +23,7 @@ export interface ServerOptions {
   limits?: LimitsHook
   providers?: Provider[]
   allowHosts?: string[]
-  cors?: boolean
+  cors?: string[]
   ui?: boolean
   maxBodyBytes?: number
   webhooks?: Record<string, WebhookTarget>
@@ -81,13 +81,23 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
       throw new Error(`The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`)
     }
   }
+  if (options.cors !== undefined && !Array.isArray(options.cors)) {
+    throw new Error('cors takes the origins to allow, such as ["http://localhost:3000"].')
+  }
+  const corsOrigins = (options.cors ?? []).map((value) => {
+    const url = URL.parse(value)
+    if (!url || !/^https?:$/.test(url.protocol)) {
+      throw new Error(`The CORS origin ${JSON.stringify(value)} is not an http:// or https:// origin, such as http://localhost:3000.`)
+    }
+    return url.origin
+  })
   const store = options.store ?? (await createSqliteStore())
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes
   const ingest = createIngest({ store, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
 
   const app = new Hono({ strict: false })
   app.use('*', hostCheck(options.allowHosts ?? []))
-  if (options.cors) app.use('*', cors())
+  if (corsOrigins.length > 0) app.use('*', cors({ origin: corsOrigins }))
   app.use(
     '*',
     bodyLimit({

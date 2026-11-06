@@ -23,7 +23,7 @@ Run it with `npx nid-inbox <command>` when nid is not installed in your project,
 Starts the HTTP server (provider APIs, read API and web view) and the SMTP server. It runs until it gets Ctrl+C (`SIGINT`) or `SIGTERM`.
 
 ```
-nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--quiet]
+nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name] [--quiet]
 ```
 
 | Option | Default | What it does |
@@ -32,7 +32,7 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--smtp-port <n>` | `1025`, or `NID_SMTP_PORT` | SMTP port. `0` picks a free port. |
 | `--host <address>` | `127.0.0.1`, or `NID_HOST` | Address both servers listen on. Use `0.0.0.0` to accept connections from other machines. |
 | `--db <path>` | none, or `NID_DB` | SQLite file to keep mail in. Without it, mail is kept in memory and lost when nid stops. |
-| `--cors` | off | Sends CORS headers, so web pages on other origins can call nid. |
+| `--cors <origin>` | none | Lets web pages from this origin, such as `http://localhost:3000`, call nid. Repeat it for more origins. See [Security](../explanation/security.md). |
 | `--allow-host <name>` | none | Accepts requests whose `Host` header is this name. Repeat it for more names. See [Security](../explanation/security.md). |
 | `--quiet` | off | Prints nothing on start. |
 
