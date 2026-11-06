@@ -2,7 +2,7 @@ export { createServer, defaultHost, defaultPort, defaultSmtpPort } from './serve
 export type { ServerOptions, ListenOptions, Listening, NidServer } from './server.js'
 export { createSqliteStore, KyselyStore, NodeSqliteDialect } from './store/index.js'
 export type { Store, MessageQuery, RejectionQuery, Database, SqliteStoreOptions } from './store/index.js'
-export { providers, resend, brevo, sendgrid, postmark, mailgun, SendError } from './providers/index.js'
+export { providers, resend, brevo, sendgrid, postmark, mailgun, SendError, sendgridWebhookPublicKey } from './providers/index.js'
 export type {
   Provider,
   ProviderRoute,
@@ -14,7 +14,6 @@ export type {
   WebhookInput,
   WebhookRequest,
 } from './providers/index.js'
-export { sendgridWebhookPublicKey } from './providers/index.js'
 export { extract, htmlToText, matchesPattern } from './extract/index.js'
 export type { ExtractInput } from './extract/index.js'
 export { defaultLimits, defaultProject } from './ingest/index.js'

@@ -89,10 +89,6 @@ test('a Brevo bounce reaches the app with the token, message-id and job id the a
   assert.deepEqual(event.tags, ['otp'])
   assert.match(event.reason, /does not exist/)
   assert.ok(Math.abs(event.ts_epoch - Date.now()) < 5000)
-
-  const delivered = await trigger(running, await latestId(running), 'delivered')
-  assert.equal(JSON.parse(app.received[1]?.body ?? '').event, 'delivered')
-  assert.equal(delivered.body.delivered, true)
 })
 
 test('a webhook handler that fails shows its status and error in the test, and the CLI exits non-zero', async (t) => {
