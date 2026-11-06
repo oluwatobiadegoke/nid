@@ -1,6 +1,6 @@
 {
   "name": "nid-inbox",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "An email inbox that runs on your computer. Read what your app sends in your browser, or from your tests.",
   "license": "Apache-2.0",
   "repository": {
