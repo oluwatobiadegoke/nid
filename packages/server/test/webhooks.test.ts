@@ -9,7 +9,7 @@ import { test } from 'node:test'
 import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 import { createServer, sendgridWebhookPublicKey, type ServerOptions } from '../src/index.js'
-import { brevoHeaders, json, sendBrevo, sendResend, start, type Running } from './helpers.js'
+import { json, sendBrevo, sendResend, start, type Running } from './helpers.js'
 
 interface Received {
   path: string
@@ -262,7 +262,7 @@ test('a Postmark webhook URL with a user and password arrives as basic auth', as
 
 test('nid says what to set when it cannot send a webhook', async (t) => {
   const running = await nid(t, { resend: { url: 'http://127.0.0.1:3000' } })
-  await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html }, brevoHeaders)
+  await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html })
   const brevoId = await latestId(running)
   const noUrl = await trigger(running, brevoId, 'bounced')
   assert.equal(noUrl.status, 400)
