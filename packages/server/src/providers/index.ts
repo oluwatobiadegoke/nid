@@ -5,8 +5,19 @@ import { resend } from './resend.js'
 import { sendgrid } from './sendgrid.js'
 import type { Provider } from './types.js'
 
-export type { IncomingRequest, Provider, ProviderReply, ProviderRoute, ReadRoute, SendRoute } from './types.js'
+export type {
+  IncomingRequest,
+  Provider,
+  ProviderReply,
+  ProviderRoute,
+  ReadRoute,
+  SendRoute,
+  WebhookEvent,
+  WebhookInput,
+  WebhookRequest,
+} from './types.js'
 export { SendError } from './types.js'
+export { sendgridWebhookPublicKey } from './sendgrid.js'
 export { resend, brevo, sendgrid, postmark, mailgun }
 
 export const providers: Provider[] = [resend, brevo, sendgrid, postmark, mailgun]

@@ -11,6 +11,7 @@ import { createSmtpServer, listenSmtp } from './ingest/smtp.js'
 import { providers as builtInProviders, type Provider } from './providers/index.js'
 import { hostCheck } from './security/host.js'
 import { mcpRoutes } from './mcp/http.js'
+import type { WebhookTarget } from './api/webhook.js'
 import { createSqliteStore, type Store } from './store/index.js'
 import type { AuthHook, LimitsHook, Message } from './types.js'
 import { webView } from './ui/index.js'
@@ -25,6 +26,7 @@ export interface ServerOptions {
   cors?: boolean
   ui?: boolean
   maxBodyBytes?: number
+  webhooks?: Record<string, WebhookTarget>
   onMessage?: (message: Message) => void
   onError?: (error: Error) => void
 }
@@ -69,8 +71,17 @@ function closeSmtp(server: SMTPServer): Promise<void> {
 }
 
 export async function createServer(options: ServerOptions = {}): Promise<NidServer> {
-  const store = options.store ?? (await createSqliteStore())
   const providers = options.providers ?? builtInProviders
+  const webhookProviders = providers.filter((p) => p.webhook).map((p) => p.name)
+  for (const [name, target] of Object.entries(options.webhooks ?? {})) {
+    if (!webhookProviders.includes(name)) {
+      throw new Error(`webhooks.${name} names no provider that sends webhooks. Use ${webhookProviders.join(', ')}.`)
+    }
+    if (!/^https?:$/.test(URL.parse(target.url)?.protocol ?? '')) {
+      throw new Error(`The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`)
+    }
+  }
+  const store = options.store ?? (await createSqliteStore())
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes
   const ingest = createIngest({ store, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
 
@@ -85,7 +96,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     }),
   )
   app.get('/healthz', (c) => c.json({ ok: true, version }))
-  app.route('/api', readApi({ store, ingest, providers, version }))
+  app.route('/api', readApi({ store, ingest, providers, webhooks: options.webhooks ?? {}, version }))
   app.route('/mcp', mcpRoutes(async (path, init) => app.request(path, init), options.allowHosts ?? []))
   if (options.ui !== false) app.route('/', webView())
   app.route('/', providerRoutes({ providers, ingest, store }))

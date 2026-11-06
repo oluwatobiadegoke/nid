@@ -23,12 +23,12 @@ packages/
       ingest/       the HTTP and SMTP listeners that call the providers and the store
       store/        the Store interface, the schema and the SQLite dialect
       extract/      codes and links
-      api/          the read API: wait, messages, rejections, stream, openapi
+      api/          the read API: wait, messages, rejections, stream, webhook sending, openapi
       security/     the Host and Origin checks
       mcp/          the MCP tools, served at /mcp and by `nid mcp`
       ui/           serves the one-page web view in ../ui/index.html
       server.ts     createServer: wires it all together
-      cli.ts        serve, read, clear, mcp, healthcheck
+      cli.ts        serve, read, clear, webhook, mcp, healthcheck
     test/
   client/           the npm package `@nid-inbox/client`: a tiny client and a Playwright fixture
 docs/               the documentation: tutorials, how-to guides, reference and explanation
@@ -57,6 +57,7 @@ Rules every adapter follows:
 3. **Right kind of credential.** Locally any key value works, but a request with no credential, or the wrong kind, must fail as it would in production.
 4. **Keep the raw request** on every message (`raw`).
 5. **Templates.** When a send has a template and no body, store the template id and variables in `meta.templateId` and `meta.variables`. Extraction runs over the variables.
+6. **Webhooks.** If the provider sends webhooks, add `webhook(input)`. It builds the provider's payload for each `WebhookEvent`, with the ids the send returned, and signs it the provider's way. Test it against the provider's own verifier when one exists, in `test/webhooks.test.ts`.
 
 Then add it to the list in `providers/index.ts`, add a test in `test/providers/<name>.test.ts` with real request bodies, and add the official SDK to `devDependencies` with a case in `test/sdk.test.ts`. Finally, document it: see the provider row in [docs/contributing-docs.md](docs/contributing-docs.md#which-page-to-change).
 

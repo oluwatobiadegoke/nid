@@ -181,6 +181,39 @@ Recipients come from the SMTP envelope (`RCPT TO`). A recipient in the `To` head
 
 When a send uses a template and has no body, nid has nothing to show but the template id and variables. It stores them in `meta.templateId` and `meta.variables`, and looks for a code and a link in the variables. Variables named `code`, `otp`, `token`, `passcode`, `pin` or `verification_code` are read as the code. Variables named `url`, `link`, `magic_link`, `verify_url` or `action_url` are read as the link.
 
+## Webhooks
+
+[`POST /api/messages/{id}/events`](read-api.md#post-apimessagesidevents) sends the provider's webhook for a message to your app. See [Test your webhook handler](../how-to/test-webhooks.md). Each event becomes the provider's own:
+
+| nid event | Resend | Brevo | SendGrid | Postmark | Mailgun |
+| --- | --- | --- | --- | --- | --- |
+| `delivered` | `email.delivered` | `delivered` | `delivered` | `Delivery` | `delivered` |
+| `deferred` | `email.delivery_delayed` | `deferred` | `deferred` | `Bounce`, type `Transient` | `failed`, severity `temporary` |
+| `bounced` | `email.bounced`, type `Permanent` | `hard_bounce` | `bounce` | `Bounce`, type `HardBounce` | `failed`, severity `permanent` |
+| `complained` | `email.complained` | `spam` | `spamreport` | `SpamComplaint` | `complained` |
+| `opened` | `email.opened` | `opened` | `open` | `Open` | `opened` |
+| `clicked` | `email.clicked` | `click` | `click` | `Click` | `clicked` |
+
+The payload carries the ids your app got back when it sent, so it can find the email:
+
+| Provider | Id in the payload | Also copied from the send | Signed with |
+| --- | --- | --- | --- |
+| Resend | `data.email_id` | `tags` | Svix headers (`svix-id`, `svix-timestamp`, `svix-signature`) made with your `whsec_` secret. |
+| Brevo | `message-id` | `X-Mailin-custom` header, `tags` | Not signed. With a secret, `Authorization: Bearer <secret>`. |
+| SendGrid | `sg_message_id`, which starts with the `X-Message-Id` | `custom_args`, categories as `category` | nid's test key. See below. |
+| Postmark | `MessageID` | `Tag`, `Metadata`, `MessageStream` | Not signed. A user and password in the URL become basic auth. |
+| Mailgun | `message.headers.message-id`, without `<` and `>` | `v:` variables as `user-variables`, `tags` | `signature.signature`, an HMAC-SHA256 of `timestamp` and `token` with your signing key. |
+
+### SendGrid webhooks
+
+SendGrid signs with a private key only SendGrid has, so nid signs with its own fixed test key instead. In your app's test settings, use nid's public key as SendGrid's verification key:
+
+```
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiu0d91rTdUCRS7HAXf1YGhnOMjooYTGohQqZPwtGLgqjnlxvzX4vUEWKixV3RiaKqlWDo25D126LGigNAxvnvQ==
+```
+
+The `nid-inbox` package exports it as `sendgridWebhookPublicKey`. The key is public on purpose, so never trust it outside tests.
+
 ## Adding a provider
 
 Each provider is one file in `packages/server/src/providers/`. See [CONTRIBUTING.md](../../CONTRIBUTING.md#adding-a-provider).

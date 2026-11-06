@@ -66,6 +66,16 @@ nid clear [<address>] [--url <url>]
 
 With an address, it deletes mail for that address only. Without one, it deletes every message.
 
+## nid webhook
+
+Sends a provider webhook for a message to your app, and prints your app's status, time and body. See [Test your webhook handler](../how-to/test-webhooks.md).
+
+```
+nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked> [--url <url>]
+```
+
+It exits with code 1 when your app answers anything but a 2xx, or cannot be reached. `nid serve` needs `NID_<PROVIDER>_WEBHOOK_URL` set for the message's provider.
+
 ## nid mcp
 
 Serves nid's MCP tools over standard input and output, for an AI agent that starts nid as a command. It reads mail from a running server, so start `nid serve` first. See [Let an AI agent read your mail](../how-to/connect-an-ai-agent.md).
@@ -88,7 +98,7 @@ The Docker image uses this command for its health check.
 
 ## Choosing the server
 
-`read`, `clear`, `mcp` and `healthcheck` talk to the server at, in order:
+`read`, `clear`, `webhook`, `mcp` and `healthcheck` talk to the server at, in order:
 
 1. The `--url` option.
 2. The `NID_URL` environment variable.

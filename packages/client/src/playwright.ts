@@ -20,4 +20,4 @@ export const test = base.extend<InboxFixtures, InboxWorkerOptions>({
 
 export { expect } from '@playwright/test'
 export { Inbox, InboxError, InboxTimeoutError, createInbox } from './index.js'
-export type { Email, FullEmail, InboxOptions, ListOptions, Rejection, WaitOptions } from './index.js'
+export type { Email, FullEmail, InboxOptions, ListOptions, Rejection, WaitOptions, WebhookEvent, WebhookResult } from './index.js'

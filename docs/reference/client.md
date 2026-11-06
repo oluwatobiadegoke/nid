@@ -95,6 +95,10 @@ Returns refused sends as `Rejection[]`, newest first. With `to`, only those addr
 
 Deletes mail for `address`, or every message when you leave it out. Also forgets the matching cursors. Returns how many messages it deleted.
 
+### triggerWebhook(id, type)
+
+Sends the provider's webhook for message `id` to your app and returns your app's answer as `{ url, delivered, appStatus, appBody, durationMs, error? }`. `type` is `'delivered'`, `'deferred'`, `'bounced'`, `'complained'`, `'opened'` or `'clicked'`. A 4xx or 5xx from your app is not an error: check `delivered` or `appStatus`. It throws `InboxError` when nid cannot send it, for example when no webhook URL is set. See [Test your webhook handler](../how-to/test-webhooks.md).
+
 ## Email
 
 An `Email` is a [Message](read-api.md#message) with three shortcuts copied from `extracted`:

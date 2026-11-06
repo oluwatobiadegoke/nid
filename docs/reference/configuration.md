@@ -10,9 +10,11 @@ nid has no config file. You set it with command line options, environment variab
 | `NID_SMTP_PORT` | `nid serve` | `1025` | SMTP port. |
 | `NID_HOST` | `nid serve` | `127.0.0.1` | Address both servers listen on. |
 | `NID_DB` | `nid serve` | none (memory) | SQLite file to keep mail in. |
-| `NID_URL` | `nid read`, `nid clear`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
-| `NID_TOKEN` | `nid read`, `nid clear`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
+| `NID_URL` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
+| `NID_TOKEN` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
 | `NID_DOMAIN` | `@nid-inbox/client` | `inbox.test` | Domain for addresses made by `inbox.address()`. |
+| `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. It must start with `http://` or `https://`, or nid stops at startup. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK` or `MAILGUN`. See [Test your webhook handler](../how-to/test-webhooks.md). |
+| `NID_<PROVIDER>_WEBHOOK_SECRET` | `nid serve` | none | The secret your app checks webhooks with, such as `NID_RESEND_WEBHOOK_SECRET`. What it is depends on the provider. |
 
 A command line option wins over its environment variable. An option passed in code wins over the environment variable for the client.
 
@@ -42,6 +44,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `cors` | `boolean` | `false` | Sends CORS headers. Same as `--cors`. |
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
 | `maxBodyBytes` | `number` | `52428800` (50 MB) | Largest HTTP body or SMTP message accepted. Larger HTTP bodies get a 413. |
+| `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. `createServer` throws on a name that is not a provider or a URL that is not `http://` or `https://`. |
 | `onMessage` | `(message) => void` | none | Called after each message is stored. |
 | `onError` | `(error) => void` | none | Called on unexpected server errors. |
 

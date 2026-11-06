@@ -1,3 +1,5 @@
+import { webhookEvents } from '../providers/types.js'
+
 const message = {
   type: 'object',
   properties: {
@@ -184,6 +186,46 @@ export function openapi(version: string) {
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
           responses: {
             '200': { description: 'The message', content: { 'application/json': { schema: { type: 'object', properties: { message } } } } },
+            '404': { description: 'No such message' },
+          },
+        },
+      },
+      '/api/messages/{id}/events': {
+        post: {
+          summary: "Send the provider's signed webhook for this message to your app, and return your app's answer.",
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['type'],
+                  properties: { type: { type: 'string', enum: [...webhookEvents] } },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'The webhook was sent. delivered is true when your app answered 2xx.',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      url: { type: 'string' },
+                      delivered: { type: 'boolean' },
+                      appStatus: { type: 'integer', nullable: true },
+                      appBody: { type: 'string' },
+                      durationMs: { type: 'integer' },
+                      error: { type: 'string', description: 'Why nid could not reach your app.' },
+                    },
+                  },
+                },
+              },
+            },
+            '400': { description: 'Unknown type, no webhook URL or secret set, or mail sent over SMTP' },
             '404': { description: 'No such message' },
           },
         },

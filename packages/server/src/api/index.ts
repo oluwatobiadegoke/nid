@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { Ingest } from '../ingest/types.js'
-import type { Provider } from '../providers/types.js'
+import { webhookEvents, type Provider, type WebhookEvent } from '../providers/types.js'
 import type { Store } from '../store/types.js'
 import type { Project } from '../types.js'
 import { openapi } from './openapi.js'
@@ -17,11 +17,13 @@ import {
 } from './query.js'
 import { serializeMessage, serializeRejection } from './serialize.js'
 import { defaultTimeoutSeconds, describeTimeout, waitForMessage } from './wait.js'
+import { sendWebhook, type WebhookTarget } from './webhook.js'
 
 export interface ApiOptions {
   store: Store
   ingest: Ingest
   providers: Provider[]
+  webhooks: Record<string, WebhookTarget>
   version: string
 }
 
@@ -107,6 +109,42 @@ export function readApi(options: ApiOptions): Hono<Env> {
     const message = await store.getMessage(c.get('project').projectId, id)
     if (!message) return c.json({ error: `No message with id ${id}` }, 404)
     return c.json({ message: serializeMessage(message, { raw: true }) })
+  })
+
+  app.post('/messages/:id/events', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
+    const body = (await c.req.json().catch(() => null)) as { type?: unknown } | null
+    const event = body?.type as WebhookEvent
+    if (!webhookEvents.includes(event)) {
+      return c.json({ error: `type must be one of ${webhookEvents.join(', ')}` }, 400)
+    }
+    const message = await store.getMessage(c.get('project').projectId, id)
+    if (!message) return c.json({ error: `No message with id ${id}` }, 404)
+    const provider = options.providers.find((p) => p.name === message.provider)
+    if (!provider?.webhook) return c.json({ error: `Mail sent over ${message.provider} has no webhooks` }, 400)
+    const target = options.webhooks[provider.name]
+    if (!target) {
+      return c.json(
+        {
+          error: `No ${provider.label} webhook URL is set. Start nid with NID_${provider.name.toUpperCase()}_WEBHOOK_URL set to your app's ${provider.label} webhook route.`,
+        },
+        400,
+      )
+    }
+    let request
+    try {
+      request = provider.webhook({
+        message,
+        event,
+        recipient: message.recipients[0]?.address ?? '',
+        secret: target.secret,
+        now: new Date(),
+      })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400)
+    }
+    return c.json(await sendWebhook(target, request))
   })
 
   app.get('/messages/:id/attachments/:n', async (c) => {

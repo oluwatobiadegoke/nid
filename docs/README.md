@@ -20,6 +20,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 - [Run nid](how-to/run-nid.md) with npm, Docker, Playwright or GitHub Actions.
 - [Point your app at nid](how-to/connect-your-app.md) when it sends with Resend, Brevo, SendGrid, Postmark, Mailgun or SMTP.
 - [Read mail in tests](how-to/read-mail-in-tests.md), with Playwright or any other test runner.
+- [Test your webhook handler](how-to/test-webhooks.md) with the bounce and delivery events your provider sends.
 - [Use the command line](how-to/use-the-cli.md) to read and clear mail from a terminal.
 - [Let an AI agent read your mail](how-to/connect-an-ai-agent.md) over MCP.
 - [Embed nid in your own code](how-to/embed-nid.md) instead of running it as a command.
@@ -51,6 +52,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 | Cursor | A message id. "After the cursor" means "newer than that message". |
 | MCP | The Model Context Protocol, which AI agents use to call tools. nid's tools read mail. |
 | Rejection | A send that nid refused, kept with the error it returned. |
+| Webhook | A request a provider sends to your app when something happens to an email, such as a bounce. |
 
 ## Keeping these docs current
 

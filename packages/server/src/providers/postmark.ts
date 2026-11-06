@@ -1,8 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { Message, NewMessage, Recipient } from '../types.js'
-import { attachmentFrom, header, isRecord, looseAddresses, mailboxes, parseMailbox, splitAddresses, toAddresses } from './shared.js'
-import { SendError, type Provider, type SendRoute } from './types.js'
+import {
+  attachmentFrom,
+  bounceReason,
+  deferReason,
+  header,
+  isRecord,
+  looseAddresses,
+  mailboxes,
+  parseMailbox,
+  senderAddress,
+  splitAddresses,
+  toAddresses,
+} from './shared.js'
+import { SendError, type Provider, type SendRoute, type WebhookEvent, type WebhookInput } from './types.js'
 
 const name = 'postmark'
 
@@ -142,6 +154,63 @@ const batch = (path: string, templated: boolean): SendRoute => ({
   }),
 })
 
+const bounces: Partial<Record<WebhookEvent, object>> = {
+  bounced: {
+    Type: 'HardBounce',
+    TypeCode: 1,
+    Name: 'Hard bounce',
+    Description: 'The server was unable to deliver your message (ex: unknown user, mailbox not found).',
+    Details: bounceReason,
+  },
+  deferred: {
+    Type: 'Transient',
+    TypeCode: 2,
+    Name: 'Message delayed',
+    Description: 'The server could not temporarily deliver your message (ex: Message is delayed due to network troubles).',
+    Details: deferReason,
+  },
+  complained: {
+    Type: 'SpamComplaint',
+    TypeCode: 512,
+    Name: 'Spam complaint',
+    Description: 'The subscriber explicitly marked this message as spam.',
+    Details: '',
+  },
+}
+
+function webhook({ message: m, event, recipient, now }: WebhookInput) {
+  const common = {
+    MessageID: m.providerId,
+    MessageStream: (m.meta.messageStream as string | undefined) ?? 'outbound',
+    Tag: ((m.meta.tags as string[] | undefined) ?? [])[0] ?? '',
+    Metadata: (m.meta.metadata as Record<string, unknown> | undefined) ?? {},
+    ServerID: 1,
+  }
+  const at = now.toISOString()
+  const reader = { Platform: 'Desktop', UserAgent: 'nid', Client: { Name: 'nid', Company: 'nid', Family: 'nid' }, OS: { Name: 'nid', Company: 'nid', Family: 'nid' }, Geo: {} }
+  const bounce = bounces[event]
+  const payload = bounce
+    ? {
+        RecordType: event === 'complained' ? 'SpamComplaint' : 'Bounce',
+        ID: now.getTime(),
+        ...bounce,
+        ...common,
+        Email: recipient,
+        From: senderAddress(m.from),
+        BouncedAt: at,
+        DumpAvailable: false,
+        Inactive: event !== 'deferred',
+        CanActivate: true,
+        Subject: m.subject,
+      }
+    : event === 'delivered'
+      ? { RecordType: 'Delivery', ...common, Recipient: recipient, DeliveredAt: at, Details: 'Test delivery webhook details' }
+      : event === 'opened'
+        ? { RecordType: 'Open', ...common, ...reader, FirstOpen: true, ReadSeconds: 0, Recipient: recipient, ReceivedAt: at }
+        : { RecordType: 'Click', ...common, ...reader, ClickLocation: 'HTML', OriginalLink: m.extracted.link ?? '', Recipient: recipient, ReceivedAt: at }
+  return { body: JSON.stringify(payload), headers: {} }
+}
+
 export const postmark: Provider = {
   name,
   label: 'Postmark',
@@ -168,4 +237,5 @@ export const postmark: Provider = {
     env: "new postmark.ServerClient(token, { useHttps: false, requestHost: '127.0.0.1:4400' })",
     note: 'requestHost takes a host and port, not a URL.',
   },
+  webhook,
 }
