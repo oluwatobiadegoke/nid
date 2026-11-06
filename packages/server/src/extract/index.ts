@@ -156,7 +156,7 @@ export function extract(input: ExtractInput): Extracted {
     if (found.code) codes = [found.code, ...codes.filter((c) => c !== found.code)]
     if (codes.length === 0) codes = findCodes(found.values.join('\n'))
     if (found.link) link = found.link
-    const seen = new Set(links.map((l) => l.href))
+    const seen = new Set<string>()
     for (const value of found.values) {
       for (const m of value.matchAll(urlPattern)) {
         const href = trimUrl(m[0])
