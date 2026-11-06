@@ -20,7 +20,7 @@ export async function sendWebhook(target: WebhookTarget, request: WebhookRequest
   const url = new URL(target.url)
   const headers: Record<string, string> = { 'content-type': 'application/json', 'user-agent': 'nid', ...request.headers }
   if (url.username || url.password) {
-    const credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`
+    const credentials = `${decode(url.username)}:${decode(url.password)}`
     headers.authorization = `Basic ${Buffer.from(credentials).toString('base64')}`
     url.username = ''
     url.password = ''
@@ -43,6 +43,14 @@ export async function sendWebhook(target: WebhookTarget, request: WebhookRequest
   } catch (err) {
     const reason = (err as Error).name === 'TimeoutError' ? `no answer within ${webhookTimeoutMs / 1000} seconds` : errorCause(err)
     return result({ delivered: false, appStatus: null, appBody: '', error: `Could not reach your app at ${url.href}: ${reason}` })
+  }
+}
+
+function decode(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
   }
 }
 

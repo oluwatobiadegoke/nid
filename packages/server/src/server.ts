@@ -71,13 +71,17 @@ function closeSmtp(server: SMTPServer): Promise<void> {
 }
 
 export async function createServer(options: ServerOptions = {}): Promise<NidServer> {
+  const providers = options.providers ?? builtInProviders
+  const webhookProviders = providers.filter((p) => p.webhook).map((p) => p.name)
   for (const [name, target] of Object.entries(options.webhooks ?? {})) {
+    if (!webhookProviders.includes(name)) {
+      throw new Error(`webhooks.${name} names no provider that sends webhooks. Use ${webhookProviders.join(', ')}.`)
+    }
     if (!/^https?:\/\//i.test(target.url) || !URL.canParse(target.url)) {
       throw new Error(`The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`)
     }
   }
   const store = options.store ?? (await createSqliteStore())
-  const providers = options.providers ?? builtInProviders
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes
   const ingest = createIngest({ store, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
 

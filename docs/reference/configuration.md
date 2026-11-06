@@ -44,7 +44,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `cors` | `boolean` | `false` | Sends CORS headers. Same as `--cors`. |
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
 | `maxBodyBytes` | `number` | `52428800` (50 MB) | Largest HTTP body or SMTP message accepted. Larger HTTP bodies get a 413. |
-| `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. |
+| `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. `createServer` throws on a name that is not a provider or a URL that is not `http://` or `https://`. |
 | `onMessage` | `(message) => void` | none | Called after each message is stored. |
 | `onError` | `(error) => void` | none | Called on unexpected server errors. |
 

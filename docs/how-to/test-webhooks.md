@@ -30,6 +30,19 @@ Each provider has its own pair, such as `NID_RESEND_WEBHOOK_URL` and `NID_RESEND
 | Postmark | Not used. Put a user and password in the URL, such as `http://user:pass@127.0.0.1:3000/hooks`, and nid sends them as basic auth. |
 | Mailgun | Required. Your app's HTTP webhook signing key. |
 
+When nid runs in Docker, `127.0.0.1` is the container itself, so point it at your machine with `host.docker.internal`:
+
+```sh
+docker run --rm \
+  -p 127.0.0.1:4400:4400 \
+  --add-host=host.docker.internal:host-gateway \
+  -e NID_BREVO_WEBHOOK_URL=http://host.docker.internal:3000/api/communications/webhooks/brevo \
+  -e NID_BREVO_WEBHOOK_SECRET=webhook-token \
+  ghcr.io/oluwatobiadegoke/nid
+```
+
+`--add-host` is needed on Linux. Docker Desktop on macOS and Windows knows `host.docker.internal` already.
+
 When you [embed nid](embed-nid.md), pass `webhooks: { brevo: { url, secret } }` to `createServer` instead.
 
 ## Send an event

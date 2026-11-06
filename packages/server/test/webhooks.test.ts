@@ -149,8 +149,12 @@ test('an app that is not running is reported, not hidden', async (t) => {
   assert.match(String(result.body.error), /^Could not reach your app at http:\/\/localhost:\d+\/webhooks\/brevo: .*ECONNREFUSED/)
 })
 
-test('a webhook URL without http:// stops nid at startup and names the setting', async () => {
+test('a webhook URL without http://, or a misspelled provider, stops nid at startup and says what to fix', async () => {
   await assert.rejects(createServer({ webhooks: { brevo: { url: '127.0.0.1:3000/api/webhooks/brevo' } } }), /NID_BREVO_WEBHOOK_URL/)
+  await assert.rejects(
+    createServer({ webhooks: { Brevo: { url: 'http://127.0.0.1:3000/api/webhooks/brevo' } } }),
+    /webhooks\.Brevo names no provider that sends webhooks\. Use resend, brevo, sendgrid, postmark, mailgun\./,
+  )
 })
 
 test('a Resend webhook passes the Resend SDK signature check', async (t) => {
@@ -239,7 +243,7 @@ test('a Mailgun webhook carries a signature the app can check with its signing k
 
 test('a Postmark webhook URL with a user and password arrives as basic auth', async (t) => {
   const app = await fakeApp(t)
-  const running = await nid(t, { postmark: { url: `http://hooks:s3cret@${app.url.slice('http://'.length)}/postmark` } })
+  const running = await nid(t, { postmark: { url: `http://hooks:50%off@${app.url.slice('http://'.length)}/postmark` } })
   const res = await running.server.app.request(
     '/email',
     json(
@@ -250,7 +254,7 @@ test('a Postmark webhook URL with a user and password arrives as basic auth', as
   const sent = (await res.json()) as { MessageID: string }
   const result = await trigger(running, await latestId(running), 'bounced')
   assert.equal(result.body.url, `${app.url}/postmark`)
-  assert.equal(app.received[0]?.headers.authorization, `Basic ${Buffer.from('hooks:s3cret').toString('base64')}`)
+  assert.equal(app.received[0]?.headers.authorization, `Basic ${Buffer.from('hooks:50%off').toString('base64')}`)
   const bounce = JSON.parse(app.received[0]?.body ?? '')
   assert.equal(bounce.RecordType, 'Bounce')
   assert.equal(bounce.Type, 'HardBounce')
