@@ -41,7 +41,7 @@ docker run --rm \
   ghcr.io/oluwatobiadegoke/nid
 ```
 
-`--add-host` is needed on Linux. Docker Desktop on macOS and Windows knows `host.docker.internal` already.
+`--add-host` is needed on Linux, and there your app must listen on an address the container can reach, such as `0.0.0.0`, not only `127.0.0.1`. Docker Desktop on macOS and Windows knows `host.docker.internal` already.
 
 When you [embed nid](embed-nid.md), pass `webhooks: { brevo: { url, secret } }` to `createServer` instead.
 
@@ -90,7 +90,7 @@ nid waits up to 10 seconds for your app and returns what it answered:
 Could not reach your app at http://127.0.0.1:3000/api/communications/webhooks/brevo: connect ECONNREFUSED 127.0.0.1:3000
 ```
 
-`nid webhook` prints that sentence and exits with code 1 when your app answers anything but a 2xx.
+When nid cannot reach your app, `nid webhook` prints that sentence and exits with code 1. When your app answers anything but a 2xx, it prints the status and body, and also exits with code 1.
 
 ## Limits
 
