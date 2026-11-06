@@ -71,7 +71,7 @@ nid waits up to 10 seconds for your app and returns what it answered:
 }
 ```
 
-`delivered` is `true` when your app answered with a 2xx status. When your handler throws, you see its status and body here, in the test, not only in your app's log. When nid cannot reach your app, `appStatus` is `null` and `error` says why:
+`delivered` is `true` when your app answered with a 2xx status. nid does not follow redirects, so a route that redirects to a login page shows up as a 302, not as delivered. When your handler throws, you see its status and body here, in the test, not only in your app's log. When nid cannot reach your app, `appStatus` is `null` and `error` says why:
 
 ```
 Could not reach your app at http://127.0.0.1:3000/api/communications/webhooks/brevo: connect ECONNREFUSED 127.0.0.1:3000

@@ -36,6 +36,7 @@ export async function sendWebhook(target: WebhookTarget, request: WebhookRequest
       method: 'POST',
       headers,
       body: request.body,
+      redirect: 'manual',
       signal: AbortSignal.timeout(webhookTimeoutMs),
     })
     return result({ delivered: response.ok, appStatus: response.status, appBody: await response.text() })

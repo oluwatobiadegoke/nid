@@ -17,7 +17,7 @@ interface Received {
   body: string
 }
 
-type Handler = (req: Received) => { status: number; body: string }
+type Handler = (req: Received) => { status: number; body: string; headers?: Record<string, string> }
 
 async function fakeApp(t: { after(fn: () => Promise<void>): void }, handler: Handler = () => ({ status: 200, body: 'ok' })) {
   const received: Received[] = []
@@ -28,7 +28,7 @@ async function fakeApp(t: { after(fn: () => Promise<void>): void }, handler: Han
       const request = { path: req.url ?? '', headers: req.headers, body }
       received.push(request)
       const reply = handler(request)
-      res.writeHead(reply.status, { 'content-type': 'application/json' }).end(reply.body)
+      res.writeHead(reply.status, { 'content-type': 'application/json', ...reply.headers }).end(reply.body)
     })
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -125,6 +125,18 @@ async function closedPort(): Promise<number> {
   await new Promise<void>((resolve) => server.close(() => resolve()))
   return port
 }
+
+test('a route that redirects to a login page is reported as not delivered', async (t) => {
+  const app = await fakeApp(t, (req) =>
+    req.path === '/login' ? { status: 200, body: '<html>login page</html>' } : { status: 302, body: '', headers: { location: '/login' } },
+  )
+  const running = await nid(t, { brevo: { url: `${app.url}/hooks/brevo` } })
+  await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html })
+  const result = await trigger(running, await latestId(running), 'bounced')
+  assert.equal(result.body.delivered, false)
+  assert.equal(result.body.appStatus, 302)
+  assert.deepEqual(app.received.map((r) => r.path), ['/hooks/brevo'])
+})
 
 test('an app that is not running is reported, not hidden', async (t) => {
   const url = `http://localhost:${await closedPort()}/webhooks/brevo`

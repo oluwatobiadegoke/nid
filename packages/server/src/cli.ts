@@ -92,7 +92,12 @@ async function serve(args: string[]) {
         `  web view    ${listening.url}`,
         `  provider APIs and read API on ${listening.url}`,
         `  SMTP        ${listening.host}:${listening.smtpPort}`,
-        ...Object.entries(webhooks).map(([name, target]) => `  webhooks    ${name} to ${target.url}`),
+        ...Object.entries(webhooks).map(([name, target]) => {
+          const shown = new URL(target.url)
+          shown.username = ''
+          shown.password = ''
+          return `  webhooks    ${name} to ${shown.href}`
+        }),
         `  mail is ${where}`,
         '',
       ].join('\n'),
