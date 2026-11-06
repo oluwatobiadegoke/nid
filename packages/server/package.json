@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.6",
+    "@modelcontextprotocol/server": "2.3.1",
     "hono": "4.13.16",
     "kysely": "0.29.8",
     "mailparser": "3.14.2",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@getbrevo/brevo": "6.2.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@sendgrid/mail": "8.1.6",
     "@types/mailparser": "3.9.0",
     "@types/node": "26.6.6",

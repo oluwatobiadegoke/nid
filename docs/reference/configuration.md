@@ -10,8 +10,8 @@ nid has no config file. You set it with command line options, environment variab
 | `NID_SMTP_PORT` | `nid serve` | `1025` | SMTP port. |
 | `NID_HOST` | `nid serve` | `127.0.0.1` | Address both servers listen on. |
 | `NID_DB` | `nid serve` | none (memory) | SQLite file to keep mail in. |
-| `NID_URL` | `nid read`, `nid clear`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
-| `NID_TOKEN` | `nid read`, `nid clear`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
+| `NID_URL` | `nid read`, `nid clear`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
+| `NID_TOKEN` | `nid read`, `nid clear`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
 | `NID_DOMAIN` | `@nid-inbox/client` | `inbox.test` | Domain for addresses made by `inbox.address()`. |
 
 A command line option wins over its environment variable. An option passed in code wins over the environment variable for the client.

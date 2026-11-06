@@ -24,10 +24,11 @@ packages/
       store/        the Store interface, the schema and the SQLite dialect
       extract/      codes and links
       api/          the read API: wait, messages, rejections, stream, openapi
-      security/     the Host check
+      security/     the Host and Origin checks
+      mcp/          the MCP tools, served at /mcp and by `nid mcp`
       ui/           serves the one-page web view in ../ui/index.html
       server.ts     createServer: wires it all together
-      cli.ts        serve, read, clear, healthcheck
+      cli.ts        serve, read, clear, mcp, healthcheck
     test/
   client/           the npm package `@nid-inbox/client`: a tiny client and a Playwright fixture
 docs/               the documentation: tutorials, how-to guides, reference and explanation

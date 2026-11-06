@@ -12,6 +12,7 @@ The docs change in the same pull request as the code they describe. A change tha
 | A read API route, parameter or field | [reference/read-api.md](reference/read-api.md) and `packages/server/src/api/openapi.ts` |
 | The client library | [reference/client.md](reference/client.md), and [how-to/read-mail-in-tests.md](how-to/read-mail-in-tests.md) if it needs an example |
 | A provider, or a provider route | [reference/providers.md](reference/providers.md), [how-to/connect-your-app.md](how-to/connect-your-app.md), the provider list in the root README, and "What nid does not do yet" in [explanation/how-nid-works.md](explanation/how-nid-works.md) |
+| An MCP tool, or `/mcp` | [reference/mcp.md](reference/mcp.md), and [how-to/connect-an-ai-agent.md](how-to/connect-an-ai-agent.md) if setup changes |
 | Code or link extraction | "Finding codes and links" in [explanation/how-nid-works.md](explanation/how-nid-works.md) |
 | The web view (`packages/server/ui/index.html`) | [how-to/use-the-web-view.md](how-to/use-the-web-view.md), and the tutorial if its steps mention the view |
 | Host checks, CORS or anything about who can reach nid | [explanation/security.md](explanation/security.md) |

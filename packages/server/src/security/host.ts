@@ -29,3 +29,14 @@ export function hostCheck(allowHosts: string[]): MiddlewareHandler {
     await next()
   }
 }
+
+export function originCheck(allowHosts: string[]): MiddlewareHandler {
+  return async (c, next) => {
+    const origin = c.req.header('origin')
+    const host = origin && URL.canParse(origin) ? new URL(origin).host : null
+    if (origin && !(host && hostAllowed(host, allowHosts))) {
+      return c.json({ error: 'This origin is not allowed. Start the server with --allow-host <name> to accept it.' }, 403)
+    }
+    await next()
+  }
+}

@@ -10,6 +10,7 @@ import { providerRoutes } from './ingest/http.js'
 import { createSmtpServer, listenSmtp } from './ingest/smtp.js'
 import { providers as builtInProviders, type Provider } from './providers/index.js'
 import { hostCheck } from './security/host.js'
+import { mcpRoutes } from './mcp/http.js'
 import { createSqliteStore, type Store } from './store/index.js'
 import type { AuthHook, LimitsHook, Message } from './types.js'
 import { webView } from './ui/index.js'
@@ -85,6 +86,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
   )
   app.get('/healthz', (c) => c.json({ ok: true, version }))
   app.route('/api', readApi({ store, ingest, providers, version }))
+  app.route('/mcp', mcpRoutes(async (path, init) => app.request(path, init), options.allowHosts ?? []))
   if (options.ui !== false) app.route('/', webView())
   app.route('/', providerRoutes({ providers, ingest, store }))
   app.notFound((c) => c.json({ error: `No route for ${c.req.method} ${c.req.path}` }, 404))

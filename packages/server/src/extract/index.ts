@@ -138,14 +138,18 @@ export interface ExtractInput {
   variables?: Record<string, unknown> | undefined
 }
 
+export function bodyText(message: { text: string | null; html: string | null }): string {
+  return message.text ?? (message.html ? htmlToText(message.html) : '')
+}
+
 export function extract(input: ExtractInput): Extracted {
-  const bodyText = input.text ?? (input.html ? htmlToText(input.html) : '')
-  let codes = [...findCodes(input.subject), ...findCodes(bodyText)].filter(
+  const text = bodyText(input)
+  let codes = [...findCodes(input.subject), ...findCodes(text)].filter(
     (token, i, all) => all.indexOf(token) === i,
   )
   const links = findLinks(input.html, input.text)
   let link = links.find(isPrimaryLink)?.href ?? null
-  if (input.variables && !bodyText && !input.html) {
+  if (input.variables && !text && !input.html) {
     const found = fromVariables(input.variables)
     if (found.code) codes = [found.code, ...codes.filter((c) => c !== found.code)]
     if (codes.length === 0) codes = findCodes(found.values.join('\n'))
@@ -162,7 +166,7 @@ export function extract(input: ExtractInput): Extracted {
 }
 
 export function matchesPattern(message: { subject: string; text: string | null; html: string | null }, pattern: RegExp): string | null {
-  const haystack = [message.subject, message.text ?? (message.html ? htmlToText(message.html) : '')].join('\n')
+  const haystack = [message.subject, bodyText(message)].join('\n')
   const match = haystack.match(pattern)
   if (!match) return null
   return match[1] ?? match[0]
