@@ -13,7 +13,7 @@ nid has no config file. You set it with command line options, environment variab
 | `NID_URL` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
 | `NID_TOKEN` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
 | `NID_DOMAIN` | `@nid-inbox/client` | `inbox.test` | Domain for addresses made by `inbox.address()`. |
-| `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK` or `MAILGUN`. See [Test your webhook handler](../how-to/test-webhooks.md). |
+| `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. It must start with `http://` or `https://`, or nid stops at startup. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK` or `MAILGUN`. See [Test your webhook handler](../how-to/test-webhooks.md). |
 | `NID_<PROVIDER>_WEBHOOK_SECRET` | `nid serve` | none | The secret your app checks webhooks with, such as `NID_RESEND_WEBHOOK_SECRET`. What it is depends on the provider. |
 
 A command line option wins over its environment variable. An option passed in code wins over the environment variable for the client.

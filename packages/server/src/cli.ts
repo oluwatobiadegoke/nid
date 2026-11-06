@@ -78,7 +78,7 @@ async function serve(args: string[]) {
     allowHosts: values['allow-host'],
     webhooks,
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
-  })
+  }).catch((err: Error) => fail(err.message))
   const listening = await server.listen({
     port: Number(values.port),
     smtpPort: Number(values['smtp-port']),

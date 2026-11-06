@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { test } from 'node:test'
 import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
-import { sendgridWebhookPublicKey, type ServerOptions } from '../src/index.js'
+import { createServer, sendgridWebhookPublicKey, type ServerOptions } from '../src/index.js'
 import { brevoHeaders, json, sendBrevo, sendResend, start, type Running } from './helpers.js'
 
 interface Received {
@@ -118,14 +118,27 @@ test('a webhook handler that fails shows its status and error in the test, and t
   assert.match(failed.stdout, /reading 'email'/)
 })
 
+async function closedPort(): Promise<number> {
+  const server = createHttpServer()
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  await new Promise<void>((resolve) => server.close(() => resolve()))
+  return port
+}
+
 test('an app that is not running is reported, not hidden', async (t) => {
-  const running = await nid(t, { brevo: { url: 'http://127.0.0.1:9/webhooks/brevo' } })
+  const url = `http://localhost:${await closedPort()}/webhooks/brevo`
+  const running = await nid(t, { brevo: { url } })
   await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html })
   const result = await trigger(running, await latestId(running), 'delivered')
   assert.equal(result.status, 200)
   assert.equal(result.body.delivered, false)
   assert.equal(result.body.appStatus, null)
-  assert.match(String(result.body.error), /Could not reach your app at http:\/\/127\.0\.0\.1:9\/webhooks\/brevo/)
+  assert.match(String(result.body.error), /^Could not reach your app at http:\/\/localhost:\d+\/webhooks\/brevo: .*ECONNREFUSED/)
+})
+
+test('a webhook URL without http:// stops nid at startup and names the setting', async () => {
+  await assert.rejects(createServer({ webhooks: { brevo: { url: '127.0.0.1:3000/api/webhooks/brevo' } } }), /NID_BREVO_WEBHOOK_URL/)
 })
 
 test('a Resend webhook passes the Resend SDK signature check', async (t) => {
@@ -236,7 +249,7 @@ test('a Postmark webhook URL with a user and password arrives as basic auth', as
 })
 
 test('nid says what to set when it cannot send a webhook', async (t) => {
-  const running = await nid(t, { resend: { url: 'http://127.0.0.1:9' } })
+  const running = await nid(t, { resend: { url: 'http://127.0.0.1:3000' } })
   await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html }, brevoHeaders)
   const brevoId = await latestId(running)
   const noUrl = await trigger(running, brevoId, 'bounced')

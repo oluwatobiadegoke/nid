@@ -46,6 +46,6 @@ export async function sendWebhook(target: WebhookTarget, request: WebhookRequest
 }
 
 function errorCause(err: unknown): string {
-  const cause = (err as { cause?: { message?: string } }).cause
-  return cause?.message ?? (err as Error).message
+  const cause = (err as { cause?: { message?: string; code?: string } }).cause
+  return cause?.message || cause?.code || (err as Error).message
 }
