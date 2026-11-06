@@ -3,6 +3,11 @@
   "version": "0.3.0",
   "description": "An email inbox that runs on your computer. Read what your app sends in your browser, or from your tests.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oluwatobiadegoke/nid.git",
+    "directory": "packages/server"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.13"
