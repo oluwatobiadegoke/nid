@@ -114,6 +114,9 @@ export function readApi(options: ApiOptions): Hono<Env> {
   app.post('/messages/:id/events', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
+    if (!/^application\/json\b/i.test(c.req.header('content-type') ?? '')) {
+      return c.json({ error: 'Send the event as JSON, with content-type: application/json' }, 415)
+    }
     const body = (await c.req.json().catch(() => null)) as { type?: unknown } | null
     const event = body?.type as WebhookEvent
     if (!webhookEvents.includes(event)) {
@@ -153,10 +156,11 @@ export function readApi(options: ApiOptions): Hono<Env> {
     if (!Number.isInteger(id) || !Number.isInteger(n)) return c.json({ error: 'Ids must be integers' }, 400)
     const attachment = await store.getAttachment(c.get('project').projectId, id, n)
     if (!attachment) return c.json({ error: `No attachment ${n} on message ${id}` }, 404)
-    const safeName = attachment.filename.replace(/["\r\n]/g, '')
+    const asciiName = attachment.filename.replace(/[^\x20-\x7e]|["\\]/g, '_')
+    const utf8Name = encodeURIComponent(attachment.filename).replace(/['()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`)
     return c.body(new Uint8Array(attachment.content), 200, {
       'content-type': attachment.contentType,
-      'content-disposition': `attachment; filename="${safeName}"`,
+      'content-disposition': `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`,
       'content-length': String(attachment.content.byteLength),
     })
   })

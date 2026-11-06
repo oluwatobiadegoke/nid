@@ -227,6 +227,7 @@ export function openapi(version: string) {
             },
             '400': { description: 'Unknown type, no webhook URL or secret set, or mail sent over SMTP' },
             '404': { description: 'No such message' },
+            '415': { description: 'The body was not sent as application/json' },
           },
         },
       },

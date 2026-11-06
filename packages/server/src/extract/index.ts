@@ -11,6 +11,7 @@ const windowAfter = 40
 const anchorPattern = /<a\b([^<>]*)>([\s\S]*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
 const hrefPattern = /[\s"'/]href\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
+const unsafeSchemes = ['javascript:', 'vbscript:', 'data:']
 
 function codePoint(value: number): string {
   return value <= 0x10ffff ? String.fromCodePoint(value) : '\ufffd'
@@ -86,7 +87,7 @@ function findLinks(html: string | null, text: string | null): Link[] {
   const seen = new Set<string>()
   const push = (href: string, label: string) => {
     const clean = trimUrl(decodeEntities(href.trim()))
-    if (!clean || seen.has(clean)) return
+    if (!clean || seen.has(clean) || unsafeSchemes.includes(URL.parse(clean)?.protocol ?? '')) return
     seen.add(clean)
     links.push({ href: clean, text: label.trim() })
   }

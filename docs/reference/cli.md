@@ -56,6 +56,8 @@ nid read <address> [--latest] [--code] [--links] [--wait <seconds>] [--json] [--
 | `--json` | Prints JSON instead of text. |
 | `--url <url>` | The server to read from. See [Choosing the server](#choosing-the-server). |
 
+Without `--json`, `nid read` leaves out control characters other than newlines and tabs, so an email cannot change your terminal.
+
 ## nid clear
 
 Deletes mail on a running server and prints how many messages it deleted.
