@@ -8,8 +8,8 @@ const urlPattern = /https?:\/\/[^\s<>"'`)\]]+/g
 const windowBefore = 80
 const windowAfter = 40
 
-const anchorPattern = /<a\b([^<>]*)>((?:(?!<a\b)[\s\S])*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
-const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+const anchorPattern = /<a\b([^<>]*)>([\s\S]*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
+const hrefPattern = /(?:^|[\s"'/])href\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
 
 function codePoint(value: number): string {
@@ -34,7 +34,7 @@ export function htmlToText(html: string): string {
       .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|tr|li|h[1-6]|td|th)>/gi, '\n')
-      .replace(/<[a-z!/?][^>]*(?:>|$)/gi, ' '),
+      .replace(/<[a-z!/?][^>]*>?/gi, ' '),
   )
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n+/g, '\n')
