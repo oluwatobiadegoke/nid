@@ -14,7 +14,7 @@ nid keeps every email on your machine. By default, only your own computer can op
 - **Its MCP endpoint checks the Origin header.** A browser sends `Origin` with the requests a page makes. `/mcp` refuses a request whose `Origin` names a host nid would refuse in `Host`, such as `https://evil.example`, even when that origin is in `--cors`. A page whose origin is in `--cors` and whose host nid accepts, such as `http://localhost:3000`, can call it, as it can call the read API.
 - **It renders email HTML in a sandboxed frame** with scripts blocked, so an email cannot run code in the web view.
 - **It leaves out links that run code.** nid drops `javascript:`, `vbscript:` and `data:` links when it reads an email, so the web view, the CLI and your tests never get one to click.
-- **It sends a webhook only when asked in JSON.** A web page you visit can post a plain form to nid, but `POST /api/messages/{id}/events` refuses any body that is not `application/json`, so the page cannot make nid call your app. `--cors` lifts this for every page.
+- **It sends a webhook only when asked in JSON.** A web page you visit can post a plain form to nid, but `POST /api/messages/{id}/events` refuses any body that is not `application/json`, so the page cannot make nid call your app. A page whose origin is in `--cors` can still send it.
 - **It sends nothing out.** There is no relay to real inboxes and no telemetry.
 
 ## Why nid checks the Host header
