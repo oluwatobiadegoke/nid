@@ -115,3 +115,16 @@ test('links and codes survive the html quirks real templates produce', () => {
   assert.equal(result.link, 'https://app.acme.com/verify?t=1')
   assert.deepEqual(result.links.map((l) => l.href), ['https://app.acme.com/verify?t=1', "https://app.acme.com/o'neil/help", 'https://app.acme.com/more'])
 })
+
+test('a closing tag with a space and a last link left open still end where a browser ends them', () => {
+  const spaced = extract({
+    subject: 'Sign in',
+    text: null,
+    html: '<a href="https://app.acme.com/verify?t=1">Verify</a ><p>Not you? Unsubscribe from these emails. Code &#x110000; 482913</p>',
+  })
+  assert.equal(spaced.link, 'https://app.acme.com/verify?t=1')
+  assert.deepEqual(spaced.codes, ['482913'])
+  const open = extract({ subject: 'Sign in', text: null, html: '<p>Code 482913</p><a href="https://app.acme.com/verify?t=1">Verify' })
+  assert.equal(open.link, 'https://app.acme.com/verify?t=1')
+  assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")</script ><p>bye</p>'), 'Code 1234\n bye')
+})
