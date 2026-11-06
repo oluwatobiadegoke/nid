@@ -18,7 +18,7 @@ Start with the tutorial. In about ten minutes you send an email to nid, read it 
 
 - [See your mail in the web view](how-to/use-the-web-view.md) to read the emails your app sends in your browser.
 - [Run nid](how-to/run-nid.md) with npm, Docker, Playwright or GitHub Actions.
-- [Point your app at nid](how-to/connect-your-app.md) when it sends with Resend, Brevo or SMTP.
+- [Point your app at nid](how-to/connect-your-app.md) when it sends with Resend, Brevo, SendGrid, Postmark, Mailgun or SMTP.
 - [Read mail in tests](how-to/read-mail-in-tests.md), with Playwright or any other test runner.
 - [Use the command line](how-to/use-the-cli.md) to read and clear mail from a terminal.
 - [Let an AI agent read your mail](how-to/connect-an-ai-agent.md) over MCP.
