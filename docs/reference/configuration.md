@@ -41,7 +41,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `limits` | `(project) => Limits` | `{ maxBodyBytes: 52428800, retentionHours: null }` | Per-project limits. Can return a promise. See the note below. |
 | `providers` | `Provider[]` | All five: Resend, Brevo, SendGrid, Postmark and Mailgun | Which provider APIs to answer. |
 | `allowHosts` | `string[]` | `[]` | Extra `Host` names to accept. Same as `--allow-host`. |
-| `cors` | `boolean` | `false` | Sends CORS headers. Same as `--cors`. |
+| `cors` | `string[]` | `[]` | Origins whose web pages may call nid, such as `['http://localhost:3000']`. Same as `--cors`. `createServer` throws on a value that is not an `http://` or `https://` URL. |
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
 | `maxBodyBytes` | `number` | `52428800` (50 MB) | Largest HTTP body or SMTP message accepted. Larger HTTP bodies get a 413. |
 | `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. `createServer` throws on a name that is not a provider or a URL that is not `http://` or `https://`. |
