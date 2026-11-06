@@ -80,3 +80,51 @@ test('code_pattern runs over subject and text and returns the first group', () =
   assert.equal(matchesPattern(message, /access key is ([A-Z0-9-]+)/), 'ACME-77-ZED')
   assert.equal(matchesPattern(message, /nothing/), null)
 })
+
+test('broken or hostile html is read quickly and still gives the code and link', () => {
+  const start = '<p>Your code is 482913</p><a class="btn" data-href="x" href="https://app.acme.com/verify?t=1">Verify</a>'
+  const codes = Array.from({ length: 40_000 }, (_, i) => `<p>code ${1_000_000 + i}</p>`).join('')
+  const junk = ['<'.repeat(200_000), '<a '.repeat(70_000), '<script'.repeat(30_000), `<a href="https://a${'.'.repeat(200_000)}x">x</a>`, codes]
+  for (const tail of junk) {
+    const began = performance.now()
+    const result = extract({ subject: 'Sign in', text: null, html: start + tail })
+    assert.ok(performance.now() - began < 1000, `took ${Math.round(performance.now() - began)}ms`)
+    assert.equal(result.code, '482913')
+    assert.equal(result.link, 'https://app.acme.com/verify?t=1')
+  }
+  const urls = Array.from({ length: 25_000 }, (_, i) => `https://app.acme.com/r/${i}`).join(' ')
+  const began = performance.now()
+  const templated = extract({ subject: 'Welcome', text: null, html: null, variables: { code: '482913', urls } })
+  assert.ok(performance.now() - began < 1000, `took ${Math.round(performance.now() - began)}ms`)
+  assert.equal(templated.links.length, 25_000)
+  assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")'), 'Code 1234')
+})
+
+test('links and codes survive the html quirks real templates produce', () => {
+  const result = extract({
+    subject: 'Sign in',
+    text: null,
+    html: [
+      '<a class="btn"href="https://app.acme.com/verify?t=1">Verify</a>',
+      '<p>Expires in <10 min. Your code &#99999999; is 482913</p>',
+      "<a href=https://app.acme.com/o'neil/help>Help",
+      '<a href="https://app.acme.com/more">More</a>',
+    ].join(''),
+  })
+  assert.deepEqual(result.codes, ['482913'])
+  assert.equal(result.link, 'https://app.acme.com/verify?t=1')
+  assert.deepEqual(result.links.map((l) => l.href), ['https://app.acme.com/verify?t=1', "https://app.acme.com/o'neil/help", 'https://app.acme.com/more'])
+})
+
+test('a closing tag with a space and a last link left open still end where a browser ends them', () => {
+  const spaced = extract({
+    subject: 'Sign in',
+    text: null,
+    html: '<a href="https://app.acme.com/verify?t=1">Verify</a ><p>Not you? Unsubscribe from these emails. Code &#x110000; 482913</p>',
+  })
+  assert.equal(spaced.link, 'https://app.acme.com/verify?t=1')
+  assert.deepEqual(spaced.codes, ['482913'])
+  const open = extract({ subject: 'Sign in', text: null, html: '<p>Code 482913</p><a href="https://app.acme.com/verify?t=1">Verify' })
+  assert.equal(open.link, 'https://app.acme.com/verify?t=1')
+  assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")</script ><p>bye</p>'), 'Code 1234\n bye')
+})
