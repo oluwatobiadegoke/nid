@@ -4,6 +4,8 @@ An email inbox that runs on your computer.
 
 While you build, your app sends its emails to nid instead of to real people. Open nid in your browser and read each email as it arrives: the message, its links and any sign-in code. The mail stays on your machine, and your tests can read it too.
 
+![Two emails arrive in the nid web view. Opening one shows its sign-in code and link.](https://raw.githubusercontent.com/oluwatobiadegoke/nid/main/docs/assets/demo.gif)
+
 **[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
 ## Quick start
