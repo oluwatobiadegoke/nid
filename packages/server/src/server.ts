@@ -77,7 +77,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     if (!webhookProviders.includes(name)) {
       throw new Error(`webhooks.${name} names no provider that sends webhooks. Use ${webhookProviders.join(', ')}.`)
     }
-    if (!/^https?:\/\//i.test(target.url) || !URL.canParse(target.url)) {
+    if (!/^https?:$/.test(URL.parse(target.url)?.protocol ?? '')) {
       throw new Error(`The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`)
     }
   }

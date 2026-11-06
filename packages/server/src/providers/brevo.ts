@@ -187,7 +187,7 @@ function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
     sending_ip: '127.0.0.1',
   }
   const custom = findHeader(m.headers, 'x-mailin-custom')
-  if (custom !== undefined) payload['X-Mailin-custom'] = custom
+  if (custom !== null) payload['X-Mailin-custom'] = custom
   if (event === 'bounced') payload.reason = bounceReason
   if (event === 'deferred') payload.reason = deferReason
   if (event === 'clicked') payload.link = m.extracted.link ?? ''

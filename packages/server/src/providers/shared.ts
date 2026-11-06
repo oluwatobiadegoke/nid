@@ -158,8 +158,8 @@ export function webhookSecret(secret: string | undefined, provider: string, labe
   )
 }
 
-export function findHeader(headers: Record<string, string>, name: string): string | undefined {
-  return Object.entries(headers).find(([key]) => key.toLowerCase() === name)?.[1]
+export function findHeader(headers: Record<string, string>, name: string): string | null {
+  return Object.entries(headers).find(([key]) => key.toLowerCase() === name)?.[1] ?? null
 }
 
 export function senderAddress(from: string): string {

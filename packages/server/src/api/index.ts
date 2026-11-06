@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { Ingest } from '../ingest/types.js'
-import { toAddresses } from '../providers/shared.js'
 import { webhookEvents, type Provider, type WebhookEvent } from '../providers/types.js'
 import type { Store } from '../store/types.js'
 import type { Project } from '../types.js'
@@ -138,7 +137,7 @@ export function readApi(options: ApiOptions): Hono<Env> {
       request = provider.webhook({
         message,
         event,
-        recipient: toAddresses(message.recipients, 'to')[0] ?? message.recipients[0]?.address ?? '',
+        recipient: message.recipients[0]?.address ?? '',
         secret: target.secret,
         now: new Date(),
       })

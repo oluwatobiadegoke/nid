@@ -14,7 +14,7 @@ export interface WebhookResult {
   error?: string
 }
 
-export const webhookTimeoutMs = 10_000
+const webhookTimeoutMs = 10_000
 
 export async function sendWebhook(target: WebhookTarget, request: WebhookRequest): Promise<WebhookResult> {
   const url = new URL(target.url)

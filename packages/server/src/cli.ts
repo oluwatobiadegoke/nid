@@ -199,9 +199,9 @@ async function webhook(args: string[]) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ type }),
   })
-  const body = (await response.json()) as WebhookResult & { error?: string }
-  if (!response.ok) fail(body.error ?? 'Request failed', 1)
-  if (body.appStatus === null) fail(body.error ?? 'Could not reach your app', 1)
+  const body = (await response.json()) as WebhookResult
+  if (!response.ok) fail(body.error ?? 'Request failed')
+  if (body.appStatus === null) fail(body.error ?? 'Could not reach your app')
   process.stdout.write(`Your app answered ${body.appStatus} in ${body.durationMs} ms\n${body.appBody ? `${body.appBody}\n` : ''}`)
   if (!body.delivered) process.exit(1)
 }

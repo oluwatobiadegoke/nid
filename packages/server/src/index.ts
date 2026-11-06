@@ -14,8 +14,7 @@ export type {
   WebhookInput,
   WebhookRequest,
 } from './providers/index.js'
-export { webhookEvents, sendgridWebhookPublicKey } from './providers/index.js'
-export type { WebhookTarget, WebhookResult } from './api/webhook.js'
+export { sendgridWebhookPublicKey } from './providers/index.js'
 export { extract, htmlToText, matchesPattern } from './extract/index.js'
 export type { ExtractInput } from './extract/index.js'
 export { defaultLimits, defaultProject } from './ingest/index.js'

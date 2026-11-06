@@ -90,7 +90,7 @@ nid waits up to 10 seconds for your app and returns what it answered:
 Could not reach your app at http://127.0.0.1:3000/api/communications/webhooks/brevo: connect ECONNREFUSED 127.0.0.1:3000
 ```
 
-When nid cannot reach your app, `nid webhook` prints that sentence and exits with code 1. When your app answers anything but a 2xx, it prints the status and body, and also exits with code 1.
+`nid webhook` prints that sentence, or your app's status and body, and exits with code 1 unless your app answered 2xx. See [nid webhook](../reference/cli.md#nid-webhook).
 
 ## Limits
 

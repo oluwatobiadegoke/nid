@@ -16,7 +16,7 @@ export type {
   WebhookInput,
   WebhookRequest,
 } from './types.js'
-export { SendError, webhookEvents } from './types.js'
+export { SendError } from './types.js'
 export { sendgridWebhookPublicKey } from './sendgrid.js'
 export { resend, brevo, sendgrid, postmark, mailgun }
 

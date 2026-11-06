@@ -4,6 +4,7 @@ import {
   basic,
   bounceReason,
   deferReason,
+  findHeader,
   isRecord,
   looseAddress,
   looseAddresses,
@@ -81,10 +82,6 @@ function formBody(req: IncomingRequest): Record<string, Field> {
   return req.body as Record<string, Field>
 }
 
-function headerValue(headers: Record<string, string>, name: string): string | null {
-  return Object.entries(headers).find(([k]) => k.toLowerCase() === name)?.[1] ?? null
-}
-
 function options(body: Record<string, Field>, domain: string) {
   const headers: Record<string, string> = {}
   const custom: Record<string, string> = {}
@@ -101,7 +98,7 @@ function options(body: Record<string, Field>, domain: string) {
   const deliveryTime = text(body, 'o:deliverytime')
   if (deliveryTime) meta.scheduledAt = deliveryTime
   if (/^(yes|true)$/i.test(text(body, 'o:testmode') ?? '')) meta.sandbox = true
-  const variables = jsonObject(headerValue(headers, 'x-mailgun-variables'), 'h:X-Mailgun-Variables')
+  const variables = jsonObject(findHeader(headers, 'x-mailgun-variables'), 'h:X-Mailgun-Variables')
   return { headers, meta, custom, variables }
 }
 
@@ -163,7 +160,7 @@ async function buildSend(req: IncomingRequest, body: Record<string, Field>, toLi
   const cc = recipients(addresses(body, 'cc'), 'cc')
   const bcc = recipients(addresses(body, 'bcc'), 'bcc')
   const attachments = [...(await files(body, 'attachment', false)), ...(await files(body, 'inline', true))]
-  const replyTo = looseAddresses(headerValue(headers, 'reply-to'))
+  const replyTo = looseAddresses(findHeader(headers, 'reply-to'))
 
   const message = (toRecipients: Recipient[], vars: Record<string, unknown>): NewMessage => ({
     provider: name,

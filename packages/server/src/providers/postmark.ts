@@ -154,7 +154,7 @@ const batch = (path: string, templated: boolean): SendRoute => ({
   }),
 })
 
-const bounces: Partial<Record<WebhookEvent, { Type: string; TypeCode: number; Name: string; Description: string; Details: string }>> = {
+const bounces: Partial<Record<WebhookEvent, object>> = {
   bounced: {
     Type: 'HardBounce',
     TypeCode: 1,
