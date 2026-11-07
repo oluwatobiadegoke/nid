@@ -1,5 +1,11 @@
 # nid-inbox
 
+## 0.4.1
+
+### Patch Changes
+
+- 1830768: Show a short demo of the web view at the top of the README.
+
 ## 0.4.0
 
 ### Minor Changes
