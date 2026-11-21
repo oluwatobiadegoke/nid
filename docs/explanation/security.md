@@ -15,7 +15,7 @@ nid keeps every email on your machine. By default, only your own computer can op
 - **It renders email HTML in a sandboxed frame** with scripts blocked, so an email cannot run code in the web view.
 - **It leaves out links that run code.** nid drops `javascript:`, `vbscript:` and `data:` links when it reads an email, so the web view, the CLI and your tests never get one to click.
 - **It sends a webhook or adds a fault only when asked in JSON.** A web page you visit can post a plain form to nid, but `POST /api/messages/{id}/events` and `POST /api/faults` refuse any body that is not `application/json`, so the page cannot make nid call your app or fail your sends. A page whose origin is in `--cors` can still call them.
-- **It sends nothing out.** There is no relay to real inboxes and no telemetry.
+- **It sends no mail out.** There is no relay to real inboxes and no telemetry. nid makes an outbound request only to a webhook URL you set. When you open an email in the web view, your browser loads the email's remote images.
 
 ## Why nid checks the Host header
 

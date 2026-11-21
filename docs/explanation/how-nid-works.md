@@ -20,7 +20,7 @@ your app ──SMTP──────────────┼──> nid stor
 
 ## Why you run the inbox yourself
 
-When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, nothing leaves your machine, and you decide when to clear it.
+When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, no email leaves your machine, and you decide when to clear it.
 
 You read the mail in the web view, and your tests read the same mail through the read API. The [web view guide](../how-to/use-the-web-view.md) shows what the page offers.
 

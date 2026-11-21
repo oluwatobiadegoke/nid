@@ -1,7 +1,7 @@
 {
   "name": "nid-inbox",
   "version": "0.4.1",
-  "description": "An email inbox that runs on your computer. Read what your app sends in your browser, or from your tests.",
+  "description": "Local email API, inbox, and webhook simulator for testing apps and AI agents.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
