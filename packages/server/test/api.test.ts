@@ -263,7 +263,7 @@ test('stream drains more than 100 backlog messages and resumes via Last-Event-ID
   assert.ok(seen.includes('"subject":"Backlog 120"'))
 
   await sendResend(server, { ...base, subject: 'After disconnect 121', text: 'Msg 121' })
-  const resumed = await server.app.request('/api/stream', { headers: { 'last-event-id': '120' } })
+  const resumed = await server.app.request('/api/stream?after=0', { headers: { 'last-event-id': '120' } })
   const resumedReader = resumed.body!.getReader()
   let resumedSeen = ''
   while (!resumedSeen.includes('"subject":"After disconnect 121"')) {

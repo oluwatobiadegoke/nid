@@ -33,6 +33,7 @@ const defaultLimit = 50
 const maxLimit = 500
 const defaultMaxMessages = 5000
 const defaultMaxRejections = 1000
+const maxDeliveriesPerMessage = 100
 
 function isExpired(expiresAt: string | null, nowIso: string): boolean {
   return expiresAt !== null && expiresAt <= nowIso
@@ -300,6 +301,7 @@ export class MemoryStore implements Store {
     }
     const list = bucket.webhooks.get(delivery.messageId) ?? []
     list.push(stored)
+    if (list.length > maxDeliveriesPerMessage) list.shift()
     bucket.webhooks.set(delivery.messageId, list)
     return stored
   }

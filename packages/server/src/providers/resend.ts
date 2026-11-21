@@ -227,14 +227,14 @@ const webhookTypes: Record<WebhookEvent, string> = {
   clicked: 'email.clicked',
 }
 
-function webhook({ message: m, event, recipient, secret, now, url, reason }: WebhookInput) {
+function webhook({ message: m, event, recipientOverride, secret, now, url, reason }: WebhookInput) {
   const key = Buffer.from(webhookSecret(secret, name, 'Resend').replace(/^whsec_/, ''), 'base64')
   const tags = (m.meta.tags as Array<{ name: string; value: string }> | undefined) ?? []
   const data: Record<string, unknown> = {
     email_id: m.providerId,
     message_id: `<${m.providerId}@nid.local>`,
     from: m.from,
-    to: recipient ? [recipient] : toAddresses(m.recipients, 'to'),
+    to: recipientOverride ? [recipientOverride] : toAddresses(m.recipients, 'to'),
     subject: m.subject,
     created_at: m.createdAt,
   }

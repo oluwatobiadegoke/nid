@@ -39,7 +39,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `store` | `Store` | In-memory store (5,000 messages, 1,000 rejections per project) | Where mail lives. Oldest entries are evicted past the cap. Make a SQLite store with `createSqliteStore({ path })`. |
+| `store` | `Store` | In-memory store (5,000 messages and 1,000 rejections per project, 100 webhook deliveries per message) | Where mail lives. Oldest entries are evicted past the cap. Make a SQLite store with `createSqliteStore({ path })`. |
 | `events` | `EventBus` | In-memory event bus | Publishes and listens for message, rejection and webhook events. |
 | `faults` | `FaultStore` | In-memory fault store | Stores active fault and latency rules for `/api/faults`. |
 | `auth` | `(credential) => Project \| null` | Every credential maps to the `default` project | Maps a provider key, read API token or SMTP username to a project. Return `null` to refuse. Can return a promise. |
@@ -50,7 +50,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
 | `maxBodyBytes` | `number` | `52428800` (50 MB) | Largest HTTP body or SMTP message accepted. Larger HTTP bodies get a 413. |
 | `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. `createServer` throws on a name that is not a provider or a URL that is not `http://` or `https://`. |
-| `magicAddresses` | `boolean` | `true` locally (`false` when `auth` is set) | Enables special addresses such as `bounce@inbox.test` and `ratelimit@inbox.test`. |
+| `magicAddresses` | `boolean` | `true` locally (`false` when `auth` is set) | Enables the special addresses at `inbox.test`, such as `bounce@inbox.test` and `ratelimit@inbox.test`. |
 | `autoWebhook` | `WebhookEvent` | none | Automatically fires this webhook event after each stored send when a webhook target is configured. |
 | `onMessage` | `(message) => void` | none | Called after each message is stored. |
 | `onError` | `(error) => void` | none | Called on unexpected server errors. |

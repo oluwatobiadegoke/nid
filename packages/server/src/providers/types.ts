@@ -60,6 +60,7 @@ export interface WebhookInput {
   message: Message
   event: WebhookEvent
   recipient: string
+  recipientOverride?: string | undefined
   secret: string | undefined
   now: Date
   url?: string | undefined
