@@ -346,6 +346,10 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     stopStream()
     text(where, 'signed out'); where.classList.add('off')
     openSeq++
+    selected = null
+    currentMessage = null
+    detail.hidden = true
+    document.body.classList.remove('showing')
     $('preview').removeAttribute('srcdoc')
     layout.hidden = true
     authPanel.hidden = false
@@ -620,7 +624,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     }
     dl.append(el('dt', '', 'SMTP'))
     const dd = el('dd')
-    dd.append(el('code', '', smtpPort ? 'host localhost, port ' + smtpPort + ', no TLS, any username and password' : 'SMTP disabled'))
+    dd.append(el('code', '', smtpPort ? 'host localhost, port ' + smtpPort + ', no TLS, ' + (getToken() ? 'your token as the username, any password' : 'any username and password') : 'SMTP disabled'))
     dl.append(dd)
   }
 
@@ -715,10 +719,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
   signoutBtn.addEventListener('click', () => {
     sessionStorage.removeItem(tokenKey)
     items.clear()
-    selected = null
-    currentMessage = null
     lastEventId = ''
-    detail.hidden = true
     showAuth('')
   })
 
