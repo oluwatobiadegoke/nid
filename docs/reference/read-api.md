@@ -173,7 +173,7 @@ Lists active fault and latency rules for this project: `200 {"faults": [FaultRul
 
 ### POST /api/faults
 
-Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays. The body is JSON, sent with `content-type: application/json`:
+Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays. Fault rules apply to sends through the HTTP provider APIs. Mail sent over SMTP is not affected and does not count against a rule's `count`. The body is JSON, sent with `content-type: application/json`:
 
 ```json
 {"provider": "resend", "to": "ada@inbox.test", "status": 429, "headers": {"retry-after": "2"}, "count": 1}
@@ -181,7 +181,7 @@ Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) o
 
 | Field | Default | What it does |
 | --- | --- | --- |
-| `provider` | any provider | Limit the rule to one provider, such as `resend` or `ses`. |
+| `provider` | any HTTP provider | Limit the rule to one provider, such as `resend` or `ses`. |
 | `to` | any recipient | Limit the rule to one recipient address. |
 | `status` | `500` (or `200` when only `delayMs` is set) | HTTP status to return (`200` to `599`). Statuses `400` and above also record a rejection. With a status below `300`, nid waits for `delayMs` and then handles the send as usual. |
 | `body` | `{"error": "Simulated fault (<status>)"}` | Response body to return. |
