@@ -178,4 +178,7 @@ test('a fault keeps the content type it was given, in any case', async (t) => {
   const notModified = await send()
   assert.equal(notModified.status, 304)
   assert.equal(await notModified.text(), '')
+  await add({ status: 429, body: { ErrorCode: 429, Message: 'Slow down' } })
+  await send()
+  assert.equal((await server.store.listRejections('default', { to: 'xml@inbox.test' }))[0]?.error, 'Slow down')
 })

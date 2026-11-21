@@ -95,7 +95,7 @@ function waitDelay(ms: number, signal?: AbortSignal): Promise<boolean> {
 function faultErrorMessage(status: number, body: unknown): string {
   if (typeof body === 'string' && body) return body
   if (body && typeof body === 'object' && !Array.isArray(body)) {
-    const rec = body as Record<string, unknown>
+    const rec = Object.fromEntries(Object.entries(body).map(([k, v]) => [k.toLowerCase(), v]))
     if (typeof rec.message === 'string' && rec.message) return rec.message
     if (typeof rec.error === 'string' && rec.error) return rec.error
   }

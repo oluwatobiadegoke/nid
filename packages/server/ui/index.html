@@ -350,6 +350,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     layout.hidden = true
     authPanel.hidden = false
     signoutBtn.hidden = true
+    $('clear').hidden = true
     if (message) { text(authError, message); authError.hidden = false }
     else authError.hidden = true
     $('auth-input').focus()
@@ -359,6 +360,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     authPanel.hidden = true
     layout.hidden = false
     signoutBtn.hidden = !getToken()
+    $('clear').hidden = false
   }
 
   const api = async (path, init = {}) => {
