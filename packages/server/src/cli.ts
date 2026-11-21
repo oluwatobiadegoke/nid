@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
@@ -138,12 +136,6 @@ async function serve(args: string[]) {
   process.once('SIGTERM', stop)
 }
 
-function resolveInterceptPath(): string {
-  const jsPath = fileURLToPath(new URL('./intercept.js', import.meta.url))
-  if (existsSync(jsPath)) return jsPath
-  return fileURLToPath(new URL('./intercept.ts', import.meta.url))
-}
-
 async function run(args: string[]) {
   const dashDash = args.indexOf('--')
   if (dashDash === -1) fail('Usage: nid run [options] -- <command...>')
@@ -170,7 +162,7 @@ async function run(args: string[]) {
     targetUrl = host === '0.0.0.0' ? `http://127.0.0.1:${port}` : host === '::' ? `http://[::1]:${port}` : url
   }
 
-  const importFlag = `--import ${pathToFileURL(resolveInterceptPath()).href}`
+  const importFlag = `--import ${new URL('./intercept.js', import.meta.url).href}`
   const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
   const nodeOptions = existingNodeOptions ? `${existingNodeOptions} ${importFlag}` : importFlag
 
