@@ -30,6 +30,7 @@ test('shouldInterceptHost matches supported provider endpoints only', () => {
     'email.cn-north-1.amazonaws.com.cn',
     'email.us-east-1.api.aws',
     'email-fips.us-east-1.api.aws',
+    'email.cn-north-1.api.amazonwebservices.com.cn',
   ]) {
     assert.equal(shouldInterceptHost(host), true, host)
   }

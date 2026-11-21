@@ -125,8 +125,11 @@ const bulkV2Schema = z
   .passthrough()
 
 function destinationAddresses(dest: z.infer<typeof destinationSchema> | undefined): string[] {
-  if (!dest) return []
-  return [...(dest.ToAddresses ?? []), ...(dest.CcAddresses ?? []), ...(dest.BccAddresses ?? [])].map(looseAddress)
+  if (!isRecord(dest)) return []
+  return [dest.ToAddresses, dest.CcAddresses, dest.BccAddresses]
+    .flatMap((list) => (Array.isArray(list) ? list : []))
+    .filter((value) => typeof value === 'string')
+    .map(looseAddress)
 }
 
 function parseDestination(dest: z.infer<typeof destinationSchema> | undefined): Recipient[] {
