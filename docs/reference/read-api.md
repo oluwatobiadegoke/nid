@@ -210,6 +210,8 @@ A [server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_ev
 | --- | --- |
 | `after` | Start after this message id instead of now. |
 
+To resume after a dropped connection, send the last message id you saw in the `Last-Event-ID` header. A browser's `EventSource` does this for you when it reconnects. The header wins over `after`. The stream does not replay rejections that arrived while you were disconnected. Read them with [`GET /api/rejections`](#get-apirejections).
+
 ### GET /api/providers
 
 Lists the provider APIs this server answers, the active SMTP port, and the names of providers with a webhook URL configured.

@@ -38,7 +38,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `store` | `Store` | In-memory store (5,000 messages, 1,000 rejections per project) | Where mail lives. Oldest entries are evicted past the cap. Make a SQLite store with `createSqliteStore({ path })`. |
+| `store` | `Store` | In-memory store (5,000 messages and 1,000 rejections per project, 100 webhook deliveries per message) | Where mail lives. Oldest entries are evicted past the cap. Make a SQLite store with `createSqliteStore({ path })`. |
 | `events` | `EventBus` | In-memory event bus | Publishes and listens for message, rejection and webhook events. |
 | `faults` | `FaultStore` | In-memory fault store | Stores active fault and latency rules for `/api/faults`. |
 | `auth` | `(credential) => Project \| null` | Every credential maps to the `default` project | Maps a provider key, read API token or SMTP username to a project. Return `null` to refuse. Can return a promise. |
