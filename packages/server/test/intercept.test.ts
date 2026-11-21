@@ -297,6 +297,9 @@ test('the interceptor keeps a Request body, array headers and credentials in the
     new Request('https://api.resend.com/emails', { method: 'POST', headers: { authorization: 'Bearer re_test' }, body }),
   )
   assert.equal(withKey.status, 200)
+  const stringable = { toString: () => 'https://api.resend.com/emails' } as unknown as string
+  const fromObject = await fetch(stringable, { method: 'POST', headers: { authorization: 'Bearer re_test' }, body })
+  assert.equal(fromObject.status, 200)
 
   const nodeStatus = (url: string, options: https.RequestOptions, payload: string) =>
     new Promise<number>((resolve, reject) => {
