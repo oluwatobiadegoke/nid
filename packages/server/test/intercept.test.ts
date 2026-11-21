@@ -186,6 +186,13 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   ])
   assert.equal(withToken.stderr, '')
 
+  const emptyToken = await runExec(process.execPath, [cliJs, 'run', '--url', 'http://127.0.0.1:4400', '--token', '', '--', process.execPath, '-e', '']).then(
+    () => assert.fail('expected an empty token to stop nid run'),
+    (err: { code: number; stderr: string }) => err,
+  )
+  assert.equal(emptyToken.code, 1)
+  assert.match(emptyToken.stderr, /The token must not be empty/)
+
   const failed = await runExec(process.execPath, [
     cliJs,
     'run',

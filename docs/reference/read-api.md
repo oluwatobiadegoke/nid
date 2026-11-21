@@ -8,7 +8,7 @@ The server also describes these routes as an OpenAPI 3 document at `GET /api/ope
 
 ## Common rules
 
-- **Authentication.** By default no token is needed. When the server uses a custom `auth` function, send `Authorization: Bearer <token>`. A missing or wrong token gets `401 {"error": "Invalid or missing token"}`.
+- **Authentication.** By default no token is needed. When the server uses `--token` or a custom `auth` function, send `Authorization: Bearer <token>`. A missing or wrong token gets `401 {"error": "Invalid or missing token"}`.
 - **Addresses.** `to` matches one recipient address exactly, in any case. It matches To, Cc and Bcc recipients.
 - **Strict query parameters.** An unknown parameter, such as a typo, gets a `400`, never a silent match-everything:
 
