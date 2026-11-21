@@ -210,6 +210,8 @@ for (const driver of drivers) {
       percent.map((m) => m.subject),
       ['Save 100% today'],
     )
+    await store.insertMessage('default', message({ providerId: 'sub-4', subject: 'Überprüfung Ihres Kontos' }), noCode, null)
+    assert.equal((await store.listMessages('default', { subject: 'Überprüfung ihres' })).length, 1)
     await store.close()
   })
 }
