@@ -56,6 +56,8 @@ nid run [serve options] [--url <url>] -- <command...>
 
 All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command.
 
+When `nid run` starts the server with `--token` or `NID_AUTH_TOKEN`, it also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup.
+
 ## nid read
 
 Reads mail for one address from a running server.

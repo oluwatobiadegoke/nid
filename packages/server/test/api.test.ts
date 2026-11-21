@@ -139,6 +139,7 @@ test('healthz, providers and the openapi document are served', async (t) => {
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')
   assert.equal(page.status, 200)
+  assert.match(page.headers.get('content-security-policy') ?? '', /img-src \* data: blob:/)
   assert.match(await page.text(), /nid/)
 })
 

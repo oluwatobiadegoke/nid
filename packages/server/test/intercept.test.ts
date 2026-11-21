@@ -159,6 +159,29 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   ])
   assert.equal(ok.stderr, '')
 
+  const withToken = await runExec(process.execPath, [
+    cliJs,
+    'run',
+    '--port',
+    '0',
+    '--smtp-port',
+    '0',
+    '--quiet',
+    '--token',
+    'run-secret',
+    '--',
+    process.execPath,
+    '--input-type=module',
+    '-e',
+    `
+      import assert from 'node:assert/strict'
+      assert.equal(process.env.NID_TOKEN, 'run-secret')
+      const res = await fetch(process.env.NID_URL + '/api/messages', { headers: { authorization: 'Bearer ' + process.env.NID_TOKEN } })
+      assert.equal(res.status, 200)
+    `,
+  ])
+  assert.equal(withToken.stderr, '')
+
   const failed = await runExec(process.execPath, [
     cliJs,
     'run',
