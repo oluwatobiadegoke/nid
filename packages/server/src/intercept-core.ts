@@ -94,6 +94,12 @@ function parseNodeArgs(
 }
 
 function readHostHeader(headers: unknown): string {
+  if (Array.isArray(headers)) {
+    for (let i = 0; i + 1 < headers.length; i += 2) {
+      if (String(headers[i]).toLowerCase() === 'host' && typeof headers[i + 1] === 'string') return stripPort(headers[i + 1])
+    }
+    return ''
+  }
   if (!headers || typeof headers !== 'object') return ''
   for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
     if (k.toLowerCase() === 'host' && typeof v === 'string') return stripPort(v)
@@ -101,9 +107,16 @@ function readHostHeader(headers: unknown): string {
   return ''
 }
 
-function buildRewrittenHeaders(headers: unknown, targetHost: string): Record<string, unknown> {
+function buildRewrittenHeaders(headers: unknown, targetHost: string): Record<string, unknown> | unknown[] {
+  if (Array.isArray(headers)) {
+    const pairs: unknown[] = []
+    for (let i = 0; i + 1 < headers.length; i += 2) {
+      if (String(headers[i]).toLowerCase() !== 'host') pairs.push(headers[i], headers[i + 1])
+    }
+    return [...pairs, 'host', targetHost]
+  }
   const out: Record<string, unknown> = {}
-  if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
+  if (headers && typeof headers === 'object') {
     for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
       if (k.toLowerCase() !== 'host') out[k] = v
     }
@@ -135,6 +148,7 @@ export function installInterceptor(nidUrl: string): () => void {
 
   const target = new URL(nidUrl)
   const targetPort = target.port ? Number(target.port) : target.protocol === 'https:' ? 443 : 80
+  const targetHostnameForSocket = target.hostname.replace(/^\[|\]$/g, '')
   const originalFetch = globalThis.fetch
   const origHttpRequest = cjsHttp.request
   const origHttpGet = cjsHttp.get
@@ -152,8 +166,14 @@ export function installInterceptor(nidUrl: string): () => void {
     rewrittenUrl.search = parsed.search
     const rewritten = rewrittenUrl.href
     if (input instanceof Request) {
-      const nextRequest = new Request(rewritten, input)
-      return originalFetch(nextRequest, init)
+      return originalFetch(rewritten, {
+        method: input.method,
+        headers: input.headers,
+        ...(input.body ? { body: await input.arrayBuffer() } : {}),
+        signal: input.signal,
+        redirect: input.redirect,
+        ...init,
+      })
     }
     return originalFetch(rewritten, init)
   }
@@ -173,8 +193,9 @@ export function installInterceptor(nidUrl: string): () => void {
         return (original as (...args: unknown[]) => ClientRequest)(a, b, c)
       }
       const nextOptions: Record<string, unknown> = { ...options }
-      if (target.protocol === 'http:') {
-        for (const key of tlsOptionKeys) delete nextOptions[key]
+      for (const key of tlsOptionKeys) delete nextOptions[key]
+      if (url?.username && nextOptions.auth === undefined) {
+        nextOptions.auth = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`
       }
       const rawPath =
         typeof nextOptions.path === 'string' && nextOptions.path
@@ -183,8 +204,8 @@ export function installInterceptor(nidUrl: string): () => void {
             ? `${url.pathname}${url.search}`
             : '/'
       nextOptions.protocol = target.protocol
-      nextOptions.hostname = target.hostname
-      nextOptions.host = target.hostname
+      nextOptions.hostname = targetHostnameForSocket
+      nextOptions.host = targetHostnameForSocket
       nextOptions.port = targetPort
       nextOptions.path = joinTargetPath(target.pathname, rawPath)
       nextOptions.headers = buildRewrittenHeaders(options.headers, target.host)

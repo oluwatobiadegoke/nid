@@ -170,7 +170,8 @@ async function run(args: string[]) {
   } else {
     const started = await startServer(values)
     serverToClose = started.server
-    targetUrl = started.listening.host === '0.0.0.0' ? `http://127.0.0.1:${started.listening.port}` : started.listening.url
+    const { host, port, url } = started.listening
+    targetUrl = host === '0.0.0.0' ? `http://127.0.0.1:${port}` : host === '::' ? `http://[::1]:${port}` : url
   }
 
   const importFlag = `--import ${pathToFileURL(resolveInterceptPath()).href}`
