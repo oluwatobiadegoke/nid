@@ -46,6 +46,11 @@ for (const driver of drivers) {
     assert.equal((await store.listMessages('default', { to: 'BCC@inbox.test' })).length, 1)
     assert.equal((await store.listMessages('default', { to: 'to@inbox.test' })).length, 1)
     assert.equal((await store.listMessages('default', { to: 'other@inbox.test' })).length, 0)
+    await store.insertMessage('default', message({ providerId: 'second' }), noCode, null)
+    assert.deepEqual(
+      (await store.listMessages('default', {})).at(-1)?.recipients.map((r) => r.address),
+      ['to@inbox.test', 'bcc@inbox.test'],
+    )
     await store.close()
   })
 

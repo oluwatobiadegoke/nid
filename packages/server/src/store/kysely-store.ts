@@ -433,6 +433,7 @@ export class KyselyStore implements Store {
       .select(['message_id', 'address', 'name', 'kind'])
       .where('project_id', '=', projectId)
       .where('message_id', 'in', ids)
+      .orderBy(sql`rowid`)
       .execute()
     const attachments = await this.db
       .selectFrom('attachments')
