@@ -171,7 +171,7 @@ With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address ge
 
 Point the AWS SDK v3 `SESv2Client` at nid with `AWS_ENDPOINT_URL_SESV2=http://127.0.0.1:4400` (legacy SES v1 clients read `AWS_ENDPOINT_URL_SES`), or run your app with `nid run`.
 
-**Key:** `Authorization: AWS4-HMAC-SHA256 ...` header (the AWS SDK sends this automatically). Without it: `403 {"message": "Missing Authentication Token"}` with header `x-amzn-errortype: MissingAuthenticationTokenException`.
+**Key:** `Authorization: AWS4-HMAC-SHA256 ...` header (the AWS SDK sends this automatically). Without it: `403 {"message": "Missing Authentication Token"}` with header `x-amzn-errortype: MissingAuthenticationTokenException`. On the SES v1 route `POST /`, the `403` is an XML `ErrorResponse` with code `InvalidClientTokenId`.
 
 ### POST /v2/email/outbound-emails
 

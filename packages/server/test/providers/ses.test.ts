@@ -272,6 +272,21 @@ test('SES extracts the stable access key id for auth hooks', async (t) => {
   assert.equal((await server.store.listMessages('ses-team', { to: 'a@inbox.test' }))[0]?.extracted.code, '102938')
 })
 
+test('SES answers a refused v1 request in XML and a refused v2 request in JSON', async (t) => {
+  const server = await createServer({ auth: () => null })
+  t.after(() => server.close())
+
+  const v1 = await sendV1(server, new URLSearchParams({ Action: 'SendEmail' }))
+  assert.equal(v1.status, 403)
+  assert.match(v1.headers.get('content-type') ?? '', /text\/xml/)
+  assert.match(v1.text, /<ErrorResponse[^>]*><Error><Type>Sender<\/Type><Code>InvalidClientTokenId<\/Code>/)
+
+  const v2 = await sendV2(server, {})
+  assert.equal(v2.status, 403)
+  assert.match(v2.headers.get('content-type') ?? '', /application\/json/)
+  assert.equal(v2.body.message, 'Missing Authentication Token')
+})
+
 test('SES v2 answers 400, not 500, when a destination list is not a list of strings', async (t) => {
   const server = await createServer()
   t.after(() => server.close())
