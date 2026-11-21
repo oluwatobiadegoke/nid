@@ -17,7 +17,7 @@ const interceptedHosts = new Set([
   'api.eu.mailgun.net',
 ])
 
-const sesHostPattern = /^email(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws)$/i
+const sesHostPattern = /^email(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws|api\.amazonwebservices\.com\.cn)$/i
 
 const tlsOptionKeys = [
   'agent',
@@ -194,7 +194,7 @@ export function installInterceptor(nidUrl: string): () => void {
       }
       const nextOptions: Record<string, unknown> = { ...options }
       for (const key of tlsOptionKeys) delete nextOptions[key]
-      if (url?.username && nextOptions.auth === undefined) {
+      if ((url?.username || url?.password) && nextOptions.auth === undefined) {
         nextOptions.auth = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`
       }
       const rawPath =

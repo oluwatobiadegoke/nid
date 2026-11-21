@@ -51,15 +51,18 @@ async function readRequest(c: Context): Promise<IncomingRequest> {
   }
 }
 
+const statusesWithoutBody = [204, 205, 304]
+
 function send(c: Context, reply: ProviderReply) {
   for (const [k, v] of Object.entries(reply.headers ?? {})) c.header(k, v)
-  if (reply.body === null || reply.body === undefined) return c.body(null, reply.status as 200)
-  if (typeof reply.body === 'string') {
-    return Object.keys(reply.headers ?? {}).some((k) => k.toLowerCase() === 'content-type')
-      ? c.body(reply.body, reply.status as 200)
-      : c.text(reply.body, reply.status as 200)
+  if (reply.body === null || reply.body === undefined || statusesWithoutBody.includes(reply.status)) {
+    return c.body(null, reply.status as 200)
   }
-  return c.json(reply.body as object, reply.status as 200)
+  const hasContentType = Object.keys(reply.headers ?? {}).some((k) => k.toLowerCase() === 'content-type')
+  if (typeof reply.body === 'string') {
+    return hasContentType ? c.body(reply.body, reply.status as 200) : c.text(reply.body, reply.status as 200)
+  }
+  return hasContentType ? c.body(JSON.stringify(reply.body), reply.status as 200) : c.json(reply.body as object, reply.status as 200)
 }
 
 async function authenticate(

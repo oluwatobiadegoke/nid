@@ -40,12 +40,24 @@ export const streamQuery = z.strictObject({
   after: cursor.optional(),
 })
 
+function canBeHeaders(headers: Record<string, string>): boolean {
+  try {
+    new Headers(headers)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const faultBodySchema = z.strictObject({
   provider: z.string().trim().min(1).optional(),
   to: z.string().trim().min(1).optional(),
   status: z.number().int().min(200).max(599).optional(),
   body: z.unknown().optional(),
-  headers: z.record(z.string(), z.string()).optional(),
+  headers: z
+    .record(z.string(), z.string())
+    .refine(canBeHeaders, 'Each header needs a valid name and value')
+    .optional(),
   delayMs: z.number().int().min(0).max(30_000).optional(),
   count: z.number().int().min(1).nullable().optional(),
 })

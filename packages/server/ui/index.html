@@ -733,6 +733,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     items.clear()
     for (const m of messages.messages) items.set('message:' + m.id, { kind: 'message', ...m })
     for (const r of rejections.rejections) items.set('rejection:' + r.id, { kind: 'rejection', ...r })
+    lastEventId = String(messages.messages[0]?.id ?? 0)
     render()
   }
 

@@ -257,14 +257,15 @@ export class KyselyStore implements Store {
 
   async insertRejection(projectId: string, rejection: NewRejection): Promise<Rejection> {
     const createdAt = new Date().toISOString()
-    const addresses = [...new Set(rejection.to.map((a) => a.trim().toLowerCase()).filter(Boolean))]
+    const to = rejection.to.map((a) => a.trim().toLowerCase())
+    const addresses = [...new Set(to.filter(Boolean))]
     const id = await this.db.transaction().execute(async (trx) => {
       const inserted = await trx
         .insertInto('rejections')
         .values({
           project_id: projectId,
           provider: rejection.provider,
-          to_addresses: JSON.stringify(rejection.to.map((a) => a.trim().toLowerCase())),
+          to_addresses: JSON.stringify(to),
           status: rejection.status,
           error: rejection.error,
           raw: rejection.raw,
@@ -280,7 +281,7 @@ export class KyselyStore implements Store {
       }
       return rejectionId
     })
-    return { ...rejection, id, projectId, createdAt }
+    return { ...rejection, to, id, projectId, createdAt }
   }
 
   async listRejections(projectId: string, query: RejectionQuery): Promise<Rejection[]> {
