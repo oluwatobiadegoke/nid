@@ -32,7 +32,7 @@ Choose a row. The email opens with:
 
 - **The header:** subject, From, To, Cc, Bcc, Reply to, the provider and its message id, and when it arrived.
 - **Code and link:** the sign-in code and the main link nid found, shown first. They appear only when nid found them.
-- **Links:** every link in the email.
+- **Links:** every link in the email, except links that would run code, such as `javascript:`.
 - **HTML:** the email as a reader would see it. It is shown in a sandboxed frame with scripts blocked, so an email cannot run code on the page.
 - **Text:** the plain text version.
 - **Attachments:** each file, with a download link.

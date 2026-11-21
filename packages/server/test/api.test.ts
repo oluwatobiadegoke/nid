@@ -66,7 +66,7 @@ test('messages list, get with raw, attachments and delete', async (t) => {
     ...base,
     subject: 'With file',
     text: 'See attached',
-    attachments: [{ filename: 'a.txt', content: Buffer.from('abc').toString('base64'), content_type: 'text/plain' }],
+    attachments: [{ filename: 'Łódź (final).txt', content: Buffer.from('abc').toString('base64'), content_type: 'text/plain' }],
   })
   await sendResend(server, { from: 'a@acme.com', to: 'other@inbox.test', subject: 'Other', text: 'Other' })
   const list = await get(server, '/api/messages?to=signup@inbox.test')
@@ -78,6 +78,7 @@ test('messages list, get with raw, attachments and delete', async (t) => {
   const file = await server.app.request(messages[0]!.attachments[0]!.url)
   assert.equal(file.status, 200)
   assert.equal(file.headers.get('content-type'), 'text/plain')
+  assert.equal(file.headers.get('content-disposition'), `attachment; filename="__d_ (final).txt"; filename*=UTF-8''%C5%81%C3%B3d%C5%BA%20%28final%29.txt`)
   assert.equal(await file.text(), 'abc')
   const cleared = await server.app.request('/api/messages?to=signup@inbox.test', { method: 'DELETE' })
   assert.deepEqual(await cleared.json(), { deleted: 1 })

@@ -77,3 +77,5 @@ Docs change in the same pull request as the code. If a user can see the change (
 ## Releasing
 
 Add a changeset with `pnpm changeset`. Merging the version PR that Changesets opens publishes both packages to npm and the image to the GitHub container registry.
+
+The Release workflow can publish to npm with [trusted publishing](https://docs.npmjs.com/trusted-publishers), which adds a provenance statement to each version. To turn it on, add `oluwatobiadegoke/nid` and `release.yml` as the trusted publisher of `nid-inbox` and `@nid-inbox/client` on npmjs.com, and allow `npm publish`. Do this just before you merge a version PR, because npm drops a trusted publisher that has not published within 2 days. Once a release has published that way, delete the `NPM_TOKEN` secret and its line in `release.yml`. Until then, npm publishes with `NPM_TOKEN`, without provenance.

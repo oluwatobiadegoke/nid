@@ -43,6 +43,20 @@ test('mail over SMTP is stored with recipients from the envelope', async (t) => 
   transport.close()
 })
 
+test('a message over the size limit is refused and nid keeps taking mail', async (t) => {
+  const running = await start({ maxBodyBytes: 1024 })
+  t.after(() => running.close())
+  const transport = nodemailer.createTransport({ host: '127.0.0.1', port: running.smtpPort, secure: false })
+  t.after(() => transport.close())
+  await assert.rejects(
+    transport.sendMail({ from: 'a@acme.com', to: 'big@inbox.test', subject: 'Big', text: 'x'.repeat(2048) }),
+    (err: { responseCode?: number }) => err.responseCode === 552,
+  )
+  await transport.sendMail({ from: 'a@acme.com', to: 'small@inbox.test', subject: 'Small', text: 'Your code is 604020' })
+  assert.equal((await running.server.store.listMessages('default', { to: 'big@inbox.test' })).length, 0)
+  assert.equal((await running.server.store.listMessages('default', { to: 'small@inbox.test' })).length, 1)
+})
+
 test('STARTTLS is not offered, so plain clients never try to upgrade', async (t) => {
   const running = await start()
   t.after(() => running.close())
