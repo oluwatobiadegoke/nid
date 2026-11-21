@@ -52,7 +52,7 @@ Holds the request open until a message that matches arrives, then returns the ol
 | --- | --- | --- |
 | `to` | Yes | Recipient address. |
 | `after` | No | Only messages with an id greater than this. Without it, any message matches, including old ones. |
-| `subject` | No | Part of the subject, in any case. |
+| `subject` | No | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
 | `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `has_code` | No | Skip messages with no extracted code. |
 | `code_pattern` | No | A regular expression, run without case, over the subject, plain text and HTML turned into text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
@@ -83,7 +83,7 @@ Lists messages, newest first.
 | Parameter | What it does |
 | --- | --- |
 | `to` | Recipient address. |
-| `subject` | Part of the subject, in any case. |
+| `subject` | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
 | `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `after` | Only messages with an id greater than this. |
 | `has_code` | Only messages with an extracted code. |
@@ -157,7 +157,7 @@ A [server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_ev
 | --- | --- |
 | `after` | Start after this message id instead of now. |
 
-To resume after a dropped connection, send the last message id you saw in the `Last-Event-ID` header. A browser's `EventSource` does this for you when it reconnects. The header wins over `after`. The stream does not replay rejections that arrived while you were disconnected. Read them with [`GET /api/rejections`](#get-apirejections).
+To resume after a dropped connection, send the last message id you saw in the `Last-Event-ID` header. A browser's `EventSource` does this for you when it reconnects. The header wins over `after`. An id newer than the newest stored message, such as one from before nid restarted, counts as the newest. The stream does not replay rejections that arrived while you were disconnected. Read them with [`GET /api/rejections`](#get-apirejections).
 
 ### GET /api/providers
 
