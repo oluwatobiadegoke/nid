@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
@@ -43,11 +41,17 @@ const serverOptionConfig = {
   quiet: { type: 'boolean', default: false },
 } as const
 
-const emptyToken = 'The token must not be empty. Check --token and NID_AUTH_TOKEN.'
-
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`)
   process.exit(code)
+}
+
+function tokenFrom(value: string | undefined): string | undefined {
+  const token = value?.trim()
+  if (value !== undefined && (!token || /\s/.test(token))) {
+    fail('The token must not be empty or contain spaces. Check --token and NID_AUTH_TOKEN.')
+  }
+  return token
 }
 
 function baseUrl(value: string | undefined): string {
@@ -96,10 +100,7 @@ async function startServer(values: {
     }
     autoWebhook = values['auto-webhook'] as (typeof webhookEvents)[number]
   }
-  const token = values.token?.trim()
-  if (values.token !== undefined && !token) {
-    fail(emptyToken)
-  }
+  const token = tokenFrom(values.token)
   let store
   if (values.db) {
     const { createSqliteStore } = await import('./store/index.js')
@@ -169,12 +170,6 @@ async function serve(args: string[]) {
   process.once('SIGTERM', stop)
 }
 
-function resolveInterceptPath(): string {
-  const jsPath = fileURLToPath(new URL('./intercept.js', import.meta.url))
-  if (existsSync(jsPath)) return jsPath
-  return fileURLToPath(new URL('./intercept.ts', import.meta.url))
-}
-
 async function run(args: string[]) {
   const dashDash = args.indexOf('--')
   if (dashDash === -1) fail('Usage: nid run [options] -- <command...>')
@@ -192,8 +187,7 @@ async function run(args: string[]) {
 
   let targetUrl: string
   let serverToClose: { close(): Promise<void> } | null = null
-  const childToken = values.token?.trim()
-  if (values.token !== undefined && !childToken) fail(emptyToken)
+  const childToken = tokenFrom(values.token)
   if (values.url) {
     targetUrl = baseUrl(values.url)
   } else {
@@ -203,7 +197,7 @@ async function run(args: string[]) {
     targetUrl = host === '0.0.0.0' ? `http://127.0.0.1:${port}` : host === '::' ? `http://[::1]:${port}` : url
   }
 
-  const importFlag = `--import ${pathToFileURL(resolveInterceptPath()).href}`
+  const importFlag = `--import ${new URL('./intercept.js', import.meta.url).href}`
   const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
   const nodeOptions = existingNodeOptions ? `${existingNodeOptions} ${importFlag}` : importFlag
 
