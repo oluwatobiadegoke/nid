@@ -122,7 +122,7 @@ export function openapi(version: string) {
             param('subject', { type: 'string' }, 'Case-insensitive substring of the subject.'),
             param('provider', { type: 'string' }, 'Only mail that came in through this provider.'),
             param('has_code', { type: 'boolean' }, 'Skip mail with no extracted code.'),
-            param('code_pattern', { type: 'string' }, 'A regex run over subject and text at read time. Its first group, or the whole match, becomes the code.'),
+            param('code_pattern', { type: 'string' }, 'A regex run over subject, text and HTML turned into text at read time. Its first group, or the whole match, becomes the code.'),
             param('timeout', { type: 'number', maximum: 120, default: 30 }, 'Seconds to wait.'),
           ],
           responses: {

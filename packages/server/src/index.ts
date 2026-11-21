@@ -1,7 +1,9 @@
 export { createServer, defaultHost, defaultPort, defaultSmtpPort } from './server.js'
 export type { ServerOptions, ListenOptions, Listening, NidServer } from './server.js'
-export { createSqliteStore, KyselyStore, NodeSqliteDialect } from './store/index.js'
-export type { Store, MessageQuery, RejectionQuery, Database, SqliteStoreOptions } from './store/index.js'
+export { createMemoryStore, MemoryStore, createSqliteStore } from './store/index.js'
+export type { Store, MessageQuery, RejectionQuery, Database, MemoryStoreOptions, SqliteStoreOptions } from './store/index.js'
+export { createMemoryEventBus } from './events/index.js'
+export type { EventBus, EventListener, NidEvent } from './events/index.js'
 export { providers, resend, brevo, sendgrid, postmark, mailgun, SendError, sendgridWebhookPublicKey } from './providers/index.js'
 export type {
   Provider,
@@ -34,8 +36,10 @@ export type {
   Message,
   NewMessage,
   NewRejection,
+  NewWebhookDelivery,
   Project,
   Recipient,
   RecipientKind,
   Rejection,
+  WebhookDelivery,
 } from './types.js'

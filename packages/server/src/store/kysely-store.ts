@@ -7,8 +7,10 @@ import type {
   Message,
   NewMessage,
   NewRejection,
+  NewWebhookDelivery,
   Recipient,
   Rejection,
+  WebhookDelivery,
 } from '../types.js'
 import { migrationProvider, type Database, type MessagesTable } from './schema.js'
 import type { MessageQuery, RejectionQuery, Store } from './types.js'
@@ -105,81 +107,110 @@ export class KyselyStore implements Store {
       }
       return messageId
     })
-    const stored = await this.getMessage(projectId, id)
-    if (!stored) throw new Error(`message ${id} vanished after insert`)
-    return stored
-  }
-
-  async getMessage(projectId: string, id: number) {
     const row = await this.db
       .selectFrom('messages')
       .selectAll()
       .where('project_id', '=', projectId)
       .where('id', '=', id)
       .executeTakeFirst()
+    if (!row) throw new Error(`message ${id} vanished after insert`)
+    const [stored] = await this.hydrate(projectId, [row])
+    if (!stored) throw new Error(`message ${id} vanished after insert`)
+    return stored
+  }
+
+  async getMessage(projectId: string, id: number) {
+    const now = new Date().toISOString()
+    const row = await this.db
+      .selectFrom('messages')
+      .selectAll()
+      .where('project_id', '=', projectId)
+      .where('id', '=', id)
+      .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', now)]))
+      .executeTakeFirst()
     if (!row) return null
-    const [message] = await this.hydrate([row])
+    const [message] = await this.hydrate(projectId, [row])
     return message ?? null
   }
 
   async findByProviderId(projectId: string, provider: string, providerId: string) {
+    const now = new Date().toISOString()
     const row = await this.db
       .selectFrom('messages')
       .selectAll()
       .where('project_id', '=', projectId)
       .where('provider', '=', provider)
       .where('provider_id', '=', providerId)
+      .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', now)]))
       .executeTakeFirst()
     if (!row) return null
-    const [message] = await this.hydrate([row])
+    const [message] = await this.hydrate(projectId, [row])
     return message ?? null
   }
 
   async findByIdempotencyKey(projectId: string, provider: string, key: string) {
+    const now = new Date().toISOString()
     const row = await this.db
       .selectFrom('messages')
       .selectAll()
       .where('project_id', '=', projectId)
       .where('provider', '=', provider)
       .where('idempotency_key', '=', key)
+      .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', now)]))
       .orderBy('id', 'desc')
       .executeTakeFirst()
     if (!row) return null
-    const [message] = await this.hydrate([row])
+    const [message] = await this.hydrate(projectId, [row])
     return message ?? null
   }
 
   async listMessages(projectId: string, query: MessageQuery) {
-    let q = this.db.selectFrom('messages').selectAll('messages').where('messages.project_id', '=', projectId)
+    const now = new Date().toISOString()
+    let q = this.db
+      .selectFrom('messages')
+      .selectAll('messages')
+      .where('messages.project_id', '=', projectId)
+      .where((eb) => eb.or([eb('messages.expires_at', 'is', null), eb('messages.expires_at', '>', now)]))
     if (query.to) {
       const address = query.to.trim().toLowerCase()
       q = q.where(({ exists, selectFrom }) =>
         exists(
           selectFrom('recipients')
             .select('recipients.message_id')
+            .where('recipients.project_id', '=', projectId)
             .whereRef('recipients.message_id', '=', 'messages.id')
             .where('recipients.address', '=', address),
         ),
       )
     }
     if (query.subject) {
-      q = q.where(sql<boolean>`lower(messages.subject) like ${'%' + query.subject.toLowerCase() + '%'}`)
+      const escaped = query.subject.toLowerCase().replace(/[\\%_]/g, '\\$&')
+      q = q.where(sql<boolean>`lower(messages.subject) like ${'%' + escaped + '%'} escape '\\'`)
     }
     if (query.provider) q = q.where('messages.provider', '=', query.provider)
     if (query.after !== undefined) q = q.where('messages.id', '>', query.after)
     if (query.hasCode) q = q.where('messages.has_code', '=', 1)
     const limit = Math.min(query.limit ?? defaultLimit, maxLimit)
     const rows = await q.orderBy('messages.id', query.order ?? 'desc').limit(limit).execute()
-    return this.hydrate(rows)
+    return this.hydrate(projectId, rows)
   }
 
   async getAttachment(projectId: string, messageId: number, n: number): Promise<Attachment | null> {
+    const now = new Date().toISOString()
     const row = await this.db
       .selectFrom('attachments')
-      .selectAll()
-      .where('project_id', '=', projectId)
-      .where('message_id', '=', messageId)
-      .where('n', '=', n)
+      .innerJoin('messages', 'messages.id', 'attachments.message_id')
+      .select([
+        'attachments.filename',
+        'attachments.content_type',
+        'attachments.content_id',
+        'attachments.content',
+      ])
+      .where('attachments.project_id', '=', projectId)
+      .where('attachments.message_id', '=', messageId)
+      .where('attachments.n', '=', n)
+      .where('messages.project_id', '=', projectId)
+      .where((eb) => eb.or([eb('messages.expires_at', 'is', null), eb('messages.expires_at', '>', now)]))
       .executeTakeFirst()
     if (!row) return null
     return {
@@ -188,6 +219,16 @@ export class KyselyStore implements Store {
       contentId: row.content_id,
       content: row.content,
     }
+  }
+
+  async deleteMessage(projectId: string, id: number): Promise<boolean> {
+    return this.db.transaction().execute(async (trx) => {
+      await trx.deleteFrom('webhook_deliveries').where('project_id', '=', projectId).where('message_id', '=', id).execute()
+      await trx.deleteFrom('attachments').where('project_id', '=', projectId).where('message_id', '=', id).execute()
+      await trx.deleteFrom('recipients').where('project_id', '=', projectId).where('message_id', '=', id).execute()
+      const deleted = await trx.deleteFrom('messages').where('project_id', '=', projectId).where('id', '=', id).executeTakeFirst()
+      return Number(deleted.numDeletedRows) > 0
+    })
   }
 
   async deleteMessages(projectId: string, to?: string) {
@@ -203,30 +244,43 @@ export class KyselyStore implements Store {
       : (
           await this.db.selectFrom('messages').select('id').where('project_id', '=', projectId).execute()
         ).map((r) => r.id)
-    if (ids.length === 0) return 0
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return 0
     await this.db.transaction().execute(async (trx) => {
-      await trx.deleteFrom('attachments').where('message_id', 'in', ids).execute()
-      await trx.deleteFrom('recipients').where('message_id', 'in', ids).execute()
-      await trx.deleteFrom('messages').where('id', 'in', ids).execute()
+      await trx.deleteFrom('webhook_deliveries').where('project_id', '=', projectId).where('message_id', 'in', uniqueIds).execute()
+      await trx.deleteFrom('attachments').where('project_id', '=', projectId).where('message_id', 'in', uniqueIds).execute()
+      await trx.deleteFrom('recipients').where('project_id', '=', projectId).where('message_id', 'in', uniqueIds).execute()
+      await trx.deleteFrom('messages').where('project_id', '=', projectId).where('id', 'in', uniqueIds).execute()
     })
-    return ids.length
+    return uniqueIds.length
   }
 
   async insertRejection(projectId: string, rejection: NewRejection): Promise<Rejection> {
     const createdAt = new Date().toISOString()
-    const inserted = await this.db
-      .insertInto('rejections')
-      .values({
-        project_id: projectId,
-        provider: rejection.provider,
-        to_addresses: JSON.stringify(rejection.to.map((a) => a.toLowerCase())),
-        status: rejection.status,
-        error: rejection.error,
-        raw: rejection.raw,
-        created_at: createdAt,
-      })
-      .executeTakeFirstOrThrow()
-    return { ...rejection, id: Number(inserted.insertId), projectId, createdAt }
+    const addresses = [...new Set(rejection.to.map((a) => a.trim().toLowerCase()).filter(Boolean))]
+    const id = await this.db.transaction().execute(async (trx) => {
+      const inserted = await trx
+        .insertInto('rejections')
+        .values({
+          project_id: projectId,
+          provider: rejection.provider,
+          to_addresses: JSON.stringify(rejection.to.map((a) => a.toLowerCase())),
+          status: rejection.status,
+          error: rejection.error,
+          raw: rejection.raw,
+          created_at: createdAt,
+        })
+        .executeTakeFirstOrThrow()
+      const rejectionId = Number(inserted.insertId)
+      if (addresses.length > 0) {
+        await trx
+          .insertInto('rejection_recipients')
+          .values(addresses.map((address) => ({ rejection_id: rejectionId, project_id: projectId, address })))
+          .execute()
+      }
+      return rejectionId
+    })
+    return { ...rejection, id, projectId, createdAt }
   }
 
   async listRejections(projectId: string, query: RejectionQuery): Promise<Rejection[]> {
@@ -235,56 +289,153 @@ export class KyselyStore implements Store {
     if (query.since) q = q.where('created_at', '>=', query.since)
     const address = query.to?.trim().toLowerCase()
     if (address) {
-      q = q.where(sql<boolean>`exists (select 1 from json_each(rejections.to_addresses) where lower(value) = ${address})`)
+      q = q.where(({ exists, selectFrom }) =>
+        exists(
+          selectFrom('rejection_recipients')
+            .select('rejection_recipients.rejection_id')
+            .where('rejection_recipients.project_id', '=', projectId)
+            .whereRef('rejection_recipients.rejection_id', '=', 'rejections.id')
+            .where('rejection_recipients.address', '=', address),
+        ),
+      )
     }
     const limit = Math.min(query.limit ?? defaultLimit, maxLimit)
-    const rows = await q.orderBy('id', 'desc').limit(limit).execute()
-    return rows
-      .map((row) => ({
-        id: row.id,
-        projectId: row.project_id,
-        provider: row.provider,
-        to: JSON.parse(row.to_addresses) as string[],
-        status: row.status,
-        error: row.error,
-        raw: row.raw,
-        createdAt: row.created_at,
-      }))
+    const rows = await q.orderBy('id', query.order ?? 'desc').limit(limit).execute()
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      provider: row.provider,
+      to: JSON.parse(row.to_addresses) as string[],
+      status: row.status,
+      error: row.error,
+      raw: row.raw,
+      createdAt: row.created_at,
+    }))
+  }
+
+  async deleteRejections(projectId: string, to?: string): Promise<number> {
+    const ids = to
+      ? (
+          await this.db
+            .selectFrom('rejection_recipients')
+            .select('rejection_id')
+            .where('project_id', '=', projectId)
+            .where('address', '=', to.trim().toLowerCase())
+            .execute()
+        ).map((r) => r.rejection_id)
+      : (
+          await this.db.selectFrom('rejections').select('id').where('project_id', '=', projectId).execute()
+        ).map((r) => r.id)
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return 0
+    await this.db.transaction().execute(async (trx) => {
+      await trx.deleteFrom('rejection_recipients').where('project_id', '=', projectId).where('rejection_id', 'in', uniqueIds).execute()
+      await trx.deleteFrom('rejections').where('project_id', '=', projectId).where('id', 'in', uniqueIds).execute()
+    })
+    return uniqueIds.length
+  }
+
+  async insertWebhookDelivery(projectId: string, delivery: NewWebhookDelivery): Promise<WebhookDelivery> {
+    const createdAt = new Date().toISOString()
+    const inserted = await this.db
+      .insertInto('webhook_deliveries')
+      .values({
+        project_id: projectId,
+        message_id: delivery.messageId,
+        provider: delivery.provider,
+        event: delivery.event,
+        recipient: delivery.recipient,
+        url: delivery.url,
+        delivered: delivery.delivered ? 1 : 0,
+        app_status: delivery.appStatus,
+        app_body: delivery.appBody,
+        duration_ms: delivery.durationMs,
+        error: delivery.error,
+        created_at: createdAt,
+      })
+      .executeTakeFirstOrThrow()
+    return { ...delivery, id: Number(inserted.insertId), projectId, createdAt }
+  }
+
+  async listWebhookDeliveries(projectId: string, messageId: number): Promise<WebhookDelivery[]> {
+    const rows = await this.db
+      .selectFrom('webhook_deliveries')
+      .selectAll()
+      .where('project_id', '=', projectId)
+      .where('message_id', '=', messageId)
+      .orderBy('id', 'asc')
+      .execute()
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      messageId: row.message_id,
+      provider: row.provider,
+      event: row.event,
+      recipient: row.recipient,
+      url: row.url,
+      delivered: row.delivered === 1,
+      appStatus: row.app_status,
+      appBody: row.app_body,
+      durationMs: row.duration_ms,
+      error: row.error,
+      createdAt: row.created_at,
+    }))
+  }
+
+  async latestWebhookEvent(projectId: string, messageId: number): Promise<string | null> {
+    const row = await this.db
+      .selectFrom('webhook_deliveries')
+      .select('event')
+      .where('project_id', '=', projectId)
+      .where('message_id', '=', messageId)
+      .orderBy('id', 'desc')
+      .limit(1)
+      .executeTakeFirst()
+    return row?.event ?? null
   }
 
   async deleteExpired(now: string) {
-    const ids = (
-      await this.db
-        .selectFrom('messages')
-        .select('id')
-        .where('expires_at', 'is not', null)
-        .where('expires_at', '<=', now)
-        .execute()
-    ).map((r) => r.id)
-    if (ids.length === 0) return 0
+    const expired = await this.db
+      .selectFrom('messages')
+      .select(['id', 'project_id'])
+      .where('expires_at', 'is not', null)
+      .where('expires_at', '<=', now)
+      .execute()
+    if (expired.length === 0) return 0
+    const byProject = new Map<string, number[]>()
+    for (const row of expired) {
+      const list = byProject.get(row.project_id) ?? []
+      list.push(row.id)
+      byProject.set(row.project_id, list)
+    }
     await this.db.transaction().execute(async (trx) => {
-      await trx.deleteFrom('attachments').where('message_id', 'in', ids).execute()
-      await trx.deleteFrom('recipients').where('message_id', 'in', ids).execute()
-      await trx.deleteFrom('messages').where('id', 'in', ids).execute()
+      for (const [projectId, ids] of byProject) {
+        await trx.deleteFrom('webhook_deliveries').where('project_id', '=', projectId).where('message_id', 'in', ids).execute()
+        await trx.deleteFrom('attachments').where('project_id', '=', projectId).where('message_id', 'in', ids).execute()
+        await trx.deleteFrom('recipients').where('project_id', '=', projectId).where('message_id', 'in', ids).execute()
+        await trx.deleteFrom('messages').where('project_id', '=', projectId).where('id', 'in', ids).execute()
+      }
     })
-    return ids.length
+    return expired.length
   }
 
   async close() {
     await this.db.destroy()
   }
 
-  private async hydrate(rows: MessageRow[]): Promise<Message[]> {
+  private async hydrate(projectId: string, rows: MessageRow[]): Promise<Message[]> {
     if (rows.length === 0) return []
     const ids = rows.map((r) => r.id)
     const recipients = await this.db
       .selectFrom('recipients')
       .select(['message_id', 'address', 'name', 'kind'])
+      .where('project_id', '=', projectId)
       .where('message_id', 'in', ids)
       .execute()
     const attachments = await this.db
       .selectFrom('attachments')
       .select(['message_id', 'n', 'filename', 'content_type', 'content_id', 'size'])
+      .where('project_id', '=', projectId)
       .where('message_id', 'in', ids)
       .orderBy('n')
       .execute()

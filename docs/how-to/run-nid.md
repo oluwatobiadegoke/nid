@@ -160,7 +160,7 @@ Port `0` asks the system for any free port. This is useful when you [embed nid i
 
 ## Keep mail across restarts
 
-By default nid keeps mail in memory, so it is gone when nid stops. To keep it, give nid a SQLite file:
+By default nid keeps mail in memory (up to 5,000 messages and 1,000 rejections per project), so it is gone when nid stops or evicts older entries. To keep it, give nid a SQLite file:
 
 ```sh
 npx nid-inbox serve --db mail.sqlite

@@ -1,20 +1,12 @@
-import { Kysely } from 'kysely'
-import type { Database } from './schema.js'
-import { KyselyStore } from './kysely-store.js'
-import { NodeSqliteDialect, openSqlite } from './sqlite-dialect.js'
+import type { Store } from './types.js'
+import type { SqliteStoreOptions } from './sqlite-store.js'
 
 export type { Store, MessageQuery, RejectionQuery } from './types.js'
 export type { Database } from './schema.js'
-export { KyselyStore } from './kysely-store.js'
-export { NodeSqliteDialect } from './sqlite-dialect.js'
+export type { SqliteStoreOptions } from './sqlite-store.js'
+export { MemoryStore, createMemoryStore, type MemoryStoreOptions } from './memory-store.js'
 
-export interface SqliteStoreOptions {
-  path?: string
-}
-
-export async function createSqliteStore(options: SqliteStoreOptions = {}): Promise<KyselyStore> {
-  const db = new Kysely<Database>({ dialect: new NodeSqliteDialect(openSqlite(options.path ?? ':memory:')) })
-  const store = new KyselyStore(db)
-  await store.migrate()
-  return store
+export async function createSqliteStore(options: SqliteStoreOptions = {}): Promise<Store> {
+  const { createSqliteStore: open } = await import('./sqlite-store.js')
+  return open(options)
 }

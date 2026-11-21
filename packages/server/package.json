@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./sqlite": {
+      "types": "./dist/store/sqlite-store.d.ts",
+      "default": "./dist/store/sqlite-store.js"
     }
   },
   "files": [
@@ -58,7 +62,6 @@
     "sendgrid",
     "postmark",
     "mailgun",
-    "ses",
     "smtp",
     "playwright",
     "mcp"

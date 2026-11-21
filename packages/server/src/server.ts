@@ -5,6 +5,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import type { SMTPServer } from 'smtp-server'
 import { readApi } from './api/index.js'
+import { createMemoryEventBus, type EventBus } from './events/index.js'
 import { createIngest, defaultLimits, type Ingest } from './ingest/index.js'
 import { providerRoutes } from './ingest/http.js'
 import { createSmtpServer, listenSmtp } from './ingest/smtp.js'
@@ -12,13 +13,14 @@ import { providers as builtInProviders, type Provider } from './providers/index.
 import { hostCheck } from './security/host.js'
 import { mcpRoutes } from './mcp/http.js'
 import type { WebhookTarget } from './api/webhook.js'
-import { createSqliteStore, type Store } from './store/index.js'
+import { createMemoryStore, type Store } from './store/index.js'
 import type { AuthHook, LimitsHook, Message } from './types.js'
 import { webView } from './ui/index.js'
 import { version } from './version.js'
 
 export interface ServerOptions {
   store?: Store
+  events?: EventBus
   auth?: AuthHook
   limits?: LimitsHook
   providers?: Provider[]
@@ -33,7 +35,7 @@ export interface ServerOptions {
 
 export interface ListenOptions {
   port?: number
-  smtpPort?: number
+  smtpPort?: number | false
   host?: string
 }
 
@@ -48,6 +50,7 @@ export interface Listening {
 export interface NidServer {
   app: Hono
   store: Store
+  events: EventBus
   ingest: Ingest
   providers: Provider[]
   version: string
@@ -77,13 +80,17 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     if (!webhookProviders.includes(name)) {
       throw new Error(`webhooks.${name} names no provider that sends webhooks. Use ${webhookProviders.join(', ')}.`)
     }
-    if (!/^https?:$/.test(URL.parse(target.url)?.protocol ?? '')) {
-      throw new Error(`The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`)
+    const protocol = URL.canParse(target.url) ? new URL(target.url).protocol : ''
+    if (!/^https?:$/.test(protocol)) {
+      throw new Error(
+        `The ${name} webhook URL ${JSON.stringify(target.url)} is not an http:// or https:// URL. Check NID_${name.toUpperCase()}_WEBHOOK_URL.`,
+      )
     }
   }
-  const store = options.store ?? (await createSqliteStore())
+  const store = options.store ?? createMemoryStore()
+  const events = options.events ?? createMemoryEventBus()
   const maxBodyBytes = options.maxBodyBytes ?? defaultLimits.maxBodyBytes
-  const ingest = createIngest({ store, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
+  const ingest = createIngest({ store, events, auth: options.auth, limits: options.limits, onMessage: options.onMessage })
 
   const app = new Hono({ strict: false })
   app.use('*', hostCheck(options.allowHosts ?? []))
@@ -96,7 +103,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     }),
   )
   app.get('/healthz', (c) => c.json({ ok: true, version }))
-  app.route('/api', readApi({ store, ingest, providers, webhooks: options.webhooks ?? {}, version }))
+  app.route('/api', readApi({ store, events, ingest, providers, webhooks: options.webhooks ?? {}, version }))
   app.route('/mcp', mcpRoutes(async (path, init) => app.request(path, init), options.allowHosts ?? []))
   if (options.ui !== false) app.route('/', webView())
   app.route('/', providerRoutes({ providers, ingest, store }))
@@ -106,12 +113,19 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
     return c.json({ error: err.message }, 500)
   })
 
-  const smtp = createSmtpServer({ ingest, maxBodyBytes, onError: options.onError })
+  const sweepTimer = options.limits
+    ? setInterval(() => {
+        void store.deleteExpired(new Date().toISOString()).catch((err) => options.onError?.(err as Error))
+      }, 60_000)
+    : null
+  sweepTimer?.unref()
+
   let listening: Listening | null = null
 
   return {
     app,
     store,
+    events,
     ingest,
     providers,
     version,
@@ -125,12 +139,16 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
         server.once('error', reject)
       })
       const port = (http.address() as AddressInfo).port
-      let smtpPort: number
-      try {
-        smtpPort = await listenSmtp(smtp, listenOptions.smtpPort ?? defaultSmtpPort, host)
-      } catch (err) {
-        await closeHttp(http)
-        throw err
+      let smtp: SMTPServer | null = null
+      let smtpPort = 0
+      if (listenOptions.smtpPort !== false) {
+        try {
+          smtp = await createSmtpServer({ ingest, maxBodyBytes, onError: options.onError })
+          smtpPort = await listenSmtp(smtp, listenOptions.smtpPort ?? defaultSmtpPort, host)
+        } catch (err) {
+          await closeHttp(http)
+          throw err
+        }
       }
       const urlHost = host.includes(':') ? `[${host}]` : host
       listening = {
@@ -139,13 +157,15 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
         port,
         smtpPort,
         close: async () => {
-          await Promise.all([closeHttp(http), closeSmtp(smtp)])
+          await Promise.all([closeHttp(http), smtp ? closeSmtp(smtp) : Promise.resolve()])
+          smtp = null
           listening = null
         },
       }
       return listening
     },
     async close() {
+      if (sweepTimer) clearInterval(sweepTimer)
       await listening?.close()
       await store.close()
     },

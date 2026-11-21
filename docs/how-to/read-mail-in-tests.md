@@ -118,7 +118,7 @@ const message = await inbox.waitFor(email, { codePattern: /key is (\w+)/ })
 message.code
 ```
 
-The pattern runs over the subject and the plain text of the email.
+The pattern runs over the subject, plain text and HTML turned into text.
 
 ## Change how long to wait
 

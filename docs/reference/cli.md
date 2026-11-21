@@ -31,7 +31,7 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--port <n>` | `4400`, or `NID_PORT` | HTTP port. `0` picks a free port. |
 | `--smtp-port <n>` | `1025`, or `NID_SMTP_PORT` | SMTP port. `0` picks a free port. |
 | `--host <address>` | `127.0.0.1`, or `NID_HOST` | Address both servers listen on. Use `0.0.0.0` to accept connections from other machines. |
-| `--db <path>` | none, or `NID_DB` | SQLite file to keep mail in. Without it, mail is kept in memory and lost when nid stops. |
+| `--db <path>` | none, or `NID_DB` | SQLite file to keep mail in. Without it, mail is kept in memory (up to 5,000 messages and 1,000 rejections per project) and lost when nid stops. |
 | `--cors` | off | Sends CORS headers, so web pages on other origins can call nid. |
 | `--allow-host <name>` | none | Accepts requests whose `Host` header is this name. Repeat it for more names. See [Security](../explanation/security.md). |
 | `--quiet` | off | Prints nothing on start. |

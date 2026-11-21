@@ -55,7 +55,7 @@ Holds the request open until a message that matches arrives, then returns the ol
 | `subject` | No | Part of the subject, in any case. |
 | `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `has_code` | No | Skip messages with no extracted code. |
-| `code_pattern` | No | A regular expression, run without case, over the subject and plain text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
+| `code_pattern` | No | A regular expression, run without case, over the subject, plain text and HTML turned into text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
 | `timeout` | No | Seconds to wait, from 0 to 120. Default 30. |
 
 On success: `200 {"message": Message}`.

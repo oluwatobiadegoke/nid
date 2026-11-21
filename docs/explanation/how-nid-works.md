@@ -49,7 +49,7 @@ The client library does this for you:
 
 ## Waiting without polling
 
-`GET /api/wait` holds the HTTP request open until a matching message arrives or the timeout ends. Inside nid it checks the store about four times a second. To the test it is one request that returns the moment the mail is there.
+`GET /api/wait` holds the HTTP request open until a matching message arrives or the timeout ends. Inside nid, an in-process event bus wakes the request the instant a matching message is stored, with no polling loop. To the test it is one request that returns the moment the mail is there.
 
 So a test has no loops and no `sleep`. It also never waits longer than it must, and on a slow CI machine it waits a little more, up to its timeout.
 
@@ -67,14 +67,14 @@ Timed out waiting for mail to signup.6aaee5fd@inbox.test after 30s. 1 resend req
 
 When a message arrives, nid pulls out codes and links once and stores them with the message.
 
-**Codes.** nid looks at the subject and the plain text (or the HTML turned into text). A token counts as a code when it is:
+**Codes.** nid looks at the subject, the plain text and the HTML turned into text. A token counts as a code when it is:
 
 - 4 to 8 digits, or two groups of 3 digits such as `123 456` or `123-456`; or
 - 6 to 8 capital letters and digits with at least one digit, such as `AB12CD`;
 
 and it sits near a word such as code, OTP, PIN, verify, confirm, login, sign in, 2FA or security. nid skips years, phone numbers and anything inside a URL. The first code found is `code`. All of them are in `codes`.
 
-**Links.** nid collects every `<a href>` in the HTML and every URL in the text. The first one that is not `mailto:`, `tel:`, an image or an unsubscribe link becomes `link`.
+**Links.** nid collects every `http://`, `https://`, `mailto:` and `tel:` link from `<a href>` in the HTML and every URL in the text. The first HTTP or HTTPS link that is not an image or an unsubscribe link becomes `link`.
 
 **Templates.** When a send uses a provider template and has no body, nid reads the template variables instead. See [Templates](../reference/providers.md#templates).
 
@@ -82,7 +82,7 @@ When the guess is wrong, a test passes its own `codePattern`. That pattern runs 
 
 ## Memory by default
 
-nid keeps mail in an in-memory SQLite database unless you pass `--db`. Each run starts empty, which is what most test runs want. With `--db` it uses a SQLite file, so mail survives a restart.
+nid keeps mail in memory by default, with no database file or startup overhead. Each run starts empty, which is what most test runs want, and each project holds up to 5,000 messages and 1,000 rejections before evicting the oldest entries. With `--db` it uses a SQLite file, so mail survives a restart.
 
 ## Projects
 
@@ -94,5 +94,4 @@ Today:
 
 - Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
 - nid calls your app's webhook route only when you [ask it to](../how-to/test-webhooks.md). It never sends "delivered" or "bounced" by itself after a send.
-- `retentionHours` stamps an expiry time on messages, but nothing deletes expired messages yet.
-- The only built-in store is SQLite.
+- The only built-in persistent store is SQLite.

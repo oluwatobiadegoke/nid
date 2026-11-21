@@ -191,7 +191,8 @@ const send: SendRoute = {
   },
   reply(messages) {
     const id = messages[0]?.providerId.split('.')[0] ?? ''
-    return { status: 202, body: null, headers: { 'x-message-id': id } }
+    const status = messages[0]?.meta.sandbox ? 200 : 202
+    return { status, body: null, headers: { 'x-message-id': id } }
   },
 }
 

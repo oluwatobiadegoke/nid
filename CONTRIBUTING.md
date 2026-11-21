@@ -11,7 +11,7 @@ pnpm test
 pnpm dev          # starts the server from source on 4400 and 1025
 ```
 
-Node 22.13 or later. Tests use `node:test` and run against a server started in-process, so nothing else has to be running.
+Node 20.12 or later (Node 22.13 or later for the SQLite store tests). Tests use `node:test` and run against a server started in-process, so nothing else has to be running.
 
 ## Layout
 

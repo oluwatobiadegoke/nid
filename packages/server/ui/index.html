@@ -204,6 +204,13 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
   let providers = []
 
   const text = (node, value) => { node.textContent = value ?? '' }
+  const safeHref = (href, allowMailto) => {
+    if (typeof href !== 'string') return null
+    const trimmed = href.trim()
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    if (allowMailto && /^(mailto|tel):/i.test(trimmed)) return trimmed
+    return null
+  }
   const el = (tag, cls, content) => { const n = document.createElement(tag); if (cls) n.className = cls; if (content !== undefined) n.textContent = content; return n }
   const ago = (iso) => {
     const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000))
@@ -298,15 +305,19 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
       ['When', new Date(message.createdAt).toLocaleString()],
     ])
     const { code, link, links } = message.extracted
-    $('found').hidden = !code && !link
+    const safeLink = safeHref(link, false)
+    const safeLinks = links.map((l) => ({ href: safeHref(l.href, true), raw: l.href, text: l.text })).filter((l) => l.href)
+    $('found').hidden = !code && !safeLink
     $('found-code').hidden = !code
-    $('found-link').hidden = !link
+    $('found-link').hidden = !safeLink
     text($('code'), code)
-    const a = $('link'); a.href = link || '#'; text(a, link)
-    $('links-section').hidden = links.length === 0
-    $('links').replaceChildren(...links.map((l) => {
+    const a = $('link')
+    if (safeLink) { a.href = safeLink; text(a, safeLink) }
+    else { a.removeAttribute('href'); text(a, '') }
+    $('links-section').hidden = safeLinks.length === 0
+    $('links').replaceChildren(...safeLinks.map((l) => {
       const li = el('li')
-      const la = el('a', '', l.href); la.href = l.href; la.target = '_blank'; la.rel = 'noreferrer noopener'
+      const la = el('a', '', l.raw); la.href = l.href; la.target = '_blank'; la.rel = 'noreferrer noopener'
       li.append(la)
       if (l.text) li.append(el('span', 'label', l.text))
       return li

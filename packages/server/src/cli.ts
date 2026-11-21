@@ -59,12 +59,15 @@ async function serve(args: string[]) {
       quiet: { type: 'boolean', default: false },
     },
   })
-  const [{ createServer }, { createSqliteStore }, { providers }] = await Promise.all([
+  const [{ createServer }, { providers }] = await Promise.all([
     import('./server.js'),
-    import('./store/index.js'),
     import('./providers/index.js'),
   ])
-  const store = await createSqliteStore(values.db ? { path: values.db } : {})
+  let store
+  if (values.db) {
+    const { createSqliteStore } = await import('./store/index.js')
+    store = await createSqliteStore({ path: values.db }).catch((err: Error) => fail(err.message))
+  }
   const webhooks = Object.fromEntries(
     providers.flatMap((p) => {
       const env = `NID_${p.name.toUpperCase()}_WEBHOOK`
@@ -73,7 +76,7 @@ async function serve(args: string[]) {
     }),
   )
   const server = await createServer({
-    store,
+    ...(store ? { store } : {}),
     cors: values.cors,
     allowHosts: values['allow-host'],
     webhooks,

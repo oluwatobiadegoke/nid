@@ -158,3 +158,18 @@ test('a padded junk address is refused quickly instead of stalling the server', 
   assert.equal(res.status, 400)
   assert.ok(Date.now() - started < 1000)
 })
+
+test('sandbox mode returns 200 and records meta.sandbox', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const res = await send(server, {
+    personalizations: [{ to: [{ email: 'sandbox@inbox.test' }] }],
+    from: { email: 'hello@acme.com' },
+    subject: 'Sandbox',
+    content: [{ type: 'text/plain', value: 'Hello' }],
+    mail_settings: { sandbox_mode: { enable: true } },
+  })
+  assert.equal(res.status, 200)
+  const stored = (await server.store.listMessages('default', { to: 'sandbox@inbox.test' }))[0]
+  assert.equal(stored?.meta.sandbox, true)
+})

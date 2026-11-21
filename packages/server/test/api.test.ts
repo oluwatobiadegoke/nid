@@ -152,3 +152,117 @@ test('the auth and limits hooks pick the project and its retention', async (t) =
   const authenticated = await server.app.request('/api/messages', { headers: { authorization: 'Bearer ti_live' } })
   assert.equal(authenticated.status, 200)
 })
+
+test('wait wakes up immediately via EventBus with zero polling and cleans up on abort', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  let listCalls = 0
+  const origList = server.store.listMessages.bind(server.store)
+  server.store.listMessages = (...args) => {
+    listCalls++
+    return origList(...args)
+  }
+  let activeSubs = 0
+  const origSubscribe = server.events.subscribe.bind(server.events)
+  server.events.subscribe = (projectId, listener) => {
+    activeSubs++
+    const unsub = origSubscribe(projectId, listener)
+    return () => {
+      activeSubs--
+      unsub()
+    }
+  }
+
+  const started = performance.now()
+  const pending = get(server, '/api/wait?to=signup@inbox.test&timeout=5')
+  await sleep(10)
+  await sendResend(server, { ...base, subject: 'Fast', text: 'Code 918273' })
+  const res = await pending
+  const elapsed = performance.now() - started
+  assert.equal(res.status, 200)
+  assert.ok(elapsed < 100, `expected <100ms, got ${elapsed}ms`)
+  assert.equal(listCalls, 1)
+  assert.equal(activeSubs, 0)
+
+  const controller = new AbortController()
+  const aborted = server.app.request('/api/wait?to=never@inbox.test&timeout=20', { signal: controller.signal })
+  await sleep(10)
+  assert.equal(activeSubs, 1)
+  controller.abort()
+  await aborted
+  assert.equal(activeSubs, 0)
+})
+
+test('wait with code_pattern finds a match past more than 50 earlier messages', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  for (let i = 0; i < 60; i++) {
+    await sendResend(server, { ...base, subject: `Noise ${i}`, text: `Nothing to match ${i}` })
+  }
+  await sendResend(server, { ...base, subject: 'Key', text: 'Your access key is PAGE-2-OK' })
+  const res = await get(server, `/api/wait?to=signup@inbox.test&timeout=1&code_pattern=${encodeURIComponent('key is ([A-Z0-9-]+)')}`)
+  assert.equal(res.status, 200)
+  assert.equal((res.body.message as { extracted: { code: string } }).extracted.code, 'PAGE-2-OK')
+})
+
+test('expired messages are hidden from read routes and attachment downloads', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const expired = await server.store.insertMessage(
+    'default',
+    {
+      provider: 'resend',
+      providerId: 'exp-1',
+      from: 'a@acme.com',
+      replyTo: [],
+      recipients: [{ address: 'signup@inbox.test', name: null, kind: 'to' }],
+      subject: 'Expired',
+      text: 'Old',
+      html: null,
+      headers: {},
+      attachments: [{ filename: 'a.txt', contentType: 'text/plain', contentId: null, content: new Uint8Array([1]) }],
+      raw: '{}',
+      meta: {},
+      idempotencyKey: null,
+    },
+    { code: null, codes: [], link: null, links: [] },
+    '2000-01-01T00:00:00.000Z',
+  )
+  assert.deepEqual((await get(server, '/api/messages')).body.messages, [])
+  assert.equal((await get(server, `/api/messages/${expired.id}`)).status, 404)
+  const file = await server.app.request(`/api/messages/${expired.id}/attachments/0`)
+  assert.equal(file.status, 404)
+})
+
+test('stream drains more than 100 backlog messages and resumes via Last-Event-ID', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  for (let i = 1; i <= 120; i++) {
+    await sendResend(server, { ...base, subject: `Backlog ${i}`, text: `Msg ${i}` })
+  }
+  const response = await server.app.request('/api/stream?after=0')
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let seen = ''
+  while (!seen.includes('"subject":"Backlog 120"')) {
+    const { value, done } = await reader.read()
+    if (done) break
+    seen += decoder.decode(value)
+  }
+  await reader.cancel()
+  assert.ok(seen.includes('"subject":"Backlog 1"'))
+  assert.ok(seen.includes('"subject":"Backlog 101"'))
+  assert.ok(seen.includes('"subject":"Backlog 120"'))
+
+  await sendResend(server, { ...base, subject: 'After disconnect 121', text: 'Msg 121' })
+  const resumed = await server.app.request('/api/stream', { headers: { 'last-event-id': '120' } })
+  const resumedReader = resumed.body!.getReader()
+  let resumedSeen = ''
+  while (!resumedSeen.includes('"subject":"After disconnect 121"')) {
+    const { value, done } = await resumedReader.read()
+    if (done) break
+    resumedSeen += decoder.decode(value)
+  }
+  await resumedReader.cancel()
+  assert.equal(resumedSeen.includes('"subject":"Backlog 120"'), false)
+})

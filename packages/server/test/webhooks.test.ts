@@ -176,6 +176,19 @@ test('a Resend webhook passes the Resend SDK signature check', async (t) => {
   assert.deepEqual(event.data.tags, { flow: 'signin' })
   assert.equal(event.data.click.link, 'https://app.acme.com/verify?t=1')
 
+  const afterClick = await running.server.app.request(`/emails/${sent.body.id}`, { headers: { authorization: 'Bearer re_x' } })
+  assert.equal(((await afterClick.json()) as { last_event: string }).last_event, 'clicked')
+
+  const delayed = await trigger(running, await latestId(running), 'deferred')
+  assert.equal(delayed.body.appStatus, 200)
+  const afterDelay = await running.server.app.request(`/emails/${sent.body.id}`, { headers: { authorization: 'Bearer re_x' } })
+  assert.equal(((await afterDelay.json()) as { last_event: string }).last_event, 'delivery_delayed')
+
+  const bounced = await trigger(running, await latestId(running), 'bounced')
+  assert.equal(bounced.body.appStatus, 200)
+  const afterBounce = await running.server.app.request(`/emails/${sent.body.id}`, { headers: { authorization: 'Bearer re_x' } })
+  assert.equal(((await afterBounce.json()) as { last_event: string }).last_event, 'bounced')
+
   const wrong = await nid(t, { resend: { url: app.url, secret: `whsec_${Buffer.from('another-secret').toString('base64')}` } })
   await sendResend(wrong.server, { from: 'hello@acme.com', to: 'ada@inbox.test', ...signIn })
   assert.equal((await trigger(wrong, await latestId(wrong), 'bounced')).body.appStatus, 400)

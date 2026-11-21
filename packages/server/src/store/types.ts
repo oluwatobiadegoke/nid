@@ -4,7 +4,9 @@ import type {
   Message,
   NewMessage,
   NewRejection,
+  NewWebhookDelivery,
   Rejection,
+  WebhookDelivery,
 } from '../types.js'
 
 export interface MessageQuery {
@@ -22,6 +24,7 @@ export interface RejectionQuery {
   after?: number | undefined
   since?: string | undefined
   limit?: number | undefined
+  order?: 'asc' | 'desc' | undefined
 }
 
 export interface Store {
@@ -38,9 +41,14 @@ export interface Store {
   findByIdempotencyKey(projectId: string, provider: string, key: string): Promise<Message | null>
   listMessages(projectId: string, query: MessageQuery): Promise<Message[]>
   getAttachment(projectId: string, messageId: number, n: number): Promise<Attachment | null>
+  deleteMessage(projectId: string, id: number): Promise<boolean>
   deleteMessages(projectId: string, to?: string): Promise<number>
   insertRejection(projectId: string, rejection: NewRejection): Promise<Rejection>
   listRejections(projectId: string, query: RejectionQuery): Promise<Rejection[]>
+  deleteRejections(projectId: string, to?: string): Promise<number>
+  insertWebhookDelivery(projectId: string, delivery: NewWebhookDelivery): Promise<WebhookDelivery>
+  listWebhookDeliveries(projectId: string, messageId: number): Promise<WebhookDelivery[]>
+  latestWebhookEvent(projectId: string, messageId: number): Promise<string | null>
   deleteExpired(now: string): Promise<number>
   close(): Promise<void>
 }

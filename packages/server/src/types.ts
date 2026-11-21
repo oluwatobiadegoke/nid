@@ -72,6 +72,25 @@ export interface Rejection extends NewRejection {
   createdAt: string
 }
 
+export interface NewWebhookDelivery {
+  messageId: number
+  provider: string
+  event: string
+  recipient: string
+  url: string
+  delivered: boolean
+  appStatus: number | null
+  appBody: string
+  durationMs: number
+  error: string | null
+}
+
+export interface WebhookDelivery extends NewWebhookDelivery {
+  id: number
+  projectId: string
+  createdAt: string
+}
+
 export interface Project {
   projectId: string
   plan: string

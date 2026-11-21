@@ -43,7 +43,7 @@ Sends up to 100 emails in one request. The body is a JSON array of `POST /emails
 
 ### GET /emails/{id}
 
-Returns an email sent through nid, in Resend's shape, with `last_event` set to `delivered`. Returns `404 not_found` for an unknown id.
+Returns an email sent through nid, in Resend's shape, with `last_event` set to the latest webhook event triggered for it (or `delivered` before any event). Returns `404 not_found` for an unknown id.
 
 ## Brevo
 
@@ -77,7 +77,7 @@ Point the SDK at nid with `sgMail.client.setDefaultRequest('baseUrl', 'http://12
 
 ### POST /v3/mail/send
 
-Sends one email per entry in `personalizations`. Returns `202` with an empty body and an `X-Message-Id` header. Each stored message has the provider id `<X-Message-Id>.<n>`, where `n` is the index of its personalization.
+Sends one email per entry in `personalizations`. Returns `202` (`200` when `mail_settings.sandbox_mode.enable` is `true`) with an empty body and an `X-Message-Id` header. Each stored message has the provider id `<X-Message-Id>.<n>`, where `n` is the index of its personalization.
 
 nid checks, in the same way SendGrid does:
 
@@ -164,7 +164,7 @@ Sends a message you built yourself, for example with Nodemailer. The form needs 
 
 ### Batch sends
 
-With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
+With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message with its own provider id, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
 
 ## SMTP
 

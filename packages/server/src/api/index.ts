@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import type { EventBus } from '../events/index.js'
 import type { Ingest } from '../ingest/types.js'
 import { webhookEvents, type Provider, type WebhookEvent } from '../providers/types.js'
 import type { Store } from '../store/types.js'
@@ -21,6 +22,7 @@ import { sendWebhook, type WebhookTarget } from './webhook.js'
 
 export interface ApiOptions {
   store: Store
+  events: EventBus
   ingest: Ingest
   providers: Provider[]
   webhooks: Record<string, WebhookTarget>
@@ -35,7 +37,7 @@ function bearerToken(header: string | undefined): string | null {
 }
 
 export function readApi(options: ApiOptions): Hono<Env> {
-  const { store } = options
+  const { store, events } = options
   const app = new Hono<Env>()
 
   app.use('*', async (c, next) => {
@@ -65,7 +67,7 @@ export function readApi(options: ApiOptions): Hono<Env> {
       timeoutMs: (query.timeout ?? defaultTimeoutSeconds) * 1000,
       signal: c.req.raw.signal,
     }
-    const result = await waitForMessage(store, c.get('project').projectId, params)
+    const result = await waitForMessage(store, events, c.get('project').projectId, params)
     if (!result.message) {
       return c.json(
         {
@@ -119,7 +121,8 @@ export function readApi(options: ApiOptions): Hono<Env> {
     if (!webhookEvents.includes(event)) {
       return c.json({ error: `type must be one of ${webhookEvents.join(', ')}` }, 400)
     }
-    const message = await store.getMessage(c.get('project').projectId, id)
+    const projectId = c.get('project').projectId
+    const message = await store.getMessage(projectId, id)
     if (!message) return c.json({ error: `No message with id ${id}` }, 404)
     const provider = options.providers.find((p) => p.name === message.provider)
     if (!provider?.webhook) return c.json({ error: `Mail sent over ${message.provider} has no webhooks` }, 400)
@@ -132,19 +135,34 @@ export function readApi(options: ApiOptions): Hono<Env> {
         400,
       )
     }
+    const recipient = message.recipients[0]?.address ?? ''
     let request
     try {
       request = provider.webhook({
         message,
         event,
-        recipient: message.recipients[0]?.address ?? '',
+        recipient,
         secret: target.secret,
         now: new Date(),
       })
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400)
     }
-    return c.json(await sendWebhook(target, request))
+    const outcome = await sendWebhook(target, request)
+    const delivery = await store.insertWebhookDelivery(projectId, {
+      messageId: message.id,
+      provider: provider.name,
+      event,
+      recipient,
+      url: outcome.url,
+      delivered: outcome.delivered,
+      appStatus: outcome.appStatus,
+      appBody: outcome.appBody,
+      durationMs: outcome.durationMs,
+      error: outcome.error ?? null,
+    })
+    events.emit(projectId, { kind: 'webhook', delivery })
+    return c.json(outcome)
   })
 
   app.get('/messages/:id/attachments/:n', async (c) => {
@@ -176,30 +194,76 @@ export function readApi(options: ApiOptions): Hono<Env> {
     const query = parseQuery(streamQuery, new URL(c.req.url).searchParams)
     if (isIssue(query)) return c.json(query, 400)
     const projectId = c.get('project').projectId
-    let messageCursor = query.after ?? (await store.cursor(projectId))
-    let rejectionCursor = (await store.listRejections(projectId, { limit: 1 }))[0]?.id ?? 0
+    const rawLastId = c.req.header('last-event-id')?.trim()
+    const parsedLastId = rawLastId && /^\d+$/.test(rawLastId) ? Number(rawLastId) : undefined
     return streamSSE(c, async (stream) => {
-      await stream.writeSSE({ event: 'ready', data: JSON.stringify({ cursor: messageCursor }) })
-      let beat = 0
-      while (!c.req.raw.signal.aborted && !stream.closed && !stream.aborted) {
-        let messages
-        let rejections
-        try {
-          messages = await store.listMessages(projectId, { after: messageCursor, order: 'asc', limit: 100 })
-          rejections = (await store.listRejections(projectId, { after: rejectionCursor, limit: 100 })).reverse()
-        } catch {
-          break
+      let dirty = false
+      let wake: (() => void) | null = null
+      const flushWake = () => {
+        const current = wake
+        wake = null
+        current?.()
+      }
+      const unsubscribe = events.subscribe(projectId, (event) => {
+        if (event.kind !== 'message' && event.kind !== 'rejection') return
+        dirty = true
+        flushWake()
+      })
+      let done = false
+      const stop = () => {
+        if (done) return
+        done = true
+        unsubscribe()
+        flushWake()
+      }
+      stream.onAbort(stop)
+      c.req.raw.signal.addEventListener('abort', stop, { once: true })
+      const heartbeat = setInterval(() => {
+        if (!done && !stream.closed && !stream.aborted) {
+          void stream.writeSSE({ event: 'ping', data: '' }).catch(stop)
         }
-        for (const m of messages) {
-          messageCursor = m.id
-          await stream.writeSSE({ event: 'message', data: JSON.stringify(serializeMessage(m)), id: String(m.id) })
+      }, 20_000)
+      heartbeat.unref?.()
+      const isStopped = () => done || c.req.raw.signal.aborted || stream.closed || stream.aborted
+      try {
+        let messageCursor = query.after ?? parsedLastId ?? (await store.cursor(projectId))
+        let rejectionCursor = (await store.listRejections(projectId, { limit: 1 }))[0]?.id ?? 0
+        await stream.writeSSE({ event: 'ready', data: JSON.stringify({ cursor: messageCursor }) })
+        const drain = async () => {
+          while (!isStopped()) {
+            const messages = await store.listMessages(projectId, { after: messageCursor, order: 'asc', limit: 100 })
+            for (const m of messages) {
+              if (isStopped()) return
+              if (m.id <= messageCursor) continue
+              messageCursor = m.id
+              await stream.writeSSE({ event: 'message', data: JSON.stringify(serializeMessage(m)), id: String(m.id) })
+            }
+            if (messages.length < 100) break
+          }
+          while (!isStopped()) {
+            const rejections = await store.listRejections(projectId, { after: rejectionCursor, order: 'asc', limit: 100 })
+            for (const r of rejections) {
+              if (isStopped()) return
+              if (r.id <= rejectionCursor) continue
+              rejectionCursor = r.id
+              await stream.writeSSE({ event: 'rejection', data: JSON.stringify(serializeRejection(r)) })
+            }
+            if (rejections.length < 100) break
+          }
         }
-        for (const r of rejections) {
-          rejectionCursor = r.id
-          await stream.writeSSE({ event: 'rejection', data: JSON.stringify(serializeRejection(r)) })
+        while (!isStopped()) {
+          dirty = false
+          await drain()
+          if (isStopped()) break
+          if (dirty) continue
+          await new Promise<void>((resolve) => {
+            wake = resolve
+          })
         }
-        if (++beat % 50 === 0) await stream.writeSSE({ event: 'ping', data: '' })
-        await stream.sleep(400)
+      } finally {
+        clearInterval(heartbeat)
+        c.req.raw.signal.removeEventListener('abort', stop)
+        stop()
       }
     })
   })

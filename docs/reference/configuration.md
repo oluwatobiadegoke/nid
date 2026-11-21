@@ -36,7 +36,8 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `store` | `Store` | In-memory SQLite | Where mail lives. Make one with `createSqliteStore({ path })`. |
+| `store` | `Store` | In-memory store (5,000 messages, 1,000 rejections per project) | Where mail lives. Oldest entries are evicted past the cap. Make a SQLite store with `createSqliteStore({ path })`. |
+| `events` | `EventBus` | In-memory event bus | Publishes and listens for message, rejection and webhook events. |
 | `auth` | `(credential) => Project \| null` | Every credential maps to the `default` project | Maps a provider key, read API token or SMTP username to a project. Return `null` to refuse. Can return a promise. |
 | `limits` | `(project) => Limits` | `{ maxBodyBytes: 52428800, retentionHours: null }` | Per-project limits. Can return a promise. See the note below. |
 | `providers` | `Provider[]` | All five: Resend, Brevo, SendGrid, Postmark and Mailgun | Which provider APIs to answer. |
@@ -50,14 +51,14 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 
 A `credential` has `kind` (`http` or `smtp`), `provider` (`resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `smtp` or `api` for the read API) and `value` (the key, token or username; for Mailgun, the Basic auth password). A `Project` has `projectId` and `plan`.
 
-Note on `limits.retentionHours`: when set, nid stamps each new message with an `expiresAt` time. Nothing deletes expired messages yet, so they stay until you clear them or stop the server.
+Note on `limits.retentionHours`: when set, nid stamps each new message with an `expiresAt` time. Expired messages are hidden on read and deleted every minute.
 
 ### server.listen(options)
 
 | Option | Default |
 | --- | --- |
 | `port` | `4400` |
-| `smtpPort` | `1025` |
+| `smtpPort` | `1025` (or `false` to skip SMTP) |
 | `host` | `127.0.0.1` |
 
 It returns `{ url, host, port, smtpPort, close() }`. `port` and `smtpPort` are the real ports, which matters when you pass `0`.
@@ -68,5 +69,6 @@ It returns `{ url, host, port, smtpPort, close() }`. `port` and `smtpPort` are t
 | --- | --- |
 | `server.app` | The Hono app. Call `server.app.request(path, init)` to send a request without a network. |
 | `server.store` | The store passed in or created. |
+| `server.events` | The event bus passed in or created. |
 | `server.version` | The package version. |
 | `server.close()` | Stops the listeners and closes the store. |

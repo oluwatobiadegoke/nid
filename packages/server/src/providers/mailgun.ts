@@ -150,7 +150,6 @@ async function buildSend(req: IncomingRequest, body: Record<string, Field>, toLi
 
   const domain = req.params.domain ?? ''
   const { headers, meta, custom, variables } = options(body, domain)
-  const providerId = messageId(domain)
   const templateVariables = jsonObject(text(body, 't:variables'), 't:variables')
   if (template) {
     meta.templateId = template
@@ -164,7 +163,7 @@ async function buildSend(req: IncomingRequest, body: Record<string, Field>, toLi
 
   const message = (toRecipients: Recipient[], vars: Record<string, unknown>): NewMessage => ({
     provider: name,
-    providerId,
+    providerId: messageId(domain),
     from,
     replyTo,
     recipients: [...toRecipients, ...cc, ...bcc],
