@@ -192,6 +192,12 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   )
   assert.equal(emptyToken.code, 1)
   assert.match(emptyToken.stderr, /The token must not be empty/)
+  const spacedToken = await runExec(process.execPath, [cliJs, 'serve', '--port', '0', '--smtp-port', '0', '--token', 'my secret']).then(
+    () => assert.fail('expected a token with a space to stop nid serve'),
+    (err: { code: number; stderr: string }) => err,
+  )
+  assert.equal(spacedToken.code, 1)
+  assert.match(spacedToken.stderr, /must not be empty or contain spaces/)
 
   const failed = await runExec(process.execPath, [
     cliJs,

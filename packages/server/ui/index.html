@@ -344,6 +344,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
 
   const showAuth = (message) => {
     stopStream()
+    text(where, 'signed out'); where.classList.add('off')
     openSeq++
     $('preview').removeAttribute('srcdoc')
     layout.hidden = true
