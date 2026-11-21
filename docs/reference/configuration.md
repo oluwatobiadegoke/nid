@@ -6,16 +6,16 @@ nid has no config file. You set it with command line options, environment variab
 
 | Variable | Read by | Default | What it sets |
 | --- | --- | --- | --- |
-| `NID_PORT` | `nid serve` | `4400` | HTTP port. |
-| `NID_SMTP_PORT` | `nid serve` | `1025` | SMTP port. |
-| `NID_HOST` | `nid serve` | `127.0.0.1` | Address both servers listen on. |
-| `NID_DB` | `nid serve` | none (memory) | SQLite file to keep mail in. |
+| `NID_PORT` | `nid serve`, `nid run` | `4400` | HTTP port. |
+| `NID_SMTP_PORT` | `nid serve`, `nid run` | `1025` | SMTP port. |
+| `NID_HOST` | `nid serve`, `nid run` | `127.0.0.1` | Address both servers listen on. |
+| `NID_DB` | `nid serve`, `nid run` | none (memory) | SQLite file to keep mail in. |
 | `NID_URL` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
 | `NID_TOKEN` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
 | `NID_DOMAIN` | `@nid-inbox/client` | `inbox.test` | Domain for addresses made by `inbox.address()`. |
 | `NID_INTERCEPT` | `nid-inbox/intercept` | enabled when `NID_URL` is set | Set to `0` to turn off automatic Node.js HTTP interception when preloading `nid-inbox/intercept`. |
-| `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. It must start with `http://` or `https://`, or nid stops at startup. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK` or `MAILGUN`. See [Test your webhook handler](../how-to/test-webhooks.md). |
-| `NID_<PROVIDER>_WEBHOOK_SECRET` | `nid serve` | none | The secret your app checks webhooks with, such as `NID_RESEND_WEBHOOK_SECRET`. What it is depends on the provider. |
+| `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve`, `nid run` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. It must start with `http://` or `https://`, or nid stops at startup. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK` or `MAILGUN`. See [Test your webhook handler](../how-to/test-webhooks.md). |
+| `NID_<PROVIDER>_WEBHOOK_SECRET` | `nid serve`, `nid run` | none | The secret your app checks webhooks with, such as `NID_RESEND_WEBHOOK_SECRET`. What it is depends on the provider. |
 
 A command line option wins over its environment variable. An option passed in code wins over the environment variable for the client.
 

@@ -260,4 +260,10 @@ test('the interceptor keeps a Request body, array headers and credentials in the
     'from=a%40acme.com&to=percent%40inbox.test&subject=Percent&text=Hi',
   )
   assert.equal(percent, 200)
+  const otherHost = await nodeStatus(
+    'https://api.resend.com/emails',
+    { method: 'POST', host: 'elsewhere.invalid', headers: { authorization: 'Bearer re_test', 'content-type': 'application/json' } },
+    body,
+  )
+  assert.equal(otherHost, 200)
 })

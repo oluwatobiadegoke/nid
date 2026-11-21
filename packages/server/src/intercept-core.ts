@@ -125,8 +125,8 @@ function buildRewrittenHeaders(headers: unknown, targetHost: string): Record<str
 
 function targetHostname(url: URL | null, options: Record<string, unknown>): string {
   if (typeof options.hostname === 'string' && options.hostname) return stripPort(options.hostname)
-  if (typeof options.host === 'string' && options.host) return stripPort(options.host)
   if (url?.hostname) return url.hostname
+  if (typeof options.host === 'string' && options.host) return stripPort(options.host)
   return readHostHeader(options.headers)
 }
 
