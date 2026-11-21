@@ -56,7 +56,7 @@ nid run [serve options] [--url <url>] -- <command...>
 
 All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command. `nid run` prints its start lines to standard error, so your command's output stays its own.
 
-When `nid run` starts the server with `--token` or `NID_AUTH_TOKEN`, it also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup. Your app must still send with the token: set its provider API key, its SES access key id or its SMTP username to the token, or nid answers `401`.
+With `--token` or `NID_AUTH_TOKEN`, `nid run` also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup. Your app must still send with the token: set its provider API key, its SES access key id or its SMTP username to the token, or nid refuses the send.
 
 ## nid read
 

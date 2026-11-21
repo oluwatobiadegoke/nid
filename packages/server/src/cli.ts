@@ -96,7 +96,7 @@ async function startServer(values: {
   }
   const token = values.token?.trim()
   if (values.token !== undefined && !token) {
-    fail('--token must not be empty')
+    fail('The token must not be empty. Check --token and NID_AUTH_TOKEN.')
   }
   let store
   if (values.db) {
@@ -190,7 +190,7 @@ async function run(args: string[]) {
 
   let targetUrl: string
   let serverToClose: { close(): Promise<void> } | null = null
-  const localToken = values.url ? undefined : values.token?.trim()
+  const childToken = values.token?.trim()
   if (values.url) {
     targetUrl = baseUrl(values.url)
   } else {
@@ -210,7 +210,7 @@ async function run(args: string[]) {
     env: {
       ...process.env,
       NID_URL: targetUrl,
-      ...(localToken ? { NID_TOKEN: localToken } : {}),
+      ...(childToken ? { NID_TOKEN: childToken } : {}),
       RESEND_BASE_URL: targetUrl,
       RESEND_API_URL: targetUrl,
       AWS_ENDPOINT_URL_SESV2: targetUrl,
