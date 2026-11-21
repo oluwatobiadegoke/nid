@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createServer } from '../src/index.js'
+import { createServer, createSqliteStore } from '../src/index.js'
 import { get, resendHeaders, sendResend, sleep } from './helpers.js'
 
 const base = { from: 'a@acme.com', to: 'signup@inbox.test' }
@@ -198,6 +198,18 @@ test('wait wakes up immediately via EventBus with zero polling and cleans up on 
   controller.abort()
   await aborted
   assert.equal(activeSubs, 0)
+})
+
+test('a wait with a subject filter matches arriving mail the way the store matches stored mail', async (t) => {
+  const server = await createServer({ store: await createSqliteStore() })
+  t.after(() => server.close())
+  const pending = get(server, `/api/wait?to=signup@inbox.test&timeout=5&subject=${encodeURIComponent('übersicht')}`)
+  await sleep(10)
+  await sendResend(server, { ...base, subject: 'ÜBERSICHT', text: 'Upper' })
+  await sendResend(server, { ...base, subject: 'Die übersicht', text: 'Lower' })
+  const res = await pending
+  assert.equal(res.status, 200)
+  assert.equal((res.body.message as { subject: string }).subject, 'Die übersicht')
 })
 
 test('wait with code_pattern finds a match past more than 50 earlier messages', async (t) => {
