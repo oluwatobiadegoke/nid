@@ -23,7 +23,7 @@ interface StoredEntry {
 interface ProjectBucket {
   messages: Map<number, StoredEntry>
   byRecipient: Map<string, Set<number>>
-  byProviderId: Map<string, number>
+  byProviderId: Map<string, Set<number>>
   byIdempotencyKey: Map<string, number>
   rejections: Rejection[]
   webhooks: Map<number, WebhookDelivery[]>
@@ -110,7 +110,10 @@ export class MemoryStore implements Store {
       }
       ids.add(id)
     }
-    bucket.byProviderId.set(compositeKey(message.provider, message.providerId), id)
+    const providerKey = compositeKey(message.provider, message.providerId)
+    const sameProviderId = bucket.byProviderId.get(providerKey)
+    if (sameProviderId) sameProviderId.add(id)
+    else bucket.byProviderId.set(providerKey, new Set([id]))
     if (message.idempotencyKey) {
       bucket.byIdempotencyKey.set(compositeKey(message.provider, message.idempotencyKey), id)
     }
@@ -133,9 +136,11 @@ export class MemoryStore implements Store {
   async findByProviderId(projectId: string, provider: string, providerId: string): Promise<Message | null> {
     const bucket = this.#buckets.get(projectId)
     if (!bucket) return null
-    const id = bucket.byProviderId.get(compositeKey(provider, providerId))
-    if (id === undefined) return null
-    return this.getMessage(projectId, id)
+    for (const id of bucket.byProviderId.get(compositeKey(provider, providerId)) ?? []) {
+      const message = await this.getMessage(projectId, id)
+      if (message) return message
+    }
+    return null
   }
 
   async findByIdempotencyKey(projectId: string, provider: string, key: string): Promise<Message | null> {
@@ -364,7 +369,9 @@ export class MemoryStore implements Store {
       if (ids.size === 0) bucket.byRecipient.delete(address)
     }
     const pidKey = compositeKey(entry.message.provider, entry.message.providerId)
-    if (bucket.byProviderId.get(pidKey) === id) bucket.byProviderId.delete(pidKey)
+    const sameProviderId = bucket.byProviderId.get(pidKey)
+    sameProviderId?.delete(id)
+    if (sameProviderId?.size === 0) bucket.byProviderId.delete(pidKey)
     if (entry.message.idempotencyKey) {
       const idemKey = compositeKey(entry.message.provider, entry.message.idempotencyKey)
       if (bucket.byIdempotencyKey.get(idemKey) === id) bucket.byIdempotencyKey.delete(idemKey)
