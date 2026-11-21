@@ -9,6 +9,8 @@ import { get, json, sendResend, sleep } from './helpers.js'
 test('magic names act only at inbox.test', () => {
   assert.deepEqual(magicMatchFor(['Bounce+1@Inbox.test']), { action: 'bounced', recipient: 'bounce+1@inbox.test' })
   assert.equal(magicMatchFor(['bounce@customer.com', 'ratelimit@customer.com', 'bounce@sub.inbox.test']), null)
+  assert.equal(magicMatchFor(['bounce@inbox.test', 'ratelimit@inbox.test'])?.action, 'ratelimit')
+  assert.equal(magicMatchFor(['defer@inbox.test', 'bounce@inbox.test'])?.action, 'deferred')
 })
 
 test('fault rules return custom errors, respect count/provider/to scoping, and record rejections', async (t) => {
@@ -32,6 +34,8 @@ test('fault rules return custom errors, respect count/provider/to scoping, and r
   assert.equal(added.status, 201)
   const plain = await server.app.request('/api/faults', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{"status":500}' })
   assert.equal(plain.status, 415)
+  const tooLow = await server.app.request('/api/faults', json({ status: 100 }, { 'content-type': 'application/json' }))
+  assert.equal(tooLow.status, 400)
   assert.equal(((await get(server, '/api/faults')).body.faults as unknown[]).length, 1)
 
   const otherRecipient = await sendResend(server, { from: 'a@acme.com', to: 'other@inbox.test', subject: 'Ok', text: 'Ok' })
@@ -139,4 +143,20 @@ test('magic addresses simulate ratelimit 429 and automatic webhooks, and autoWeb
   await server.close()
   assert.equal(received.length, 3)
   assert.deepEqual((received[2]!.body.data as { to: string[] }).to, ['flush@inbox.test'])
+})
+
+test('a fault keeps the content type it was given, in any case', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  await server.app.request(
+    '/api/faults',
+    json({ status: 500, headers: { 'Content-Type': 'text/xml' }, body: '<Error>boom</Error>' }, { 'content-type': 'application/json' }),
+  )
+  const failed = await server.app.request(
+    '/emails',
+    json({ from: 'a@acme.com', to: 'xml@inbox.test', subject: 'X', text: 'X' }, { authorization: 'Bearer re_x', 'content-type': 'application/json' }),
+  )
+  assert.equal(failed.status, 500)
+  assert.equal(failed.headers.get('content-type'), 'text/xml')
+  assert.equal(await failed.text(), '<Error>boom</Error>')
 })

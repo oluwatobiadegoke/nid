@@ -52,7 +52,7 @@ async function renderHtmlPreview(store: Store, projectId: string, message: Messa
     if (!attachment) continue
     const dataUrl = `data:${attachment.contentType};base64,${Buffer.from(attachment.content).toString('base64')}`
     const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    html = html.replace(new RegExp(`cid:${escaped}`, 'gi'), dataUrl)
+    html = html.replace(new RegExp(`cid:${escaped}(?=["'\\s)>]|$)`, 'gi'), () => dataUrl)
   }
   return html
 }

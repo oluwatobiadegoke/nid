@@ -37,18 +37,24 @@ export interface MagicMatch {
 
 const magicDomain = 'inbox.test'
 
+const magicNames: Array<[RegExp, MagicAction]> = [
+  [/^ratelimit(?:\+|$)/, 'ratelimit'],
+  [/^bounce(?:\+|$)/, 'bounced'],
+  [/^defer(?:\+|$)/, 'deferred'],
+  [/^complain(?:\+|$)/, 'complained'],
+]
+
+function magicMatch(address: string): MagicMatch | null {
+  const recipient = address.trim().toLowerCase()
+  const at = recipient.lastIndexOf('@')
+  if (recipient.slice(at + 1) !== magicDomain) return null
+  const action = magicNames.find(([pattern]) => pattern.test(recipient.slice(0, at)))?.[1]
+  return action ? { action, recipient } : null
+}
+
 export function magicMatchFor(recipients: string[]): MagicMatch | null {
-  for (const address of recipients) {
-    const normalized = address.trim().toLowerCase()
-    const at = normalized.lastIndexOf('@')
-    if (normalized.slice(at + 1) !== magicDomain) continue
-    const local = normalized.slice(0, at)
-    if (/^ratelimit(?:\+|$)/.test(local)) return { action: 'ratelimit', recipient: normalized }
-    if (/^bounce(?:\+|$)/.test(local)) return { action: 'bounced', recipient: normalized }
-    if (/^defer(?:\+|$)/.test(local)) return { action: 'deferred', recipient: normalized }
-    if (/^complain(?:\+|$)/.test(local)) return { action: 'complained', recipient: normalized }
-  }
-  return null
+  const matches = recipients.map(magicMatch).filter((m) => m !== null)
+  return matches.find((m) => m.action === 'ratelimit') ?? matches[0] ?? null
 }
 
 export function magicActionFor(recipients: string[]): MagicAction | null {

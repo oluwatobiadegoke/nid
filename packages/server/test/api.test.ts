@@ -371,3 +371,24 @@ test('a stream resumed with an id from before a restart still delivers new mail'
   assert.ok(seen.includes('"cursor":0'))
   assert.ok(seen.includes('"subject":"After restart"'))
 })
+
+test('the html preview fills each inline image, even when one content id starts with another', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const image = (name: string, bytes: string) => ({
+    filename: `${name}.png`,
+    content: Buffer.from(bytes).toString('base64'),
+    content_type: 'image/png',
+    content_id: name,
+  })
+  await sendResend(server, {
+    ...base,
+    subject: 'Two logos',
+    html: '<img src="cid:logo"><img src="cid:logo-dark">',
+    attachments: [image('logo', 'light'), image('logo-dark', 'dark')],
+  })
+  const id = ((await get(server, '/api/messages')).body.messages as Array<{ id: number }>)[0]!.id
+  const html = await (await server.app.request(`/api/messages/${id}/html`)).text()
+  const data = (bytes: string) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+  assert.equal(html, `<img src="${data('light')}"><img src="${data('dark')}">`)
+})

@@ -60,7 +60,7 @@ Holds the request open until a message that matches arrives, then returns the ol
 | `to` | Yes | Recipient address. |
 | `after` | No | Only messages with an id greater than this. Without it, any message matches, including old ones. |
 | `subject` | No | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
-| `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `has_code` | No | Skip messages with no extracted code. |
 | `code_pattern` | No | A regular expression, run without case, over the subject, plain text and HTML turned into text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
 | `timeout` | No | Seconds to wait, from 0 to 120. Default 30. |
@@ -91,7 +91,7 @@ Lists messages, newest first.
 | --- | --- |
 | `to` | Recipient address. |
 | `subject` | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
-| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `after` | Only messages with an id greater than this. |
 | `has_code` | Only messages with an extracted code. |
 | `limit` | How many, from 1 to 500. Default 50. |
@@ -130,7 +130,7 @@ Sends the webhook the message's provider would send to your app, signed the prov
 {"type": "bounced", "recipient": "ada@inbox.test", "reason": "Mailbox full"}
 ```
 
-`type` is `delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`. Optional `recipient` overrides which recipient address is named (defaults to the first `to` address). Optional `url` overrides the link in `clicked` events, and optional `reason` overrides the bounce or deferral reason. The URL and secret come from `NID_<PROVIDER>_WEBHOOK_URL` and `NID_<PROVIDER>_WEBHOOK_SECRET`. See [Test your webhook handler](../how-to/test-webhooks.md) and the [payloads](providers.md#webhooks).
+`type` is `delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`. Optional `recipient` overrides which recipient address is named. Without it, the event names the first `to` address, and a Resend event names every `to` address. Optional `url` overrides the link in `clicked` events, and optional `reason` overrides the bounce or deferral reason. The URL and secret come from `NID_<PROVIDER>_WEBHOOK_URL` and `NID_<PROVIDER>_WEBHOOK_SECRET`. See [Test your webhook handler](../how-to/test-webhooks.md) and the [payloads](providers.md#webhooks).
 
 Returns `200` with your app's answer, whatever status your app gave:
 
@@ -183,7 +183,7 @@ Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) o
 | --- | --- | --- |
 | `provider` | any provider | Limit the rule to one provider, such as `resend` or `ses`. |
 | `to` | any recipient | Limit the rule to one recipient address. |
-| `status` | `500` (or `200` when only `delayMs` is set) | HTTP status to return (`100` to `599`). Statuses `400` and above also record a rejection. |
+| `status` | `500` (or `200` when only `delayMs` is set) | HTTP status to return (`200` to `599`). Statuses `400` and above also record a rejection. With a status below `300`, nid waits for `delayMs` and then handles the send as usual. |
 | `body` | `{"error": "Simulated fault (<status>)"}` | Response body to return. |
 | `headers` | `{}` | Extra response headers, such as `retry-after`. |
 | `delayMs` | `0` | Milliseconds to wait before answering (`0` to `30000`). |
@@ -235,7 +235,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | Field | Type | What it is |
 | --- | --- | --- |
 | `id` | integer | nid's id. Use it as a cursor. |
-| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `providerId` | string | The id nid returned to your app, in the provider's format. |
 | `from` | string | Sender, such as `Acme <hello@acme.com>`. |
 | `replyTo` | string[] | Reply-to addresses. |
