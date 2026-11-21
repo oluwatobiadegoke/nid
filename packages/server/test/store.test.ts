@@ -140,8 +140,10 @@ for (const driver of drivers) {
     assert.deepEqual((await store.listRejections('default', { to: 'z@y.co' })).map((r) => r.to), [['z@y.co']])
     assert.equal(await store.deleteRejections('default', 'z@y.co'), 1)
     assert.deepEqual((await store.listRejections('default', {})).map((r) => r.provider), ['resend'])
+    await store.insertRejection('other', { provider: 'resend', to: ['x@y.co'], status: 422, error: 'kept', raw: '{}' })
     assert.equal(await store.deleteRejections('default'), 1)
     assert.deepEqual(await store.listRejections('default', {}), [])
+    assert.equal((await store.listRejections('other', { to: 'x@y.co' })).length, 1)
     await store.close()
   })
 

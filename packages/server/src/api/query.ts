@@ -42,8 +42,8 @@ export const streamQuery = z.strictObject({
 
 function canBeHeaders(headers: Record<string, string>): boolean {
   try {
-    new Headers(headers)
-    return true
+    const names = [...new Headers(headers).keys()]
+    return !names.includes('content-length') && !names.includes('transfer-encoding')
   } catch {
     return false
   }
@@ -56,7 +56,7 @@ export const faultBodySchema = z.strictObject({
   body: z.unknown().optional(),
   headers: z
     .record(z.string(), z.string())
-    .refine(canBeHeaders, 'Each header needs a valid name and value')
+    .refine(canBeHeaders, 'Each header needs a valid name and value, and cannot be content-length or transfer-encoding')
     .optional(),
   delayMs: z.number().int().min(0).max(30_000).optional(),
   count: z.number().int().min(1).nullable().optional(),

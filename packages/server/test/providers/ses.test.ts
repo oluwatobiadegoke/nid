@@ -69,6 +69,21 @@ test('SES v2 simple email returns MessageId and extracts code and link', async (
   assert.deepEqual(stored.replyTo, ['help@acme.com'])
   assert.equal(stored.headers['X-Custom'], '1')
   assert.equal(stored.meta.configurationSet, 'auth-cfg')
+
+  const withFile = await sendV2(server, {
+    FromEmailAddress: 'hello@acme.com',
+    Destination: { ToAddresses: ['file@inbox.test'] },
+    Content: {
+      Simple: {
+        Subject: { Data: 'Invoice' },
+        Body: { Text: { Data: 'Attached' } },
+        Attachments: [{ FileName: 'invoice.txt', ContentType: 'text/plain', RawContent: Buffer.from('total 42').toString('base64') }],
+      },
+    },
+  })
+  assert.equal(withFile.status, 200)
+  const fileMessage = (await server.store.listMessages('default', { to: 'file@inbox.test' }))[0]!
+  assert.deepEqual(fileMessage.attachments.map((a) => [a.filename, a.contentType, a.size]), [['invoice.txt', 'text/plain', 8]])
   assert.deepEqual(stored.meta.tags, [{ name: 'flow', value: 'signin' }])
 })
 

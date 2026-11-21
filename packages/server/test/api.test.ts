@@ -378,7 +378,7 @@ test('the html preview fills each inline image, even when one content id starts 
   const image = (name: string, bytes: string) => ({
     filename: `${name}.png`,
     content: Buffer.from(bytes).toString('base64'),
-    content_type: 'image/png',
+    content_type: `image/png; name="${name}.png"`,
     content_id: name,
   })
   await sendResend(server, {

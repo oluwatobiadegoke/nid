@@ -50,7 +50,8 @@ async function renderHtmlPreview(store: Store, projectId: string, message: Messa
     if (!cleanId) continue
     const attachment = await store.getAttachment(projectId, message.id, info.n)
     if (!attachment) continue
-    const dataUrl = `data:${attachment.contentType};base64,${Buffer.from(attachment.content).toString('base64')}`
+    const mediaType = attachment.contentType.split(';')[0]!.replace(/[^\w.+/-]/g, '') || 'application/octet-stream'
+    const dataUrl = `data:${mediaType};base64,${Buffer.from(attachment.content).toString('base64')}`
     const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     html = html.replace(new RegExp(`cid:${escaped}(?=["'\\s)>]|$)`, 'gi'), () => dataUrl)
   }
