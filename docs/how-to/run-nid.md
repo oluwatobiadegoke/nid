@@ -14,6 +14,16 @@ npx nid-inbox serve
 
 Stop it with Ctrl+C.
 
+## Run your app with nid
+
+To start nid and your Node.js app in one command with provider requests redirected automatically, use `nid run`:
+
+```sh
+npx nid-inbox run -- npm run dev
+```
+
+nid stops when your app exits. See [Point your app at nid](connect-your-app.md#zero-code-setup-for-nodejs-nid-run) for how interception works.
+
 ## Add it to a project
 
 Use this when your tests start nid, so everyone on the team gets the same version.

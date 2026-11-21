@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
@@ -12,19 +15,30 @@ const help = `nid ${version}
 
 Usage:
   nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
+  nid run [serve options] [--url <url>] -- <command...>
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
   nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked>
   nid mcp
   nid healthcheck
 
-Options for read, clear, webhook, mcp and healthcheck:
+Options for read, clear, webhook, mcp, healthcheck and run:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
-  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB
+  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT
   NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
+
+const serverOptionConfig = {
+  port: { type: 'string', default: process.env.NID_PORT ?? String(defaultPort) },
+  'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
+  host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
+  db: { type: 'string', default: process.env.NID_DB },
+  cors: { type: 'boolean', default: false },
+  'allow-host': { type: 'string', multiple: true, default: [] as string[] },
+  quiet: { type: 'boolean', default: false },
+} as const
 
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`)
@@ -46,19 +60,15 @@ async function api(url: string, path: string, init: RequestInit = {}): Promise<R
   }
 }
 
-async function serve(args: string[]) {
-  const { values } = parseArgs({
-    args,
-    options: {
-      port: { type: 'string', default: process.env.NID_PORT ?? String(defaultPort) },
-      'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
-      host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
-      db: { type: 'string', default: process.env.NID_DB },
-      cors: { type: 'boolean', default: false },
-      'allow-host': { type: 'string', multiple: true, default: [] },
-      quiet: { type: 'boolean', default: false },
-    },
-  })
+async function startServer(values: {
+  port: string
+  'smtp-port': string
+  host: string
+  db?: string | undefined
+  cors: boolean
+  'allow-host': string[]
+  quiet: boolean
+}) {
   const [{ createServer }, { providers }] = await Promise.all([
     import('./server.js'),
     import('./providers/index.js'),
@@ -106,12 +116,89 @@ async function serve(args: string[]) {
       ].join('\n'),
     )
   }
+  return { server, listening }
+}
+
+async function serve(args: string[]) {
+  const { values } = parseArgs({ args, options: serverOptionConfig })
+  const { server } = await startServer(values)
   const stop = async () => {
     await server.close()
     process.exit(0)
   }
   process.once('SIGINT', stop)
   process.once('SIGTERM', stop)
+}
+
+function resolveInterceptPath(): string {
+  const jsPath = fileURLToPath(new URL('./intercept.js', import.meta.url))
+  if (existsSync(jsPath)) return jsPath
+  return fileURLToPath(new URL('./intercept.ts', import.meta.url))
+}
+
+async function run(args: string[]) {
+  const dashDash = args.indexOf('--')
+  if (dashDash === -1) fail('Usage: nid run [options] -- <command...>')
+  const nidArgs = args.slice(0, dashDash)
+  const commandArgs = args.slice(dashDash + 1)
+  const { values } = parseArgs({
+    args: nidArgs,
+    options: {
+      ...serverOptionConfig,
+      url: { type: 'string' },
+    },
+  })
+  const command = commandArgs[0]
+  if (!command) fail('Usage: nid run [options] -- <command...>')
+
+  let targetUrl: string
+  let serverToClose: { close(): Promise<void> } | null = null
+  if (values.url) {
+    targetUrl = baseUrl(values.url)
+  } else {
+    const started = await startServer(values)
+    serverToClose = started.server
+    targetUrl = started.listening.host === '0.0.0.0' ? `http://127.0.0.1:${started.listening.port}` : started.listening.url
+  }
+
+  const importFlag = `--import ${pathToFileURL(resolveInterceptPath()).href}`
+  const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
+  const nodeOptions = existingNodeOptions ? `${existingNodeOptions} ${importFlag}` : importFlag
+
+  const child = spawn(command, commandArgs.slice(1), {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      NID_URL: targetUrl,
+      RESEND_BASE_URL: targetUrl,
+      RESEND_API_URL: targetUrl,
+      NODE_OPTIONS: nodeOptions,
+    },
+  })
+
+  let interrupted = false
+  const forward = (signal: NodeJS.Signals) => {
+    interrupted = true
+    child.kill(signal)
+  }
+  process.on('SIGINT', forward)
+  process.on('SIGTERM', forward)
+
+  const exitCode = await new Promise<number>((resolve) => {
+    child.once('error', (err) => {
+      process.stderr.write(`nid: failed to start ${command}: ${err.message}\n`)
+      resolve(1)
+    })
+    child.once('exit', (code, signal) => {
+      if (code !== null) resolve(code)
+      else resolve(signal || interrupted ? 1 : 0)
+    })
+  })
+
+  process.off('SIGINT', forward)
+  process.off('SIGTERM', forward)
+  await serverToClose?.close()
+  process.exit(exitCode)
 }
 
 function printMessage(message: SerializedMessage, flags: { code: boolean; links: boolean; json: boolean }) {
@@ -232,6 +319,9 @@ const [command, ...rest] = process.argv.slice(2)
 switch (command) {
   case 'serve':
     await serve(rest)
+    break
+  case 'run':
+    await run(rest)
     break
   case 'read':
     await read(rest)

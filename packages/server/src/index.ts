@@ -23,6 +23,7 @@ export type { Ingest } from './ingest/index.js'
 export { hostAllowed } from './security/host.js'
 export { serializeMessage, serializeRejection } from './api/serialize.js'
 export type { SerializedMessage, SerializedRejection } from './api/serialize.js'
+export { installInterceptor, shouldInterceptHost } from './intercept-core.js'
 export { version } from './version.js'
 export type {
   Attachment,

@@ -1,10 +1,34 @@
 # Point your app at nid
 
-This guide shows how to send your app's email to nid instead of to your email provider. You change one setting. The rest of your app's code stays the same.
+This guide shows how to send your app's email to nid instead of to your email provider.
 
 Before you start, [run nid](run-nid.md). The examples assume it is on `http://127.0.0.1:4400` and SMTP port `1025`.
 
 Make this change only in your local and test settings. In production, your app should keep talking to the real provider.
+
+## Zero-code setup for Node.js (`nid run`)
+
+When your app runs on Node.js, start it with `nid run`. Nothing in your app or its SDK constructors needs to change:
+
+```sh
+npx nid-inbox run -- npm run dev
+```
+
+`nid run` starts nid and preloads `nid-inbox/intercept`, which redirects outbound requests to `api.resend.com`, `api.brevo.com`, `api.sendinblue.com`, `api.sendgrid.com`, `api.eu.sendgrid.com`, `api.postmarkapp.com`, `api.mailgun.net` and `api.eu.mailgun.net` to nid. It also sets `RESEND_BASE_URL` and `RESEND_API_URL`.
+
+If nid is already running in another terminal or container, pass `--url`:
+
+```sh
+npx nid-inbox run --url http://127.0.0.1:4400 -- npm run dev
+```
+
+You can also preload the hook directly with Node:
+
+```sh
+NID_URL=http://127.0.0.1:4400 NODE_OPTIONS="--import nid-inbox/intercept" npm run dev
+```
+
+If you use Docker, Python, Go or prefer explicit configuration, set your provider's base URL below instead.
 
 ## Resend
 

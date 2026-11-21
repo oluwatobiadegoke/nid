@@ -11,8 +11,10 @@ Run it with `npx nid-inbox <command>` when nid is not installed in your project,
 | Command | What it does |
 | --- | --- |
 | [`serve`](#nid-serve) | Starts the server. |
+| [`run`](#nid-run) | Starts nid and runs a command with provider requests redirected to nid. |
 | [`read`](#nid-read) | Lists or prints mail for an address. |
 | [`clear`](#nid-clear) | Deletes mail. |
+| [`webhook`](#nid-webhook) | Sends a provider webhook to your app. |
 | [`mcp`](#nid-mcp) | Serves nid's MCP tools over stdio, for AI agents. |
 | [`healthcheck`](#nid-healthcheck) | Checks that a server is answering. |
 | `help`, `--help`, `-h`, or no command | Prints usage. |
@@ -37,6 +39,20 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--quiet` | off | Prints nothing on start. |
 
 An option on the command line wins over the environment variable.
+
+## nid run
+
+Starts nid, injects `NID_URL`, `RESEND_BASE_URL`, `RESEND_API_URL` and `NODE_OPTIONS=--import ...`, and runs your command with outbound provider HTTP requests redirected to nid. When your command exits, nid stops and exits with the same code.
+
+```
+nid run [serve options] [--url <url>] -- <command...>
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--url <url>` | none | Talk to an already-running nid server instead of starting one. |
+
+All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command.
 
 ## nid read
 
