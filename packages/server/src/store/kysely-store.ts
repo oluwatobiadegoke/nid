@@ -142,6 +142,7 @@ export class KyselyStore implements Store {
       .where('provider', '=', provider)
       .where('provider_id', '=', providerId)
       .where((eb) => eb.or([eb('expires_at', 'is', null), eb('expires_at', '>', now)]))
+      .orderBy('id')
       .executeTakeFirst()
     if (!row) return null
     const [message] = await this.hydrate(projectId, [row])
