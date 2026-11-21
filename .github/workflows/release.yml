@@ -40,6 +40,19 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Push the tags that changeset publish created
         run: git push origin --tags
+      - name: Create a GitHub release for each new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for dir in packages/*; do
+            tag=$(node -p "const p = require('./$dir/package.json'); p.name + '@' + p.version")
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null || continue
+            gh release view "$tag" >/dev/null 2>&1 && continue
+            awk -v v="## ${tag##*@}" '$0 == v { f = 1; next } /^## / && f { exit } f' "$dir/CHANGELOG.md" > "$RUNNER_TEMP/notes.md"
+            latest=false
+            [ "$dir" = packages/server ] && latest=true
+            gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md" --latest="$latest"
+          done
 
   version:
     needs: release
