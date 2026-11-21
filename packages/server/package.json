@@ -1,6 +1,6 @@
 {
   "name": "nid-inbox",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Local email API, inbox, and webhook simulator for testing apps and AI agents.",
   "license": "Apache-2.0",
   "repository": {
