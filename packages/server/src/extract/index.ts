@@ -11,8 +11,7 @@ const windowAfter = 40
 const anchorPattern = /<a\b([^<>]*)>([\s\S]*?)(?:<\/a\s*>|(?=<a\b)|$)/gi
 const hrefPattern = /[\s"'/]href\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/i
 const imageExtensions = /\.(png|jpe?g|gif|svg|webp|bmp|ico)(\?|$)/i
-const allowedHrefScheme = /^(https?|mailto|tel):/i
-const httpScheme = /^https?:\/\//i
+const unsafeSchemes = ['javascript:', 'vbscript:', 'data:']
 
 function codePoint(value: number): string {
   return value <= 0x10ffff ? String.fromCodePoint(value) : '\ufffd'
@@ -88,7 +87,8 @@ function findLinks(html: string | null, text: string | null): Link[] {
   const seen = new Set<string>()
   const push = (href: string, label: string) => {
     const clean = trimUrl(decodeEntities(href.trim()))
-    if (!clean || !allowedHrefScheme.test(clean) || seen.has(clean)) return
+    if (!clean || seen.has(clean)) return
+    if (URL.canParse(clean) && unsafeSchemes.includes(new URL(clean).protocol)) return
     seen.add(clean)
     links.push({ href: clean, text: label.trim() })
   }
@@ -105,8 +105,8 @@ function findLinks(html: string | null, text: string | null): Link[] {
 }
 
 function isPrimaryLink(link: Link): boolean {
-  if (!httpScheme.test(link.href)) return false
   const href = link.href.toLowerCase()
+  if (href.startsWith('mailto:') || href.startsWith('tel:')) return false
   if (imageExtensions.test(href)) return false
   if (href.includes('unsubscribe') || link.text.toLowerCase().includes('unsubscribe')) return false
   return true

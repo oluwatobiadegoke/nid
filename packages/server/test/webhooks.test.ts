@@ -134,6 +134,15 @@ test('a route that redirects to a login page is reported as not delivered', asyn
   assert.deepEqual(app.received.map((r) => r.path), ['/hooks/brevo'])
 })
 
+test('a web page cannot make nid send a webhook with a plain-text form post', async (t) => {
+  const app = await fakeApp(t)
+  const running = await nid(t, { brevo: { url: app.url } })
+  await sendBrevo(running.server, { sender: { email: 'hello@acme.com' }, to: [{ email: 'ada@inbox.test' }], ...signIn, htmlContent: signIn.html })
+  const res = await running.server.app.request(`/api/messages/${await latestId(running)}/events`, json({ type: 'bounced' }, { 'content-type': 'text/plain;charset=UTF-8' }))
+  assert.equal(res.status, 415)
+  assert.deepEqual(app.received, [])
+})
+
 test('an app that is not running is reported, not hidden', async (t) => {
   const url = `http://localhost:${await closedPort()}/webhooks/brevo`
   const running = await nid(t, { brevo: { url } })
