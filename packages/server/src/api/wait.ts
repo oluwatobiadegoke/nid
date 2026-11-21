@@ -92,32 +92,32 @@ export async function waitForMessage(
     else buffered.push(match)
   })
 
+  const nextMatch = (ms: number) =>
+    new Promise<{ message: Message; code: string | null } | null>((resolve) => {
+      if (ms <= 0 || params.signal?.aborted) return resolve(null)
+      const finish = (value: { message: Message; code: string | null } | null) => {
+        clearTimeout(timer)
+        params.signal?.removeEventListener('abort', onAbort)
+        onMatch = null
+        resolve(value)
+      }
+      const onAbort = () => finish(null)
+      onMatch = finish
+      const timer = setTimeout(() => finish(null), ms)
+      params.signal?.addEventListener('abort', onAbort, { once: true })
+    })
+
   try {
     const existing = await findExisting(store, projectId, params)
     if (existing) {
       return { message: existing.message, code: existing.code, timedOut: false, arrived: [], rejections: [] }
     }
-    if (buffered.length > 0) {
+    const deadline = Date.now() + params.timeoutMs
+    while (true) {
       buffered.sort((a, b) => a.message.id - b.message.id)
-      const first = buffered[0]!
-      return { message: first.message, code: first.code, timedOut: false, arrived: [], rejections: [] }
-    }
-    if (params.timeoutMs > 0 && !params.signal?.aborted) {
-      const hit = await new Promise<{ message: Message; code: string | null } | null>((resolve) => {
-        let settled = false
-        const finish = (value: { message: Message; code: string | null } | null) => {
-          if (settled) return
-          settled = true
-          clearTimeout(timer)
-          params.signal?.removeEventListener('abort', onAbort)
-          onMatch = null
-          resolve(value)
-        }
-        const onAbort = () => finish(null)
-        onMatch = (match) => finish(match)
-        const timer = setTimeout(() => finish(null), params.timeoutMs)
-        params.signal?.addEventListener('abort', onAbort, { once: true })
-      })
+      const match = buffered.shift() ?? (await nextMatch(deadline - Date.now()))
+      if (!match) break
+      const hit = params.subject ? await findExisting(store, projectId, { ...params, after: match.message.id - 1 }) : match
       if (hit) return { message: hit.message, code: hit.code, timedOut: false, arrived: [], rejections: [] }
     }
     const arrived = await store.listMessages(projectId, { to: params.to, after: params.after, limit: 10 })
