@@ -17,7 +17,7 @@ const interceptedHosts = new Set([
   'api.eu.mailgun.net',
 ])
 
-const sesHostPattern = /^email(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws)$/i
+const sesHostPattern = /^email(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws|api\.amazonwebservices\.com\.cn)$/i
 
 const tlsOptionKeys = [
   'agent',

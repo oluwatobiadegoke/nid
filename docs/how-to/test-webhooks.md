@@ -50,7 +50,7 @@ When you [embed nid](embed-nid.md), pass `webhooks: { brevo: { url, secret } }` 
 
 Send an email from your app first, then send an event for it. The event goes to the route set for the provider that email came through.
 
-From a test, with the [client library](../reference/client.md#triggerwebhookid-type):
+From a test, with the [client library](../reference/client.md#triggerwebhookid-type-options):
 
 ```ts
 const email = await inbox.waitFor(address)

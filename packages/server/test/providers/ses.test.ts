@@ -256,3 +256,20 @@ test('SES extracts the stable access key id for auth hooks', async (t) => {
   assert.equal(seenValue, 'AKIAEXAMPLEKEY')
   assert.equal((await server.store.listMessages('ses-team', { to: 'a@inbox.test' }))[0]?.extracted.code, '102938')
 })
+
+test('SES v2 answers 400, not 500, when a destination list is not a list of strings', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const content = { Simple: { Subject: { Data: 's' }, Body: { Text: { Data: 't' } } } }
+  for (const ToAddresses of [123, [123], 'alice@inbox.test']) {
+    const res = await sendV2(server, { FromEmailAddress: 'a@acme.com', Destination: { ToAddresses }, Content: content })
+    assert.equal(res.status, 400, JSON.stringify(ToAddresses))
+  }
+  const bulk = await server.app.request('/v2/email/outbound-bulk-emails', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ BulkEmailEntries: [{ Destination: { ToAddresses: 123 } }] }),
+  })
+  assert.equal(bulk.status, 400)
+  assert.deepEqual((await server.store.listRejections('default', {})).flatMap((r) => r.to), [])
+})
