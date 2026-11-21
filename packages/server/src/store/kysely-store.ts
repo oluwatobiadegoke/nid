@@ -185,7 +185,7 @@ export class KyselyStore implements Store {
       )
     }
     if (query.subject) {
-      const escaped = query.subject.toLowerCase().replace(/[\\%_]/g, '\\$&')
+      const escaped = query.subject.replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/[\\%_]/g, '\\$&')
       q = q.where(sql<boolean>`lower(messages.subject) like ${'%' + escaped + '%'} escape '\\'`)
     }
     if (query.provider) q = q.where('messages.provider', '=', query.provider)
