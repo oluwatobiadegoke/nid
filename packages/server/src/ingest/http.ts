@@ -72,9 +72,9 @@ async function authenticate(
   ingest: Ingest,
 ): Promise<Project | Response> {
   const value = provider.credential(req)
-  if (!value) return send(c, provider.unauthorized())
+  if (!value) return send(c, provider.unauthorized(req))
   const project = await ingest.resolveProject({ kind: 'http', provider: provider.name, value })
-  if (!project) return send(c, provider.unauthorized())
+  if (!project) return send(c, provider.unauthorized(req))
   return project
 }
 
