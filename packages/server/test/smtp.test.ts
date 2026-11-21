@@ -57,6 +57,19 @@ test('a message over the size limit is refused and nid keeps taking mail', async
   assert.equal((await running.server.store.listMessages('default', { to: 'small@inbox.test' })).length, 1)
 })
 
+test('a send refused for no login is not reported as an error', async (t) => {
+  const errors: Error[] = []
+  const running = await start({ auth: () => null, onError: (err) => errors.push(err) })
+  t.after(() => running.close())
+  const transport = nodemailer.createTransport({ host: '127.0.0.1', port: running.smtpPort, secure: false })
+  t.after(() => transport.close())
+  await assert.rejects(
+    transport.sendMail({ from: 'a@acme.com', to: 'nologin@inbox.test', subject: 'Hi', text: 'Hi' }),
+    (err: { responseCode?: number }) => err.responseCode === 530,
+  )
+  assert.deepEqual(errors, [])
+})
+
 test('STARTTLS is not offered, so plain clients never try to upgrade', async (t) => {
   const running = await start()
   t.after(() => running.close())

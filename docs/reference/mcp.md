@@ -17,11 +17,14 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `new_address` | `prefix` (optional) | `address`, a fresh address such as `signup.974487fb@inbox.test`, and `cursor`, the newest message id. |
+| `new_address` | `prefix` (optional), `domain` (optional) | `address`, a fresh address such as `signup.974487fb@inbox.test`, and `cursor`, the newest message id. |
 | `wait_for_email` | `to`, and optional `after`, `subject`, `has_code`, `code_pattern`, `timeout` | The next email to `to` after the cursor: `id`, `from`, `to`, `subject`, `receivedAt`, `code`, `link`, `cc`, `links` and `text`. |
 | `get_code` | `to` | `code`, `id` and `subject` of the newest email to `to` that has a code. |
 | `get_links` | `to` | `link`, `links`, `id` and `subject` of the newest email to `to`. |
+| `get_message` | `id` | Full message details, including `headers`, `meta`, `attachments` and webhook `events`. |
 | `list_messages` | `to` (optional), `limit` (optional, 1 to 100, default 20) | Emails newest first, each with `id`, `from`, `to`, `subject`, `receivedAt`, `code` and `link`. |
+| `list_rejections` | `to` (optional), `limit` (optional, 1 to 100, default 20) | Refused sends newest first, with `id`, `provider`, `to`, `status`, `error` and `createdAt`. |
+| `trigger_webhook` | `id`, `type`, optional `recipient`, `url`, `reason` | Sends the provider's signed webhook for the message and returns your app's response. |
 | `clear` | `to` (optional) | `deleted`, how many emails it deleted. Without `to`, it deletes every email. |
 
 `wait_for_email` takes the same filters as [`GET /api/wait`](read-api.md#get-apiwait):
@@ -37,6 +40,6 @@ Every tool answers with JSON as text. When it cannot answer, such as when no ema
 
 `text` is the email's text part. When the email has only HTML, `text` is the HTML with its tags removed.
 
-Every tool except `clear` is marked read-only, and `clear` is marked destructive. An agent may still ask you before each call. See [Let an AI agent read your mail](../how-to/connect-an-ai-agent.md) for how to stop Claude Code asking.
+Every tool except `trigger_webhook` and `clear` is marked read-only; `trigger_webhook` and `clear` are marked destructive. An agent may still ask you before each call. See [Let an AI agent read your mail](../how-to/connect-an-ai-agent.md) for how to stop Claude Code asking.
 
-When an agent cancels a wait, `nid mcp` stops it at once. Over HTTP, nid keeps waiting until the timeout, because each request stands alone.
+When an agent cancels a wait, `nid mcp` stops waiting at once, and disconnecting from HTTP `/mcp` stops that client's wait at once.

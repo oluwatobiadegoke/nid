@@ -25,7 +25,7 @@ Run it with `npx nid-inbox <command>` when nid is not installed in your project,
 Starts the HTTP server (provider APIs, read API and web view) and the SMTP server. It runs until it gets Ctrl+C (`SIGINT`) or `SIGTERM`.
 
 ```
-nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name] [--quiet]
+nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name] [--auto-webhook event] [--token secret] [--quiet]
 ```
 
 | Option | Default | What it does |
@@ -36,13 +36,15 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--db <path>` | none, or `NID_DB` | SQLite file to keep mail in. Without it, mail is kept in memory (up to 5,000 messages and 1,000 rejections per project) and lost when nid stops. |
 | `--cors <origin>` | none | Lets web pages from this origin, such as `http://localhost:3000`, call nid. Repeat it for more origins. See [Security](../explanation/security.md). |
 | `--allow-host <name>` | none | Accepts requests whose `Host` header is this name. Repeat it for more names. See [Security](../explanation/security.md). |
+| `--auto-webhook <event>` | none, or `NID_AUTO_WEBHOOK` | Automatically sends this webhook event (`delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`) after each send when a webhook URL is configured. |
+| `--token <secret>` | none, or `NID_AUTH_TOKEN` | Requires this token on provider APIs, SMTP logins, MCP and the read API. The token cannot be empty or contain spaces. It also turns off the [magic addresses](../how-to/test-webhooks.md#automatic-webhooks-and-magic-addresses). See [Security](../explanation/security.md). |
 | `--quiet` | off | Prints nothing on start. |
 
 An option on the command line wins over the environment variable.
 
 ## nid run
 
-Starts nid, injects `NID_URL`, `RESEND_BASE_URL`, `RESEND_API_URL` and `NODE_OPTIONS=--import ...`, and runs your command with outbound provider HTTP requests redirected to nid. When your command exits, nid stops and exits with the same code.
+Starts nid, injects `NID_URL`, `RESEND_BASE_URL`, `RESEND_API_URL`, `AWS_ENDPOINT_URL_SESV2`, `AWS_ENDPOINT_URL_SES` and `NODE_OPTIONS=--import ...`, and runs your command with outbound provider HTTP requests redirected to nid. When your command exits, nid stops and exits with the same code.
 
 ```
 nid run [serve options] [--url <url>] -- <command...>
@@ -55,6 +57,8 @@ nid run [serve options] [--url <url>] -- <command...>
 All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command. `nid run` prints its start lines to standard error, so your command's output stays its own.
 
 On Windows, `nid run` starts programs such as `node` directly. To start a command that is a `.cmd` file, such as `npm`, `pnpm` or `npx`, run it through `cmd`: `nid run -- cmd /c npm run dev`.
+
+With `--token` or `NID_AUTH_TOKEN`, `nid run` also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup. Your app must still send with the token: set its provider API key, its SES access key id or its SMTP username to the token, or nid refuses the send.
 
 ## nid read
 

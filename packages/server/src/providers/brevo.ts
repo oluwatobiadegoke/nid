@@ -171,7 +171,7 @@ const webhookTypes: Record<WebhookEvent, string> = {
   clicked: 'click',
 }
 
-function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
+function webhook({ message: m, event, recipient, secret, now, url, reason }: WebhookInput) {
   const seconds = Math.floor(now.getTime() / 1000)
   const payload: Record<string, unknown> = {
     event: webhookTypes[event],
@@ -188,9 +188,9 @@ function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
   }
   const custom = findHeader(m.headers, 'x-mailin-custom')
   if (custom !== null) payload['X-Mailin-custom'] = custom
-  if (event === 'bounced') payload.reason = bounceReason
-  if (event === 'deferred') payload.reason = deferReason
-  if (event === 'clicked') payload.link = m.extracted.link ?? ''
+  if (event === 'bounced') payload.reason = reason ?? bounceReason
+  if (event === 'deferred') payload.reason = reason ?? deferReason
+  if (event === 'clicked') payload.link = url ?? m.extracted.link ?? ''
   return { body: JSON.stringify(payload), headers: secret ? { authorization: `Bearer ${secret}` } : {} }
 }
 

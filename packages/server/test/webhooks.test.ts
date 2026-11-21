@@ -158,7 +158,7 @@ test('a webhook URL without http://, or a misspelled provider, stops nid at star
   await assert.rejects(createServer({ webhooks: { brevo: { url: '127.0.0.1:3000/api/webhooks/brevo' } } }), /NID_BREVO_WEBHOOK_URL/)
   await assert.rejects(
     createServer({ webhooks: { Brevo: { url: 'http://127.0.0.1:3000/api/webhooks/brevo' } } }),
-    /webhooks\.Brevo names no provider that sends webhooks\. Use resend, brevo, sendgrid, postmark, mailgun\./,
+    /webhooks\.Brevo names no provider that sends webhooks\. Use resend, brevo, sendgrid, postmark, mailgun, ses\./,
   )
 })
 
@@ -197,6 +197,18 @@ test('a Resend webhook passes the Resend SDK signature check', async (t) => {
   assert.equal(bounced.body.appStatus, 200)
   const afterBounce = await running.server.app.request(`/emails/${sent.body.id}`, { headers: { authorization: 'Bearer re_x' } })
   assert.equal(((await afterBounce.json()) as { last_event: string }).last_event, 'bounced')
+
+  const customRecipient = await running.server.app.request(
+    `/api/messages/${await latestId(running)}/events`,
+    json({ type: 'bounced', recipient: 'override@inbox.test' }, { 'content-type': 'application/json' }),
+  )
+  assert.equal(customRecipient.status, 200)
+  const overrideEvent = JSON.parse(app.received[3]?.body ?? '')
+  assert.deepEqual(overrideEvent.data.to, ['override@inbox.test'])
+
+  await sendResend(running.server, { from: 'hello@acme.com', to: ['one@inbox.test', 'two@inbox.test'], ...signIn })
+  assert.equal((await trigger(running, await latestId(running), 'delivered')).body.appStatus, 200)
+  assert.deepEqual(JSON.parse(app.received[4]?.body ?? '').data.to, ['one@inbox.test', 'two@inbox.test'])
 
   const wrong = await nid(t, { resend: { url: app.url, secret: `whsec_${Buffer.from('another-secret').toString('base64')}` } })
   await sendResend(wrong.server, { from: 'hello@acme.com', to: 'ada@inbox.test', ...signIn })
@@ -305,4 +317,61 @@ test('nid says what to set when it cannot send a webhook', async (t) => {
   const smtp = await trigger(running, await latestId(running), 'bounced')
   assert.equal(smtp.status, 400)
   assert.match(String(smtp.body.error), /over smtp has no webhooks/)
+})
+
+test('SES webhooks, custom recipient/url/reason overrides, and delivery history work end-to-end', async (t) => {
+  const app = await fakeApp(t, () => ({ status: 202, body: '{"recorded":true}' }))
+  const running = await nid(t, { ses: { url: `${app.url}/ses`, secret: 'ses-hook-secret' } })
+  const sentRes = await running.server.app.request(
+    '/v2/email/outbound-emails',
+    json(
+      {
+        FromEmailAddress: 'hello@acme.com',
+        Destination: { ToAddresses: ['first@inbox.test', 'second@inbox.test'] },
+        EmailTags: [{ Name: 'flow', Value: 'reset' }],
+        Content: { Simple: { Subject: { Data: signIn.subject }, Body: { Html: { Data: signIn.html } } } },
+      },
+      {
+        authorization: 'AWS4-HMAC-SHA256 Credential=test/20261121/us-east-1/ses/aws4_request',
+        'content-type': 'application/json',
+      },
+    ),
+  )
+  const sent = (await sentRes.json()) as { MessageId: string }
+  const id = await latestId(running)
+
+  const bounceRes = await running.server.app.request(
+    `/api/messages/${id}/events`,
+    json(
+      { type: 'bounced', recipient: 'second@inbox.test', reason: 'Mailbox full' },
+      { 'content-type': 'application/json' },
+    ),
+  )
+  assert.equal(bounceRes.status, 200)
+  const bounceBody = JSON.parse(app.received[0]?.body ?? '')
+  assert.equal(app.received[0]?.headers.authorization, 'Bearer ses-hook-secret')
+  assert.equal(bounceBody.eventType, 'Bounce')
+  assert.equal(bounceBody.mail.messageId, sent.MessageId)
+  assert.deepEqual(bounceBody.mail.tags, { flow: ['reset'] })
+  assert.equal(bounceBody.bounce.bouncedRecipients[0].emailAddress, 'second@inbox.test')
+  assert.equal(bounceBody.bounce.bouncedRecipients[0].diagnosticCode, 'Mailbox full')
+
+  await running.server.app.request(
+    `/api/messages/${id}/events`,
+    json({ type: 'clicked', url: 'https://custom.acme.com/next' }, { 'content-type': 'application/json' }),
+  )
+  const clickBody = JSON.parse(app.received[1]?.body ?? '')
+  assert.equal(clickBody.eventType, 'Click')
+  assert.equal(clickBody.click.link, 'https://custom.acme.com/next')
+
+  const history = await running.server.app.request(`/api/messages/${id}/events`)
+  assert.equal(history.status, 200)
+  const { events } = (await history.json()) as { events: Array<{ event: string; recipient: string; appStatus: number }> }
+  assert.deepEqual(
+    events.map((e) => [e.event, e.recipient, e.appStatus]),
+    [
+      ['bounced', 'second@inbox.test', 202],
+      ['clicked', 'first@inbox.test', 202],
+    ],
+  )
 })

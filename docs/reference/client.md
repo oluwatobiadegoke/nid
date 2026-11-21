@@ -20,7 +20,7 @@ Returns a new `Inbox`. Same as `new Inbox(options)`.
 | Option | Default | What it does |
 | --- | --- | --- |
 | `url` | `NID_URL`, then `http://127.0.0.1:4400` | Server to read from. |
-| `token` | `NID_TOKEN` | Sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
+| `token` | `NID_TOKEN` | Sent as `Authorization: Bearer <token>`. Only needed when the server uses `--token` or a custom `auth` function. |
 | `domain` | `NID_DOMAIN`, then `inbox.test` | Domain for `address()`. |
 | `fetch` | The global `fetch` | A `fetch` to use instead, for example in tests of the client itself. |
 
@@ -65,7 +65,7 @@ Waits for the next message to `address` that matches, and returns it as an `Emai
 | --- | --- |
 | `after` | Only messages with an id greater than this. Overrides the remembered cursor. |
 | `subject` | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
-| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `hasCode` | Skip messages with no code. |
 | `codePattern` | A `RegExp` or string. Skips messages it does not match. Its first group, or the whole match, becomes `code`. Flags on a `RegExp` are dropped; matching ignores case. |
 | `timeout` | Seconds to wait, from 0 to 120. Default 30. |
@@ -95,9 +95,29 @@ Returns refused sends as `Rejection[]`, newest first. With `to`, only those addr
 
 Deletes mail for `address`, or every message when you leave it out. Also forgets the matching cursors. Returns how many messages it deleted.
 
-### triggerWebhook(id, type)
+### delete(id)
 
-Sends the provider's webhook for message `id` to your app and returns your app's answer as `{ url, delivered, appStatus, appBody, durationMs, error? }`. `type` is `'delivered'`, `'deferred'`, `'bounced'`, `'complained'`, `'opened'` or `'clicked'`. A 4xx or 5xx from your app is not an error: check `delivered` or `appStatus`. It throws `InboxError` when nid cannot send it, for example when no webhook URL is set. See [Test your webhook handler](../how-to/test-webhooks.md).
+Deletes one message by `id`. Throws `InboxError` if the message does not exist.
+
+### clearRejections(address?)
+
+Deletes refused sends for `address`, or all rejections when omitted. Returns how many rejections it deleted.
+
+### events(id)
+
+Returns the recorded webhook delivery attempts (`WebhookDelivery[]`) for message `id`.
+
+### triggerWebhook(id, type, options?)
+
+Sends the provider's webhook for message `id` to your app and returns your app's answer as `{ url, delivered, appStatus, appBody, durationMs, error? }`. `type` is `'delivered'`, `'deferred'`, `'bounced'`, `'complained'`, `'opened'` or `'clicked'`. Pass optional `{ recipient, url, reason }` to override the recipient address, clicked link or bounce/defer reason. A 4xx or 5xx from your app is not an error: check `delivered` or `appStatus`. It throws `InboxError` when nid cannot send it, for example when no webhook URL is set. See [Test your webhook handler](../how-to/test-webhooks.md).
+
+### failNext(rule)
+
+Adds a fault or latency rule on the server (`POST /api/faults`) and returns the created `FaultRule`. Useful for testing provider `429` rate limits, `500`/`503` retries, or timeouts.
+
+### clearFaults()
+
+Clears all active fault rules on the server and returns how many were removed.
 
 ## Email
 

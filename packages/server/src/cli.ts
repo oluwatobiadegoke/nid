@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
@@ -12,7 +13,7 @@ const defaultHost = '127.0.0.1'
 const help = `nid ${version}
 
 Usage:
-  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name]
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name] [--auto-webhook event] [--token secret]
   nid run [serve options] [--url <url>] -- <command...>
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
@@ -26,7 +27,7 @@ Options for read, clear, webhook, mcp and healthcheck:
 nid run starts its own nid unless you pass --url.
 
 Environment:
-  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT
+  NID_URL, NID_TOKEN, NID_AUTH_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK
   NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
 
@@ -37,12 +38,22 @@ const serverOptionConfig = {
   db: { type: 'string', default: process.env.NID_DB },
   cors: { type: 'string', multiple: true, default: [] as string[] },
   'allow-host': { type: 'string', multiple: true, default: [] as string[] },
+  'auto-webhook': { type: 'string', default: process.env.NID_AUTO_WEBHOOK },
+  token: { type: 'string', default: process.env.NID_AUTH_TOKEN },
   quiet: { type: 'boolean', default: false },
 } as const
 
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`)
   process.exit(code)
+}
+
+function tokenFrom(value: string | undefined): string | undefined {
+  const token = value?.trim()
+  if (value !== undefined && (!token || /\s/.test(token))) {
+    fail('The token must not be empty or contain spaces. Check --token and NID_AUTH_TOKEN.')
+  }
+  return token
 }
 
 function baseUrl(value: string | undefined): string {
@@ -60,6 +71,14 @@ async function api(url: string, path: string, init: RequestInit = {}): Promise<R
   }
 }
 
+function createTokenAuth(expected: string) {
+  const expectedHash = createHash('sha256').update(expected).digest()
+  return (credential: { value: string }) => {
+    const actualHash = createHash('sha256').update(credential.value).digest()
+    return timingSafeEqual(expectedHash, actualHash) ? { projectId: 'default', plan: 'local' } : null
+  }
+}
+
 async function startServer(values: {
   port: string
   'smtp-port': string
@@ -67,12 +86,23 @@ async function startServer(values: {
   db?: string | undefined
   cors: string[]
   'allow-host': string[]
+  'auto-webhook'?: string | undefined
+  token?: string | undefined
   quiet: boolean
 }, banner: NodeJS.WriteStream = process.stdout) {
-  const [{ createServer }, { providers }] = await Promise.all([
+  const [{ createServer }, { providers }, { webhookEvents }] = await Promise.all([
     import('./server.js'),
     import('./providers/index.js'),
+    import('./providers/types.js'),
   ])
+  let autoWebhook: (typeof webhookEvents)[number] | undefined
+  if (values['auto-webhook']) {
+    if (!webhookEvents.includes(values['auto-webhook'] as (typeof webhookEvents)[number])) {
+      fail(`--auto-webhook must be one of ${webhookEvents.join(', ')}`)
+    }
+    autoWebhook = values['auto-webhook'] as (typeof webhookEvents)[number]
+  }
+  const token = tokenFrom(values.token)
   let store
   if (values.db) {
     const { createSqliteStore } = await import('./store/index.js')
@@ -87,9 +117,11 @@ async function startServer(values: {
   )
   const server = await createServer({
     ...(store ? { store } : {}),
+    ...(token ? { auth: createTokenAuth(token) } : {}),
     cors: values.cors,
     allowHosts: values['allow-host'],
     webhooks,
+    ...(autoWebhook ? { autoWebhook } : {}),
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   }).catch((err: Error) => fail(err.message))
   const listening = await server
@@ -119,6 +151,8 @@ async function startServer(values: {
           shown.password = ''
           return `  webhooks    ${name} to ${shown.href}`
         }),
+        ...(autoWebhook ? [`  auto        ${autoWebhook} webhook after each send`] : []),
+        ...(token ? ['  auth        token required'] : []),
         `  mail is ${where}`,
         '',
       ].join('\n'),
@@ -155,6 +189,7 @@ async function run(args: string[]) {
 
   let targetUrl: string
   let serverToClose: { close(): Promise<void> } | null = null
+  const childToken = tokenFrom(values.token)
   if (values.url) {
     targetUrl = baseUrl(values.url)
   } else {
@@ -173,8 +208,11 @@ async function run(args: string[]) {
     env: {
       ...process.env,
       NID_URL: targetUrl,
+      ...(childToken ? { NID_TOKEN: childToken } : {}),
       RESEND_BASE_URL: targetUrl,
       RESEND_API_URL: targetUrl,
+      AWS_ENDPOINT_URL_SESV2: targetUrl,
+      AWS_ENDPOINT_URL_SES: targetUrl,
       NODE_OPTIONS: nodeOptions,
     },
   })

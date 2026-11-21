@@ -209,7 +209,7 @@ const webhookTypes: Record<WebhookEvent, string> = {
   clicked: 'clicked',
 }
 
-function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
+function webhook({ message: m, event, recipient, secret, now, url, reason }: WebhookInput) {
   const key = webhookSecret(secret, name, 'Mailgun')
   const timestamp = String(Math.floor(now.getTime() / 1000))
   const token = randomBytes(25).toString('hex')
@@ -226,12 +226,12 @@ function webhook({ message: m, event, recipient, secret, now }: WebhookInput) {
   }
   if (event === 'delivered') data['delivery-status'] = { code: 250, message: 'OK', description: '' }
   if (event === 'bounced') {
-    Object.assign(data, { severity: 'permanent', reason: 'bounce', 'delivery-status': { code: 550, message: bounceReason, description: '' } })
+    Object.assign(data, { severity: 'permanent', reason: 'bounce', 'delivery-status': { code: 550, message: reason ?? bounceReason, description: '' } })
   }
   if (event === 'deferred') {
-    Object.assign(data, { severity: 'temporary', reason: 'generic', 'delivery-status': { code: 421, message: deferReason, description: '' } })
+    Object.assign(data, { severity: 'temporary', reason: 'generic', 'delivery-status': { code: 421, message: reason ?? deferReason, description: '' } })
   }
-  if (event === 'clicked') data.url = m.extracted.link ?? ''
+  if (event === 'clicked') data.url = url ?? m.extracted.link ?? ''
   const signature = createHmac('sha256', key).update(timestamp + token).digest('hex')
   return { body: JSON.stringify({ signature: { timestamp, token, signature }, 'event-data': data }), headers: {} }
 }

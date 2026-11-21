@@ -17,6 +17,8 @@ const interceptedHosts = new Set([
   'api.eu.mailgun.net',
 ])
 
+const sesHostPattern = /^email(?:-fips)?\.[a-z0-9-]+\.(?:amazonaws\.com(?:\.cn)?|api\.aws|api\.amazonwebservices\.com\.cn)$/i
+
 const tlsOptionKeys = [
   'agent',
   'agents',
@@ -46,7 +48,7 @@ interface InterceptorState {
 
 export function shouldInterceptHost(hostname: string): boolean {
   const clean = hostname.trim().toLowerCase().replace(/\.$/, '')
-  return interceptedHosts.has(clean)
+  return interceptedHosts.has(clean) || sesHostPattern.test(clean)
 }
 
 function stripPort(host: string): string {
