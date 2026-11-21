@@ -185,7 +185,7 @@ Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) o
 | `to` | any recipient | Limit the rule to one recipient address. |
 | `status` | `500` (or `200` when only `delayMs` is set) | HTTP status to return (`200` to `599`). Statuses `400` and above also record a rejection. With a status below `300`, nid waits for `delayMs` and then handles the send as usual. |
 | `body` | `{"error": "Simulated fault (<status>)"}` | Response body to return. |
-| `headers` | `{}` | Extra response headers, such as `retry-after`. |
+| `headers` | `{}` | Extra response headers, such as `retry-after`. `content-length` and `transfer-encoding` are refused. |
 | `delayMs` | `0` | Milliseconds to wait before answering (`0` to `30000`). |
 | `count` | `1` | Number of sends to affect, or `null` to apply until cleared. |
 
