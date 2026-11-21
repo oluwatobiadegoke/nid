@@ -266,4 +266,6 @@ test('the interceptor keeps a Request body, array headers and credentials in the
     body,
   )
   assert.equal(otherHost, 200)
+  const pairHeaders = [['Authorization', 'Bearer re_test'], ['Content-Type', 'application/json']] as unknown as https.RequestOptions['headers']
+  assert.equal(await nodeStatus('https://api.resend.com/emails', { method: 'POST', headers: pairHeaders }, body), 200)
 })

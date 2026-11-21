@@ -91,7 +91,12 @@ function parseNodeArgs(
   return { url, options, callback }
 }
 
-function readHostHeader(headers: unknown): string {
+function flatHeaders(headers: unknown): unknown {
+  return Array.isArray(headers) && Array.isArray(headers[0]) ? headers.flat() : headers
+}
+
+function readHostHeader(input: unknown): string {
+  const headers = flatHeaders(input)
   if (Array.isArray(headers)) {
     for (let i = 0; i + 1 < headers.length; i += 2) {
       if (String(headers[i]).toLowerCase() === 'host' && typeof headers[i + 1] === 'string') return stripPort(headers[i + 1])
@@ -105,7 +110,8 @@ function readHostHeader(headers: unknown): string {
   return ''
 }
 
-function buildRewrittenHeaders(headers: unknown, targetHost: string): Record<string, unknown> | unknown[] {
+function buildRewrittenHeaders(input: unknown, targetHost: string): Record<string, unknown> | unknown[] {
+  const headers = flatHeaders(input)
   if (Array.isArray(headers)) {
     const pairs: unknown[] = []
     for (let i = 0; i + 1 < headers.length; i += 2) {
