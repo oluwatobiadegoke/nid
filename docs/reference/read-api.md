@@ -173,7 +173,7 @@ Lists active fault and latency rules for this project: `200 {"faults": [FaultRul
 
 ### POST /api/faults
 
-Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays:
+Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays. The body is JSON, sent with `content-type: application/json`:
 
 ```json
 {"provider": "resend", "to": "ada@inbox.test", "status": 429, "headers": {"retry-after": "2"}, "count": 1}
@@ -209,6 +209,8 @@ A [server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_ev
 | Parameter | What it does |
 | --- | --- |
 | `after` | Start after this message id instead of now. |
+
+To resume after a dropped connection, send the last message id you saw in the `Last-Event-ID` header. A browser's `EventSource` does this for you when it reconnects. The header wins over `after`. The stream does not replay rejections that arrived while you were disconnected. Read them with [`GET /api/rejections`](#get-apirejections).
 
 ### GET /api/providers
 

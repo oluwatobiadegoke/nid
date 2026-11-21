@@ -3,7 +3,13 @@ import { createServer as createHttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { test } from 'node:test'
 import { createServer } from '../src/index.js'
+import { magicMatchFor } from '../src/ingest/faults.js'
 import { get, json, sendResend, sleep } from './helpers.js'
+
+test('magic names act only at inbox.test', () => {
+  assert.deepEqual(magicMatchFor(['Bounce+1@Inbox.test']), { action: 'bounced', recipient: 'bounce+1@inbox.test' })
+  assert.equal(magicMatchFor(['bounce@customer.com', 'ratelimit@customer.com', 'bounce@sub.inbox.test']), null)
+})
 
 test('fault rules return custom errors, respect count/provider/to scoping, and record rejections', async (t) => {
   const server = await createServer()
@@ -24,6 +30,8 @@ test('fault rules return custom errors, respect count/provider/to scoping, and r
     ),
   )
   assert.equal(added.status, 201)
+  const plain = await server.app.request('/api/faults', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{"status":500}' })
+  assert.equal(plain.status, 415)
   assert.equal(((await get(server, '/api/faults')).body.faults as unknown[]).length, 1)
 
   const otherRecipient = await sendResend(server, { from: 'a@acme.com', to: 'other@inbox.test', subject: 'Ok', text: 'Ok' })

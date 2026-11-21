@@ -159,6 +159,29 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   ])
   assert.equal(ok.stderr, '')
 
+  const withToken = await runExec(process.execPath, [
+    cliJs,
+    'run',
+    '--port',
+    '0',
+    '--smtp-port',
+    '0',
+    '--quiet',
+    '--token',
+    'run-secret',
+    '--',
+    process.execPath,
+    '--input-type=module',
+    '-e',
+    `
+      import assert from 'node:assert/strict'
+      assert.equal(process.env.NID_TOKEN, 'run-secret')
+      const res = await fetch(process.env.NID_URL + '/api/messages', { headers: { authorization: 'Bearer ' + process.env.NID_TOKEN } })
+      assert.equal(res.status, 200)
+    `,
+  ])
+  assert.equal(withToken.stderr, '')
+
   const failed = await runExec(process.execPath, [
     cliJs,
     'run',
@@ -228,4 +251,16 @@ test('importing nid-inbox with NID_URL does not patch globals and double-slash p
   assert.equal(res.status, 404)
   const payload = (await res.json()) as { error: string }
   assert.equal(payload.error, 'No route for POST /evil.example/emails')
+})
+
+test('a cleanup from a replaced interceptor leaves the newer one in place', async () => {
+  const { installInterceptor } = await import('../src/intercept-core.js')
+  const original = globalThis.fetch
+  const restoreFirst = installInterceptor('http://127.0.0.1:4401')
+  const restoreSecond = installInterceptor('http://127.0.0.1:4402')
+  const patched = globalThis.fetch
+  restoreFirst()
+  assert.equal(globalThis.fetch, patched)
+  restoreSecond()
+  assert.equal(globalThis.fetch, original)
 })

@@ -146,7 +146,10 @@ test('SES v1 form SendEmail and SendRawEmail return XML receipts and errors', as
   assert.match(res.headers.get('content-type') ?? '', /text\/xml/)
   assert.match(res.text, /<SendEmailResponse/)
   assert.match(res.text, /<MessageId>[^<]+<\/MessageId>/)
-  assert.equal((await server.store.listMessages('default', { to: 'v1@inbox.test' }))[0]?.extracted.code, '246801')
+  const v1Stored = (await server.store.listMessages('default', { to: 'v1@inbox.test' }))[0]
+  assert.equal(v1Stored?.extracted.code, '246801')
+  assert.match(v1Stored?.raw ?? '', /^Action=SendEmail&Source=hello%40acme\.com&/)
+  assert.match(v1Stored?.raw ?? '', /Message\.Body\.Text\.Data=Your\+code\+is\+246801$/)
 
   const rawMime = await new MailComposer({
     from: 'hello@acme.com',
@@ -164,6 +167,22 @@ test('SES v1 form SendEmail and SendRawEmail return XML receipts and errors', as
   assert.equal(rawRes.status, 200)
   assert.match(rawRes.text, /<SendRawEmailResponse/)
   assert.equal((await server.store.listMessages('default', { to: 'v1raw@inbox.test' }))[0]?.extracted.code, '554433')
+
+  const bccCompiled = new MailComposer({
+    from: 'hello@acme.com',
+    to: 'v1shown@inbox.test',
+    bcc: 'v1hidden@inbox.test',
+    subject: 'SES v1 bcc',
+    text: 'Hidden copy',
+  }).compile()
+  bccCompiled.keepBcc = true
+  const bccRes = await sendV1(
+    server,
+    new URLSearchParams({ Action: 'SendRawEmail', 'RawMessage.Data': (await bccCompiled.build()).toString('base64') }),
+  )
+  assert.equal(bccRes.status, 200)
+  const hidden = (await server.store.listMessages('default', { to: 'v1hidden@inbox.test' }))[0]
+  assert.equal(hidden?.recipients.find((r) => r.address === 'v1hidden@inbox.test')?.kind, 'bcc')
 
   const bad = await sendV1(
     server,

@@ -206,6 +206,10 @@ test('a Resend webhook passes the Resend SDK signature check', async (t) => {
   const overrideEvent = JSON.parse(app.received[3]?.body ?? '')
   assert.deepEqual(overrideEvent.data.to, ['override@inbox.test'])
 
+  await sendResend(running.server, { from: 'hello@acme.com', to: ['one@inbox.test', 'two@inbox.test'], ...signIn })
+  assert.equal((await trigger(running, await latestId(running), 'delivered')).body.appStatus, 200)
+  assert.deepEqual(JSON.parse(app.received[4]?.body ?? '').data.to, ['one@inbox.test', 'two@inbox.test'])
+
   const wrong = await nid(t, { resend: { url: app.url, secret: `whsec_${Buffer.from('another-secret').toString('base64')}` } })
   await sendResend(wrong.server, { from: 'hello@acme.com', to: 'ada@inbox.test', ...signIn })
   assert.equal((await trigger(wrong, await latestId(wrong), 'bounced')).body.appStatus, 400)

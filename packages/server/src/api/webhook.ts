@@ -68,6 +68,7 @@ export async function dispatchWebhook(options: DispatchWebhookOptions): Promise<
     message: options.message,
     event: options.event,
     recipient,
+    recipientOverride: options.recipient,
     secret: options.target.secret,
     now: new Date(),
     url: options.url,
