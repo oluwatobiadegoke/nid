@@ -21,8 +21,10 @@ Usage:
   nid mcp
   nid healthcheck
 
-Options for read, clear, webhook, mcp, healthcheck and run:
+Options for read, clear, webhook, mcp and healthcheck:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
+
+nid run starts its own nid unless you pass --url.
 
 Environment:
   NID_URL, NID_TOKEN, NID_AUTH_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK

@@ -56,8 +56,8 @@ export async function createSmtpServer(options: SmtpOptions): Promise<SMTPServer
             await options.ingest.accept(project, message)
             callback()
           })
-          .catch((err: Error) => {
-            options.onError?.(err)
+          .catch((err: Error & { responseCode?: number }) => {
+            if (!err.responseCode) options.onError?.(err)
             callback(err)
           })
       })
