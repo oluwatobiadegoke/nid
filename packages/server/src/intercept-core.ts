@@ -194,7 +194,7 @@ export function installInterceptor(nidUrl: string): () => void {
       }
       const nextOptions: Record<string, unknown> = { ...options }
       for (const key of tlsOptionKeys) delete nextOptions[key]
-      if (url?.username && nextOptions.auth === undefined) {
+      if ((url?.username || url?.password) && nextOptions.auth === undefined) {
         nextOptions.auth = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`
       }
       const rawPath =

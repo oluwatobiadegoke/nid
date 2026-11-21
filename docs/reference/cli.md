@@ -53,7 +53,7 @@ nid run [serve options] [--url <url>] -- <command...>
 | --- | --- | --- |
 | `--url <url>` | none | Talk to an already-running nid server instead of starting one. |
 
-All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command.
+All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command. `nid run` prints its start lines to standard error, so your command's output stays its own.
 
 ## nid read
 

@@ -70,7 +70,7 @@ async function startServer(values: {
   'allow-host': string[]
   'auto-webhook'?: string | undefined
   quiet: boolean
-}) {
+}, banner: NodeJS.WriteStream = process.stdout) {
   const [{ createServer }, { providers }, { webhookEvents }] = await Promise.all([
     import('./server.js'),
     import('./providers/index.js'),
@@ -103,14 +103,22 @@ async function startServer(values: {
     ...(autoWebhook ? { autoWebhook } : {}),
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   }).catch((err: Error) => fail(err.message))
-  const listening = await server.listen({
-    port: Number(values.port),
-    smtpPort: Number(values['smtp-port']),
-    host: values.host,
-  })
+  const listening = await server
+    .listen({
+      port: Number(values.port),
+      smtpPort: Number(values['smtp-port']),
+      host: values.host,
+    })
+    .catch((err: Error & { code?: string; port?: number }) =>
+      fail(
+        err.code === 'EADDRINUSE'
+          ? `Port ${err.port} is already in use. Pass --port 0 and --smtp-port 0 to pick free ports, or with nid run pass --url to use the nid that is already running.`
+          : err.message,
+      ),
+    )
   if (!values.quiet) {
     const where = values.db ? `kept in ${values.db}` : 'kept in memory until you stop the server'
-    process.stdout.write(
+    banner.write(
       [
         `nid ${version}`,
         `  web view    ${listening.url}`,
@@ -168,7 +176,7 @@ async function run(args: string[]) {
   if (values.url) {
     targetUrl = baseUrl(values.url)
   } else {
-    const started = await startServer(values)
+    const started = await startServer(values, process.stderr)
     serverToClose = started.server
     const { host, port, url } = started.listening
     targetUrl = host === '0.0.0.0' ? `http://127.0.0.1:${port}` : host === '::' ? `http://[::1]:${port}` : url
@@ -180,6 +188,7 @@ async function run(args: string[]) {
 
   const child = spawn(command, commandArgs.slice(1), {
     stdio: 'inherit',
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       NID_URL: targetUrl,
