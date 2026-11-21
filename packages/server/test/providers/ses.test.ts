@@ -272,6 +272,28 @@ test('SES extracts the stable access key id for auth hooks', async (t) => {
   assert.equal((await server.store.listMessages('ses-team', { to: 'a@inbox.test' }))[0]?.extracted.code, '102938')
 })
 
+test('SES reads an access key id that contains a slash or a comma', async (t) => {
+  const allowed = ['ab/cd+ef==', 'a,b']
+  const server = await createServer({
+    auth: (credential) => (allowed.includes(credential.value) ? { projectId: 'default', plan: 'free' } : null),
+  })
+  t.after(() => server.close())
+  const signed = (key: string) => ({
+    authorization: `AWS4-HMAC-SHA256 Credential=${key}/20261121/us-east-1/ses/aws4_request, SignedHeaders=host, Signature=deadbeef`,
+    'content-type': 'application/json',
+  })
+  const body = {
+    FromEmailAddress: 'hello@acme.com',
+    Destination: { ToAddresses: ['slash@inbox.test'] },
+    Content: { Simple: { Subject: { Data: 'Hi' }, Body: { Text: { Data: 'Hi' } } } },
+  }
+  assert.equal((await sendV2(server, body, signed('ab/cd+ef=='))).status, 200)
+  assert.equal((await sendV2(server, body, signed('a,b'))).status, 200)
+  assert.equal((await sendV2(server, body, signed('ab/cd'))).status, 403)
+  const noScope = { authorization: 'AWS4-HMAC-SHA256 Credential=ab/cd+ef==, SignedHeaders=host', 'content-type': 'application/json' }
+  assert.equal((await sendV2(server, body, noScope)).status, 403)
+})
+
 test('SES answers a refused v1 request in XML and a refused v2 request in JSON', async (t) => {
   const server = await createServer({ auth: () => null })
   t.after(() => server.close())

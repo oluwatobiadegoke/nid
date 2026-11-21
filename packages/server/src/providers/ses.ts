@@ -557,7 +557,7 @@ export const ses: Provider = {
   credential(req: IncomingRequest) {
     const auth = req.headers.get('authorization') ?? ''
     if (!auth.startsWith('AWS4-HMAC-SHA256 ')) return null
-    const match = auth.match(/\bCredential=([^/,\s]+)\//)
+    const match = auth.match(/\bCredential=(.+)\/\d{8}\/[^/,\s]+\/[^/,\s]+\/aws4_request/)
     return match?.[1] ?? null
   },
   unauthorized(req?: IncomingRequest) {
