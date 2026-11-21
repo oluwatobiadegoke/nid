@@ -28,7 +28,7 @@ export interface ServerOptions {
   limits?: LimitsHook
   providers?: Provider[]
   allowHosts?: string[]
-  cors?: boolean
+  cors?: string[]
   ui?: boolean
   maxBodyBytes?: number
   webhooks?: Record<string, WebhookTarget>
@@ -96,6 +96,16 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
   if (options.autoWebhook !== undefined && !webhookEvents.includes(options.autoWebhook)) {
     throw new Error(`autoWebhook must be one of ${webhookEvents.join(', ')}.`)
   }
+  if (options.cors !== undefined && !Array.isArray(options.cors)) {
+    throw new Error('cors takes the origins to allow, such as ["http://localhost:3000"].')
+  }
+  const corsOrigins = (options.cors ?? []).map((value) => {
+    const url = URL.canParse(value) ? new URL(value) : null
+    if (!url || !/^https?:$/.test(url.protocol)) {
+      throw new Error(`The CORS origin ${JSON.stringify(value)} is not an http:// or https:// origin, such as http://localhost:3000.`)
+    }
+    return url.origin
+  })
   const store = options.store ?? createMemoryStore()
   const events = options.events ?? createMemoryEventBus()
   const faults = options.faults ?? createFaultStore()
@@ -111,7 +121,7 @@ export async function createServer(options: ServerOptions = {}): Promise<NidServ
 
   const app = new Hono({ strict: false })
   app.use('*', hostCheck(options.allowHosts ?? []))
-  if (options.cors) app.use('*', cors())
+  if (corsOrigins.length > 0) app.use('*', cors({ origin: corsOrigins }))
   app.use(
     '*',
     bodyLimit({

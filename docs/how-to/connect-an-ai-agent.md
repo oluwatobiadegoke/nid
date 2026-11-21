@@ -72,6 +72,8 @@ Once connected, ask in plain words, for example: "Sign up on http://127.0.0.1:30
 
 If no email comes, the tool says why, including any send nid refused and the error your app got.
 
+The agent reads each email's text and links. If anyone other than your app can send mail to nid, an email could carry instructions written for the agent, so let the agent act only on what your test asked for.
+
 Claude Code asks before it calls each tool. To let it call nid's tools without asking, add `mcp__nid` to `permissions.allow` in `.claude/settings.json`.
 
 For every tool and its arguments, see the [MCP reference](../reference/mcp.md).
