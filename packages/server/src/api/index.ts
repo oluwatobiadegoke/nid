@@ -68,7 +68,7 @@ export function readApi(options: ApiOptions): Hono<Env> {
 
   app.use('*', originCheck(options.allowHosts ?? []))
   app.use('*', async (c, next) => {
-    const token = bearerToken(c.req.header('authorization')) ?? c.req.query('token') ?? ''
+    const token = bearerToken(c.req.header('authorization')) ?? ''
     const project = await options.ingest.resolveProject({ kind: 'http', provider: 'api', value: token })
     if (!project) return c.json({ error: 'Invalid or missing token' }, 401)
     c.set('project', project)

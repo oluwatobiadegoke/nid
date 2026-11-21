@@ -1,8 +1,11 @@
 import { randomBytes } from 'node:crypto'
 import { McpServer, type CallToolResult, type ServerContext } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import type { SerializedMessage } from '../api/serialize.js'
+import type { SerializedMessage, SerializedRejection } from '../api/serialize.js'
+import type { WebhookResult } from '../api/webhook.js'
 import { bodyText } from '../extract/index.js'
+import { webhookEvents } from '../providers/types.js'
+import type { WebhookDelivery } from '../types.js'
 import { version } from '../version.js'
 
 export type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
@@ -41,7 +44,7 @@ async function request<T>(api: ApiFetch, path: string, init: RequestInit): Promi
   const body = (await response.json().catch(() => null)) as (T & { error?: string; details?: string[]; timedOut?: boolean }) | null
   if (!body) throw new Error(`The server answered ${response.status} and not like nid. ${wrongUrl}`)
   if (response.ok) return body
-  const hint = response.status === 404 && !body.timedOut ? [wrongUrl] : []
+  const hint = response.status === 404 && (!body.error || body.error.startsWith('No route for ')) ? [wrongUrl] : []
   throw new Error([body.error ?? `nid answered ${response.status}`, ...(body.details ?? []), ...hint].join('. '))
 }
 
@@ -50,11 +53,13 @@ const maxWaitSeconds = 55
 const readOnly = { readOnlyHint: true }
 
 const address = z.string().trim().min(1).describe('The email address the app sent to')
+const domainPattern = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/i
 
 export function createMcpServer(api: ApiFetch, authorization?: string): McpServer {
   const server = new McpServer({ name: 'nid', version }, { instructions })
   const headers = authorization ? { authorization } : {}
-  const call = <T>(ctx: ServerContext, path: string, init?: RequestInit) => request<T>(api, path, { ...init, headers, signal: ctx.mcpReq.signal })
+  const call = <T>(ctx: ServerContext, path: string, init?: RequestInit) =>
+    request<T>(api, path, { ...init, headers: { ...headers, ...init?.headers }, signal: ctx.mcpReq.signal })
   const latest = async (ctx: ServerContext, to: string, hasCode?: boolean) =>
     (await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString({ to, has_code: hasCode, limit: 1 })}`)).messages[0]
 
@@ -62,13 +67,20 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
     'new_address',
     {
       description: 'Make a fresh, unique address to sign up with, and the cursor to pass to wait_for_email as after',
-      inputSchema: z.object({ prefix: z.string().optional().describe('A word to start the address with, such as signup') }),
+      inputSchema: z.object({
+        prefix: z.string().optional().describe('A word to start the address with, such as signup'),
+        domain: z.string().trim().min(1).optional().describe('Domain for the address (default: NID_DOMAIN or inbox.test)'),
+      }),
       annotations: readOnly,
     },
-    async ({ prefix }, ctx) => {
+    async ({ prefix, domain }, ctx) => {
       const tag = (prefix ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'test'
+      const host = (domain ?? process.env.NID_DOMAIN ?? 'inbox.test').trim().toLowerCase()
+      if (!domainPattern.test(host)) {
+        throw new Error(`Invalid domain ${JSON.stringify(host)}. Pass a hostname such as inbox.test.`)
+      }
       const body = await call<{ cursor: number }>(ctx, '/api/cursor')
-      return reply({ address: `${tag}.${randomBytes(4).toString('hex')}@inbox.test`, cursor: body.cursor })
+      return reply({ address: `${tag}.${randomBytes(4).toString('hex')}@${host}`, cursor: body.cursor })
     },
   )
 
@@ -122,6 +134,28 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
   )
 
   server.registerTool(
+    'get_message',
+    {
+      description: 'Get full details for one message by id, including headers, metadata, attachments and webhook deliveries',
+      inputSchema: z.object({ id: z.number().int().min(1).describe('The message id') }),
+      annotations: readOnly,
+    },
+    async ({ id }, ctx) => {
+      const [{ message }, { events }] = await Promise.all([
+        call<{ message: SerializedMessage & { raw?: string } }>(ctx, `/api/messages/${id}`),
+        call<{ events: WebhookDelivery[] }>(ctx, `/api/messages/${id}/events`),
+      ])
+      return reply({
+        ...detail(message),
+        headers: message.headers,
+        meta: message.meta,
+        attachments: message.attachments,
+        events,
+      })
+    },
+  )
+
+  server.registerTool(
     'list_messages',
     {
       description: 'List recent email, newest first, for one address or for every address',
@@ -134,6 +168,54 @@ export function createMcpServer(api: ApiFetch, authorization?: string): McpServe
     async (args, ctx) => {
       const body = await call<{ messages: SerializedMessage[] }>(ctx, `/api/messages${queryString(args)}`)
       return reply(body.messages.map(summary))
+    },
+  )
+
+  server.registerTool(
+    'list_rejections',
+    {
+      description: 'List sends nid refused, newest first, with the status and exact error',
+      inputSchema: z.object({
+        to: address.optional(),
+        limit: z.number().int().min(1).max(100).default(20).describe('How many to list'),
+      }),
+      annotations: readOnly,
+    },
+    async (args, ctx) => {
+      const body = await call<{ rejections: SerializedRejection[] }>(ctx, `/api/rejections${queryString(args)}`)
+      return reply(
+        body.rejections.map((r) => ({
+          id: r.id,
+          provider: r.provider,
+          to: r.to,
+          status: r.status,
+          error: r.error,
+          createdAt: r.createdAt,
+        })),
+      )
+    },
+  )
+
+  server.registerTool(
+    'trigger_webhook',
+    {
+      description: 'Send a signed provider webhook event for a stored message to your app and return its response',
+      inputSchema: z.object({
+        id: z.number().int().min(1).describe('The message id'),
+        type: z.enum(webhookEvents).describe('The webhook event to simulate'),
+        recipient: address.optional().describe('Recipient address to name in the webhook'),
+        url: z.string().optional().describe('Link URL for clicked events'),
+        reason: z.string().optional().describe('Custom bounce or deferral reason'),
+      }),
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    async ({ id, type, recipient, url, reason }, ctx) => {
+      const outcome = await call<WebhookResult>(ctx, `/api/messages/${id}/events`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type, recipient, url, reason }),
+      })
+      return reply(outcome)
     },
   )
 

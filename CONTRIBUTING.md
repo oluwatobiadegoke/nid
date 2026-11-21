@@ -9,6 +9,7 @@ pnpm install
 pnpm build
 pnpm test
 pnpm dev          # starts the server from source on 4400 and 1025
+pnpm bench        # after pnpm build: prints boot time, send rate and wait wake-up time
 ```
 
 Node 22.13 or later. Tests use `node:test` and run against a server started in-process, so nothing else has to be running.

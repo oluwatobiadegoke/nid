@@ -20,7 +20,7 @@ Returns a new `Inbox`. Same as `new Inbox(options)`.
 | Option | Default | What it does |
 | --- | --- | --- |
 | `url` | `NID_URL`, then `http://127.0.0.1:4400` | Server to read from. |
-| `token` | `NID_TOKEN` | Sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
+| `token` | `NID_TOKEN` | Sent as `Authorization: Bearer <token>`. Only needed when the server uses `--token` or a custom `auth` function. |
 | `domain` | `NID_DOMAIN`, then `inbox.test` | Domain for `address()`. |
 | `fetch` | The global `fetch` | A `fetch` to use instead, for example in tests of the client itself. |
 

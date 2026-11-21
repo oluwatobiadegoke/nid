@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
 import { createServer, createSqliteStore } from '../src/index.js'
 import { get, resendHeaders, sendResend, sleep } from './helpers.js'
 
@@ -138,6 +139,7 @@ test('healthz, providers and the openapi document are served', async (t) => {
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')
   assert.equal(page.status, 200)
+  assert.match(page.headers.get('content-security-policy') ?? '', /img-src \* data: blob:/)
   assert.match(await page.text(), /nid/)
 })
 
@@ -366,6 +368,93 @@ test('read API refuses cross-origin mutating requests from disallowed origins', 
     body: JSON.stringify({ status: 503 }),
   })
   assert.equal(allowedOrigin.status, 201)
+})
+
+test('nid serve --token enforces authentication on provider and read routes', async (t) => {
+  const { spawn } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const cliJs = fileURLToPath(new URL('../dist/cli.js', import.meta.url))
+  const child = spawn(process.execPath, [cliJs, 'serve', '--port', '0', '--smtp-port', '0', '--token', 'stage-secret'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  t.after(() => {
+    if (!child.killed) child.kill('SIGTERM')
+  })
+
+  const url = await new Promise<string>((resolve, reject) => {
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (chunk: Buffer) => {
+      out += chunk.toString()
+      const match = out.match(/web view\s+(http:\/\/[^\s]+)/)
+      if (match?.[1]) resolve(match[1])
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      err += chunk.toString()
+    })
+    child.once('exit', (code) => reject(new Error(`cli exited ${code}: ${err}`)))
+  })
+
+  const unauthRead = await fetch(`${url}/api/messages`)
+  assert.equal(unauthRead.status, 401)
+  const badSend = await fetch(`${url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer wrong', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: 'u@inbox.test', subject: 'Hi', text: 'Hi' }),
+  })
+  assert.equal(badSend.status, 401)
+
+  const okSend = await fetch(`${url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer stage-secret', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: 'u@inbox.test', subject: 'Hi', text: 'Code 102030' }),
+  })
+  assert.equal(okSend.status, 200)
+
+  const queryTokenRead = await fetch(`${url}/api/messages?token=stage-secret`)
+  assert.equal(queryTokenRead.status, 401)
+
+  const okRead = await fetch(`${url}/api/messages`, { headers: { authorization: 'Bearer stage-secret' } })
+  assert.equal(okRead.status, 200)
+  const data = (await okRead.json()) as { messages: Array<{ id: number; extracted: { code: string } }> }
+  assert.equal(data.messages[0]?.extracted.code, '102030')
+
+  const badSes = new SESv2Client({
+    region: 'us-east-1',
+    endpoint: url,
+    credentials: { accessKeyId: 'wrong', secretAccessKey: 'any' },
+  })
+  await assert.rejects(
+    badSes.send(
+      new SendEmailCommand({
+        FromEmailAddress: 'hello@acme.com',
+        Destination: { ToAddresses: ['ses-auth@inbox.test'] },
+        Content: { Simple: { Subject: { Data: 'Denied' }, Body: { Text: { Data: 'Denied' } } } },
+      }),
+    ),
+  )
+
+  const okSes = new SESv2Client({
+    region: 'us-east-1',
+    endpoint: url,
+    credentials: { accessKeyId: 'stage-secret', secretAccessKey: 'any' },
+  })
+  await okSes.send(
+    new SendEmailCommand({
+      FromEmailAddress: 'hello@acme.com',
+      Destination: { ToAddresses: ['ses-auth@inbox.test'] },
+      Content: { Simple: { Subject: { Data: 'Allowed' }, Body: { Text: { Data: 'Code 454545' } } } },
+    }),
+  )
+  const sesRead = await fetch(`${url}/api/messages?to=ses-auth@inbox.test`, {
+    headers: { authorization: 'Bearer stage-secret' },
+  })
+  assert.equal(sesRead.status, 200)
+  const sesData = (await sesRead.json()) as { messages: Array<{ extracted: { code: string } }> }
+  assert.equal(sesData.messages[0]?.extracted.code, '454545')
+
+  const uiPage = await fetch(`${url}/`)
+  assert.equal(uiPage.status, 200)
 })
 
 test('a stream resumed with an id from before a restart still delivers new mail', async (t) => {
