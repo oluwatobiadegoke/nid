@@ -170,7 +170,7 @@ export function installInterceptor(nidUrl: string): () => void {
   const origHttpsGet = cjsHttps.get
 
   globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    const rawUrl = input instanceof Request ? input.url : String(input)
     const parsed = URL.canParse(rawUrl) ? new URL(rawUrl) : null
     if (!parsed || !shouldInterceptHost(parsed.hostname)) {
       return originalFetch(input, init)
