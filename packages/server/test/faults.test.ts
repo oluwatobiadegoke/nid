@@ -38,6 +38,8 @@ test('fault rules return custom errors, respect count/provider/to scoping, and r
   assert.equal(tooLow.status, 400)
   const badHeader = await server.app.request('/api/faults', json({ headers: { 'bad header': 'x' } }, { 'content-type': 'application/json' }))
   assert.equal(badHeader.status, 400)
+  const lengthHeader = await server.app.request('/api/faults', json({ headers: { 'Content-Length': '3' } }, { 'content-type': 'application/json' }))
+  assert.equal(lengthHeader.status, 400)
   assert.equal(((await get(server, '/api/faults')).body.faults as unknown[]).length, 1)
 
   const otherRecipient = await sendResend(server, { from: 'a@acme.com', to: 'other@inbox.test', subject: 'Ok', text: 'Ok' })

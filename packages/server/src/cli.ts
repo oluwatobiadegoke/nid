@@ -43,6 +43,8 @@ const serverOptionConfig = {
   quiet: { type: 'boolean', default: false },
 } as const
 
+const emptyToken = 'The token must not be empty. Check --token and NID_AUTH_TOKEN.'
+
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`)
   process.exit(code)
@@ -96,7 +98,7 @@ async function startServer(values: {
   }
   const token = values.token?.trim()
   if (values.token !== undefined && !token) {
-    fail('The token must not be empty. Check --token and NID_AUTH_TOKEN.')
+    fail(emptyToken)
   }
   let store
   if (values.db) {
@@ -191,6 +193,7 @@ async function run(args: string[]) {
   let targetUrl: string
   let serverToClose: { close(): Promise<void> } | null = null
   const childToken = values.token?.trim()
+  if (values.token !== undefined && !childToken) fail(emptyToken)
   if (values.url) {
     targetUrl = baseUrl(values.url)
   } else {
@@ -206,7 +209,6 @@ async function run(args: string[]) {
 
   const child = spawn(command, commandArgs.slice(1), {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
     env: {
       ...process.env,
       NID_URL: targetUrl,

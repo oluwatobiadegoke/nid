@@ -175,7 +175,7 @@ Point the AWS SDK v3 `SESv2Client` at nid with `AWS_ENDPOINT_URL_SESV2=http://12
 
 ### POST /v2/email/outbound-emails
 
-Supports `Content.Simple` (`Subject`, `Body.Text`, `Body.Html`, `Headers`), `Content.Raw` (base64 or bytes MIME), and `Content.Template` (`TemplateName` or `TemplateArn` plus JSON `TemplateData` stored in `meta.templateId` and `meta.variables`). Returns `200 {"MessageId": "..."}`.
+Supports `Content.Simple` (`Subject`, `Body.Text`, `Body.Html`, `Headers`, `Attachments`), `Content.Raw` (base64 or bytes MIME), and `Content.Template` (`TemplateName` or `TemplateArn` plus JSON `TemplateData` stored in `meta.templateId` and `meta.variables`). A template sent inline as `TemplateContent` is not supported and gets `400`. Returns `200 {"MessageId": "..."}`.
 
 ### POST /v2/email/outbound-bulk-emails
 

@@ -5,6 +5,7 @@ import { fromMime } from './mime.js'
 import {
   bounceReason,
   deferReason,
+  attachmentFrom,
   isRecord,
   looseAddress,
   mailboxes,
@@ -69,6 +70,16 @@ const sendV2Schema = z
             Subject: textPartSchema.optional(),
             Body: z.object({ Text: textPartSchema.optional(), Html: textPartSchema.optional() }).optional(),
             Headers: z.array(headerItemSchema).optional(),
+            Attachments: z
+              .array(
+                z.object({
+                  FileName: z.string(),
+                  RawContent: z.string(),
+                  ContentType: z.string().optional(),
+                  ContentId: z.string().optional(),
+                }),
+              )
+              .optional(),
           })
           .optional(),
         Raw: z.object({ Data: z.union([z.string(), z.array(z.number())]).optional() }).optional(),
@@ -248,7 +259,7 @@ async function parseV2Message(body: unknown, raw: string): Promise<NewMessage> {
     text,
     html,
     headers: headersFrom(simple.Headers),
-    attachments: [],
+    attachments: (simple.Attachments ?? []).map((a) => attachmentFrom(a.FileName, a.RawContent, a.ContentType, a.ContentId)),
     raw,
     meta,
     idempotencyKey: null,

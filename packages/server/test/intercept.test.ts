@@ -186,6 +186,13 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   ])
   assert.equal(withToken.stderr, '')
 
+  const emptyToken = await runExec(process.execPath, [cliJs, 'run', '--url', 'http://127.0.0.1:4400', '--token', '', '--', process.execPath, '-e', '']).then(
+    () => assert.fail('expected an empty token to stop nid run'),
+    (err: { code: number; stderr: string }) => err,
+  )
+  assert.equal(emptyToken.code, 1)
+  assert.match(emptyToken.stderr, /The token must not be empty/)
+
   const failed = await runExec(process.execPath, [
     cliJs,
     'run',
@@ -301,4 +308,10 @@ test('the interceptor keeps a Request body, array headers and credentials in the
     'from=a%40acme.com&to=basic%40inbox.test&subject=Basic&text=Hi',
   )
   assert.equal(mailgun, 200)
+  const percent = await nodeStatus(
+    'https://api:50%off@api.mailgun.net/v3/mg.acme.com/messages',
+    { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' } },
+    'from=a%40acme.com&to=percent%40inbox.test&subject=Percent&text=Hi',
+  )
+  assert.equal(percent, 200)
 })

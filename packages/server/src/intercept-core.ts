@@ -132,6 +132,14 @@ function targetHostname(url: URL | null, options: Record<string, unknown>): stri
   return readHostHeader(options.headers)
 }
 
+function decodeCredential(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 function joinTargetPath(targetBasePath: string, requestPath: string): string {
   const base = targetBasePath.replace(/\/+$/, '')
   const suffix = '/' + requestPath.replace(/^\/+/, '')
@@ -195,7 +203,7 @@ export function installInterceptor(nidUrl: string): () => void {
       const nextOptions: Record<string, unknown> = { ...options }
       for (const key of tlsOptionKeys) delete nextOptions[key]
       if ((url?.username || url?.password) && nextOptions.auth === undefined) {
-        nextOptions.auth = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`
+        nextOptions.auth = `${decodeCredential(url.username)}:${decodeCredential(url.password)}`
       }
       const rawPath =
         typeof nextOptions.path === 'string' && nextOptions.path
