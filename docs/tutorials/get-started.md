@@ -25,7 +25,7 @@ npx nid-inbox serve
 npm asks once to install the package. Say yes. nid then prints where it is listening:
 
 ```
-nid 0.2.0
+nid 0.3.0
   web view    http://127.0.0.1:4400
   provider APIs and read API on http://127.0.0.1:4400
   SMTP        127.0.0.1:1025

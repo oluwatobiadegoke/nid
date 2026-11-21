@@ -1,8 +1,8 @@
 # nid
 
-An email inbox that runs on your computer.
+Local email API, inbox, and webhook simulator for testing apps and AI agents.
 
-While you build, your app sends its emails to nid instead of to real people. Open nid in your browser and read each email as it arrives: the message, its links and any sign-in code. The mail stays on your machine, and your tests can read it too.
+While you build or run tests, your app sends email to nid instead of real recipients. nid intercepts official email SDKs with zero app-code changes, validates requests with provider-shaped errors, triggers signed webhooks back to your app, and wakes waiting tests and AI agents when mail arrives. Nothing leaves your machine.
 
 **[Read the documentation](https://github.com/oluwatobiadegoke/nid/blob/main/docs/README.md)**, or start with the [ten-minute tutorial](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md).
 
@@ -10,23 +10,27 @@ While you build, your app sends its emails to nid instead of to real people. Ope
 
 You need Node.js 22.13 or later.
 
-1. Start nid:
+1. Run your app with nid:
 
    ```sh
-   npx nid-inbox serve
+   npx nid-inbox run -- npm run dev
    ```
 
-2. Start your app with its email provider pointed at nid. For Resend:
+   `nid run` starts nid in the background and redirects outbound HTTP calls for the Resend, Amazon SES, Brevo, SendGrid, Postmark, and Mailgun SDKs without changing your app code.
 
-   ```sh
-   RESEND_BASE_URL=http://127.0.0.1:4400 npm run dev
-   ```
+2. Open [http://127.0.0.1:4400](http://127.0.0.1:4400) in your browser to see arrived messages, HTML previews, sign-in codes, links, refused requests, and webhook deliveries.
 
-3. Open [http://127.0.0.1:4400](http://127.0.0.1:4400) in your browser. Every email your app sends appears there as it arrives.
+If your app runs outside `nid run` (such as Docker or another language), start nid on its own and point your email SDK or SMTP client at it:
+
+```sh
+npx nid-inbox serve
+```
+
+SMTP listens on `127.0.0.1:1025`, and HTTP provider APIs and the read API listen on `http://127.0.0.1:4400`.
 
 ## Read mail in tests
 
-Your tests can read the same emails. In Playwright:
+Your tests can wait on mail with zero polling. In Playwright:
 
 ```ts
 import { test, expect } from '@nid-inbox/client/playwright'
@@ -43,25 +47,19 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 })
 ```
 
-## What it does
+## What sets nid apart
 
-- Shows every email your app sends in the web view, a page in your browser, as it arrives. You see the sender, the recipients, the HTML, the text, the attachments, and the sign-in code and link nid found.
-- Keeps your mail on your machine. It listens on 127.0.0.1 only and sends nothing out, so no one else can read it.
-- Works with Resend, Brevo, SendGrid, Postmark and Mailgun. Point your email SDK's base URL at nid, and your app's code stays the same.
-- Takes SMTP on port 1025 for everything else.
-- Shows the sends it refused, with the error your app got, so you can see why an email never arrived.
-- Lets tests and scripts read the same mail, and wait for the next email without polling.
-- Lets AI agents such as Claude Code sign up with a fresh address and read the sign-in code, over MCP.
-- Sends your app the provider's signed bounce and delivery webhooks when a test asks, and shows what your app answered.
-- Treats every address as an inbox. There is no "create inbox" step.
-- Keeps mail in memory by default. `--db mail.sqlite` keeps it across restarts.
+- **Zero-code provider APIs and SDK error fidelity**: Answers the HTTP APIs for Resend, Amazon SES (v2 JSON and v1 XML), Brevo, SendGrid, Postmark, and Mailgun, plus SMTP on port 1025. Redirects official Node SDKs via `nid run` or `nid-inbox/intercept` and returns provider-shaped 4xx validation errors.
+- **Event-driven test helpers and rejection diagnostics**: `@nid-inbox/client` and `/api/wait` wake over an internal event bus when mail arrives, with Playwright fixtures and automatic code and link extraction. When a wait times out, nid reports matching refused sends so failures explain why email never arrived.
+- **Signed webhook simulation and fault injection**: Triggers provider-signed webhooks (`delivered`, `bounced`, `deferred`, `complained`, `opened`, `clicked`), supports `--auto-webhook` after acceptance, and simulates rate limits, bounces, deferrals, complaints, and custom HTTP errors via magic addresses (`ratelimit@`, `bounce@`, `defer@`, `complain@`) or `/api/faults`.
+- **Built-in MCP server for AI agents**: Exposes `new_address`, `wait_for_email`, `get_code`, `get_links`, `get_message`, `list_messages`, `list_rejections`, `trigger_webhook`, and `clear` over HTTP (`/mcp`) and stdio (`nid mcp`).
 
 ## Packages
 
 | Package | What it is |
 | --- | --- |
-| [`nid-inbox`](https://www.npmjs.com/package/nid-inbox) | The server and the `nid` command. |
-| [`@nid-inbox/client`](https://www.npmjs.com/package/@nid-inbox/client) | A small client for tests, with a Playwright fixture. |
+| [`nid-inbox`](https://www.npmjs.com/package/nid-inbox) | The server, `nid run` / `nid serve` CLI, and `nid-inbox/intercept` preload hook. |
+| [`@nid-inbox/client`](https://www.npmjs.com/package/@nid-inbox/client) | Typed test client and Playwright fixture. |
 | [`ghcr.io/oluwatobiadegoke/nid`](https://github.com/users/oluwatobiadegoke/packages/container/package/nid) | The Docker image. |
 
 ## Documentation
@@ -69,8 +67,8 @@ test('sign up, then resend the code', async ({ page, inbox }) => {
 | Kind | Pages |
 | --- | --- |
 | Tutorial | [Get started](https://github.com/oluwatobiadegoke/nid/blob/main/docs/tutorials/get-started.md) |
-| How-to guides | [See your mail in the web view](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-web-view.md), [Run nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/run-nid.md) (npm, Docker, Playwright, GitHub Actions), [Point your app at nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-your-app.md), [Read mail in tests](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/read-mail-in-tests.md), [Use the command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-cli.md), [Embed nid in your own code](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/embed-nid.md) |
-| Reference | [Command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/cli.md), [Configuration](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/configuration.md), [Read API](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/read-api.md), [Client library](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/client.md), [Providers](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/providers.md) |
+| How-to guides | [See your mail in the web view](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-web-view.md), [Run nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/run-nid.md) (npm, Docker, Playwright, GitHub Actions), [Point your app at nid](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-your-app.md), [Read mail in tests](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/read-mail-in-tests.md), [Test your webhook handler](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/test-webhooks.md), [Use the command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/use-the-cli.md), [Let an AI agent read your mail](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/connect-an-ai-agent.md), [Embed nid in your own code](https://github.com/oluwatobiadegoke/nid/blob/main/docs/how-to/embed-nid.md) |
+| Reference | [Command line](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/cli.md), [Configuration](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/configuration.md), [Read API](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/read-api.md), [Client library](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/client.md), [Providers](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/providers.md), [MCP reference](https://github.com/oluwatobiadegoke/nid/blob/main/docs/reference/mcp.md) |
 | Explanation | [How nid works](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/how-nid-works.md), [Security](https://github.com/oluwatobiadegoke/nid/blob/main/docs/explanation/security.md) |
 
 ## Contributing

@@ -224,7 +224,7 @@ The OpenAPI 3 document for the read API.
 
 ### GET /healthz
 
-Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It needs no token.
+Returns `200 {"ok": true, "version": "0.3.0"}` once the server is ready. It needs no token.
 
 ## Objects
 
@@ -233,7 +233,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | Field | Type | What it is |
 | --- | --- | --- |
 | `id` | integer | nid's id. Use it as a cursor. |
-| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | string | `resend`, `ses`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
 | `providerId` | string | The id nid returned to your app, in the provider's format. |
 | `from` | string | Sender, such as `Acme <hello@acme.com>`. |
 | `replyTo` | string[] | Reply-to addresses. |
