@@ -226,7 +226,7 @@ The OpenAPI 3 document for the read API.
 
 ### GET /healthz
 
-Returns `200 {"ok": true, "version": "0.3.0"}` once the server is ready. It needs no token.
+Returns `200 {"ok": true, "version": "0.4.1"}` once the server is ready. It needs no token.
 
 ## Objects
 

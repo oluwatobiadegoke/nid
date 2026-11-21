@@ -6,7 +6,7 @@ While you build, your app sends its emails to nid instead of to real people. Ope
 
 You need Node.js 22.13 or later for the npm packages, or Docker for the container image.
 
-These docs describe the code on the `main` branch. The examples show output from version 0.3.0, so version numbers and ids in your output will differ.
+These docs describe the code on the `main` branch. The examples show output from version 0.4.1, so version numbers and ids in your output will differ.
 
 ## New to nid
 
