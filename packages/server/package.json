@@ -1,7 +1,7 @@
 {
   "name": "nid-inbox",
   "version": "0.4.1",
-  "description": "An email inbox that runs on your computer. Read what your app sends in your browser, or from your tests.",
+  "description": "Local email API, inbox, and webhook simulator for testing apps and AI agents.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -19,6 +19,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./intercept": {
+      "types": "./dist/intercept.d.ts",
+      "default": "./dist/intercept.js"
     },
     "./sqlite": {
       "types": "./dist/store/sqlite-store.d.ts",
@@ -45,6 +49,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@aws-sdk/client-sesv2": "3.1175.0",
     "@getbrevo/brevo": "6.2.0",
     "@modelcontextprotocol/client": "2.3.1",
     "@sendgrid/mail": "8.1.6",
@@ -67,6 +72,7 @@
     "sendgrid",
     "postmark",
     "mailgun",
+    "ses",
     "smtp",
     "playwright",
     "mcp"

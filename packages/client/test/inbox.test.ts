@@ -118,3 +118,55 @@ test('triggerWebhook sends a bounce for the email and returns what the app answe
   assert.equal(JSON.parse(answers[0] ?? '').type, 'email.bounced')
   await assert.rejects(inbox.triggerWebhook(sent.id, 'bounce' as never), /type must be one of/)
 })
+
+test('delete, clearRejections, events, triggerWebhook options, failNext and clearFaults', async (t) => {
+  const received: Array<Record<string, unknown>> = []
+  const app = createHttpServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', () => {
+      received.push(JSON.parse(body) as Record<string, unknown>)
+      res.writeHead(200).end('ok')
+    })
+  })
+  await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => app.close(() => resolve())))
+  const server = await createServer({
+    webhooks: { resend: { url: `http://127.0.0.1:${(app.address() as AddressInfo).port}`, secret: 'whsec_dGVzdA==' } },
+  })
+  const listening = await server.listen({ port: 0, smtpPort: 0 })
+  t.after(() => server.close())
+
+  const inbox = createInbox({ url: listening.url })
+  const email = inbox.address('client')
+
+  const rule = await inbox.failNext({ provider: 'resend', to: email, status: 429, body: { message: 'Slow down' } })
+  assert.equal(rule.status, 429)
+  const failRes = await fetch(`${listening.url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer re_x', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: email, subject: 'Blocked', text: 'Blocked' }),
+  })
+  assert.equal(failRes.status, 429)
+  assert.equal((await inbox.rejections(email)).length, 1)
+  assert.equal(await inbox.clearRejections(email), 1)
+  assert.equal((await inbox.rejections(email)).length, 0)
+
+  await inbox.failNext({ provider: 'resend', status: 503, count: null })
+  assert.equal(await inbox.clearFaults(), 1)
+
+  await fetch(`${listening.url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer re_x', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: [email, 'second@inbox.test'], subject: 'Live', text: 'Live' }),
+  })
+  const sent = await inbox.waitFor(email, { timeout: 5 })
+  await inbox.triggerWebhook(sent.id, 'bounced', { recipient: 'second@inbox.test', reason: 'Bad mailbox' })
+  const history = await inbox.events(sent.id)
+  assert.equal(history.length, 1)
+  assert.equal(history[0]?.recipient, 'second@inbox.test')
+  assert.deepEqual((received[0] as { data: { to: string[]; bounce: { message: string } } }).data.bounce.message, 'Bad mailbox')
+
+  await inbox.delete(sent.id)
+  assert.deepEqual(await inbox.list({ to: email }), [])
+})

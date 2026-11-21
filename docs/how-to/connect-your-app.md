@@ -1,10 +1,36 @@
 # Point your app at nid
 
-This guide shows how to send your app's email to nid instead of to your email provider. You change one setting. The rest of your app's code stays the same.
+This guide shows how to send your app's email to nid instead of to your email provider.
 
 Before you start, [run nid](run-nid.md). The examples assume it is on `http://127.0.0.1:4400` and SMTP port `1025`.
 
 Make this change only in your local and test settings. In production, your app should keep talking to the real provider.
+
+## Zero-code setup for Node.js (`nid run`)
+
+When your app runs on Node.js, start it with `nid run`. Nothing in your app or its SDK constructors needs to change:
+
+```sh
+npx nid-inbox run -- npm run dev
+```
+
+On Windows, put `cmd /c` before a command that is a `.cmd` file, such as `npm`: `npx nid-inbox run -- cmd /c npm run dev`.
+
+`nid run` starts nid and preloads `nid-inbox/intercept`, which redirects outbound requests to `api.resend.com`, `api.brevo.com`, `api.sendinblue.com`, `api.sendgrid.com`, `api.eu.sendgrid.com`, `api.postmarkapp.com`, `api.mailgun.net`, `api.eu.mailgun.net` and Amazon SES endpoints (`email.<region>.amazonaws.com` and the dual-stack `email.<region>.api.aws`) to nid. It also sets `RESEND_BASE_URL`, `RESEND_API_URL`, `AWS_ENDPOINT_URL_SESV2` and `AWS_ENDPOINT_URL_SES`.
+
+If nid is already running in another terminal or container, pass `--url`:
+
+```sh
+npx nid-inbox run --url http://127.0.0.1:4400 -- npm run dev
+```
+
+You can also preload the hook directly with Node:
+
+```sh
+NID_URL=http://127.0.0.1:4400 NODE_OPTIONS="--import nid-inbox/intercept" npm run dev
+```
+
+If you use Docker, Python, Go or prefer explicit configuration, set your provider's base URL below instead.
 
 ## Resend
 
@@ -127,6 +153,28 @@ const mg = mailgun.client({ username: 'api', key: process.env.MAILGUN_API_KEY, u
 
 Send `POST /v3/<your domain>/messages` to `http://127.0.0.1:4400` as a form, with Basic auth user `api` and your key as the password.
 
+## Amazon SES
+
+### AWS SDK v3 (Node.js, Python, Go, Rust)
+
+Set `AWS_ENDPOINT_URL_SESV2` when you start your app with `SESv2Client` (legacy SES v1 clients read `AWS_ENDPOINT_URL_SES`):
+
+```sh
+AWS_ENDPOINT_URL_SESV2=http://127.0.0.1:4400 npm run dev
+```
+
+Or pass `endpoint` when you create `SESv2Client`:
+
+```js
+import { SESv2Client } from '@aws-sdk/client-sesv2'
+
+const ses = new SESv2Client({
+  region: 'us-east-1',
+  endpoint: 'http://127.0.0.1:4400',
+  credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+})
+```
+
 ## SMTP
 
 Use SMTP for any library or framework that sends mail over SMTP, such as Nodemailer, Django, Rails Action Mailer or Laravel.
@@ -157,6 +205,7 @@ Locally, any API key value works. But nid checks that a key is there and that it
 - SendGrid needs `Authorization: Bearer <key>`.
 - Postmark needs an `X-Postmark-Server-Token` header.
 - Mailgun needs Basic auth with user `api` and the key as the password.
+- Amazon SES needs an `Authorization: AWS4-HMAC-SHA256 ...` header (added by the AWS SDK).
 
 A request with no key, or with the key in the wrong place, fails with the same status and body the real provider returns. This means a missing key in your config shows up in tests, not in production.
 

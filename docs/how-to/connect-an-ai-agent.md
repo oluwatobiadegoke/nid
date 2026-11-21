@@ -70,7 +70,7 @@ Once connected, ask in plain words, for example: "Sign up on http://127.0.0.1:30
 }
 ```
 
-If no email comes, the tool says why, including any send nid refused and the error your app got.
+If no email comes, the tool says why, including any send nid refused and the error your app got. Agents can also call `list_rejections`, `get_message` and `trigger_webhook` to inspect refused sends or simulate delivery and bounce callbacks.
 
 The agent reads each email's text and links. If anyone other than your app can send mail to nid, an email could carry instructions written for the agent, so let the agent act only on what your test asked for.
 

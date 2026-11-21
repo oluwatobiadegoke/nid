@@ -40,10 +40,32 @@ export const streamQuery = z.strictObject({
   after: cursor.optional(),
 })
 
+function canBeHeaders(headers: Record<string, string>): boolean {
+  try {
+    const names = [...new Headers(headers).keys()]
+    return !names.includes('content-length') && !names.includes('transfer-encoding')
+  } catch {
+    return false
+  }
+}
+
+export const faultBodySchema = z.strictObject({
+  provider: z.string().trim().min(1).optional(),
+  to: z.string().trim().min(1).optional(),
+  status: z.number().int().min(200).max(599).optional(),
+  body: z.unknown().optional(),
+  headers: z
+    .record(z.string(), z.string())
+    .refine(canBeHeaders, 'Each header needs a valid name and value, and cannot be content-length or transfer-encoding')
+    .optional(),
+  delayMs: z.number().int().min(0).max(30_000).optional(),
+  count: z.number().int().min(1).nullable().optional(),
+})
+
 export type QueryIssue = { error: string; details: string[] }
 
 export function parseQuery<T extends z.ZodType>(schema: T, params: URLSearchParams): z.infer<T> | QueryIssue {
-  const result = schema.safeParse(Object.fromEntries(params.entries()))
+  const result = schema.safeParse(Object.fromEntries(params))
   if (result.success) return result.data as z.infer<T>
   return {
     error: 'Invalid query',

@@ -316,18 +316,21 @@ export class KyselyStore implements Store {
   }
 
   async deleteRejections(projectId: string, to?: string): Promise<number> {
-    const ids = to
-      ? (
-          await this.db
-            .selectFrom('rejection_recipients')
-            .select('rejection_id')
-            .where('project_id', '=', projectId)
-            .where('address', '=', to.trim().toLowerCase())
-            .execute()
-        ).map((r) => r.rejection_id)
-      : (
-          await this.db.selectFrom('rejections').select('id').where('project_id', '=', projectId).execute()
-        ).map((r) => r.id)
+    if (!to) {
+      return this.db.transaction().execute(async (trx) => {
+        await trx.deleteFrom('rejection_recipients').where('project_id', '=', projectId).execute()
+        const deleted = await trx.deleteFrom('rejections').where('project_id', '=', projectId).executeTakeFirst()
+        return Number(deleted.numDeletedRows)
+      })
+    }
+    const ids = (
+      await this.db
+        .selectFrom('rejection_recipients')
+        .select('rejection_id')
+        .where('project_id', '=', projectId)
+        .where('address', '=', to.trim().toLowerCase())
+        .execute()
+    ).map((r) => r.rejection_id)
     const uniqueIds = [...new Set(ids)]
     if (uniqueIds.length === 0) return 0
     await this.db.transaction().execute(async (trx) => {

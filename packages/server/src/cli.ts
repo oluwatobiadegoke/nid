@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { version } from './version.js'
 import type { SerializedMessage } from './api/serialize.js'
@@ -11,7 +13,8 @@ const defaultHost = '127.0.0.1'
 const help = `nid ${version}
 
 Usage:
-  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name]
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name] [--auto-webhook event] [--token secret]
+  nid run [serve options] [--url <url>] -- <command...>
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
   nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked>
@@ -21,14 +24,36 @@ Usage:
 Options for read, clear, webhook, mcp and healthcheck:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
+nid run starts its own nid unless you pass --url.
+
 Environment:
-  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB
+  NID_URL, NID_TOKEN, NID_AUTH_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK
   NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
+
+const serverOptionConfig = {
+  port: { type: 'string', default: process.env.NID_PORT ?? String(defaultPort) },
+  'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
+  host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
+  db: { type: 'string', default: process.env.NID_DB },
+  cors: { type: 'string', multiple: true, default: [] as string[] },
+  'allow-host': { type: 'string', multiple: true, default: [] as string[] },
+  'auto-webhook': { type: 'string', default: process.env.NID_AUTO_WEBHOOK },
+  token: { type: 'string', default: process.env.NID_AUTH_TOKEN },
+  quiet: { type: 'boolean', default: false },
+} as const
 
 function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`)
   process.exit(code)
+}
+
+function tokenFrom(value: string | undefined): string | undefined {
+  const token = value?.trim()
+  if (value !== undefined && (!token || /\s/.test(token))) {
+    fail('The token must not be empty or contain spaces. Check --token and NID_AUTH_TOKEN.')
+  }
+  return token
 }
 
 function baseUrl(value: string | undefined): string {
@@ -46,23 +71,38 @@ async function api(url: string, path: string, init: RequestInit = {}): Promise<R
   }
 }
 
-async function serve(args: string[]) {
-  const { values } = parseArgs({
-    args,
-    options: {
-      port: { type: 'string', default: process.env.NID_PORT ?? String(defaultPort) },
-      'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
-      host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
-      db: { type: 'string', default: process.env.NID_DB },
-      cors: { type: 'string', multiple: true, default: [] },
-      'allow-host': { type: 'string', multiple: true, default: [] },
-      quiet: { type: 'boolean', default: false },
-    },
-  })
-  const [{ createServer }, { providers }] = await Promise.all([
+function createTokenAuth(expected: string) {
+  const expectedHash = createHash('sha256').update(expected).digest()
+  return (credential: { value: string }) => {
+    const actualHash = createHash('sha256').update(credential.value).digest()
+    return timingSafeEqual(expectedHash, actualHash) ? { projectId: 'default', plan: 'local' } : null
+  }
+}
+
+async function startServer(values: {
+  port: string
+  'smtp-port': string
+  host: string
+  db?: string | undefined
+  cors: string[]
+  'allow-host': string[]
+  'auto-webhook'?: string | undefined
+  token?: string | undefined
+  quiet: boolean
+}, banner: NodeJS.WriteStream = process.stdout) {
+  const [{ createServer }, { providers }, { webhookEvents }] = await Promise.all([
     import('./server.js'),
     import('./providers/index.js'),
+    import('./providers/types.js'),
   ])
+  let autoWebhook: (typeof webhookEvents)[number] | undefined
+  if (values['auto-webhook']) {
+    if (!webhookEvents.includes(values['auto-webhook'] as (typeof webhookEvents)[number])) {
+      fail(`--auto-webhook must be one of ${webhookEvents.join(', ')}`)
+    }
+    autoWebhook = values['auto-webhook'] as (typeof webhookEvents)[number]
+  }
+  const token = tokenFrom(values.token)
   let store
   if (values.db) {
     const { createSqliteStore } = await import('./store/index.js')
@@ -77,19 +117,29 @@ async function serve(args: string[]) {
   )
   const server = await createServer({
     ...(store ? { store } : {}),
+    ...(token ? { auth: createTokenAuth(token) } : {}),
     cors: values.cors,
     allowHosts: values['allow-host'],
     webhooks,
+    ...(autoWebhook ? { autoWebhook } : {}),
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   }).catch((err: Error) => fail(err.message))
-  const listening = await server.listen({
-    port: Number(values.port),
-    smtpPort: Number(values['smtp-port']),
-    host: values.host,
-  })
+  const listening = await server
+    .listen({
+      port: Number(values.port),
+      smtpPort: Number(values['smtp-port']),
+      host: values.host,
+    })
+    .catch((err: Error & { code?: string; port?: number }) =>
+      fail(
+        err.code === 'EADDRINUSE'
+          ? `Port ${err.port} is already in use. Pass --port 0 and --smtp-port 0 to pick free ports, or with nid run pass --url to use the nid that is already running.`
+          : err.message,
+      ),
+    )
   if (!values.quiet) {
     const where = values.db ? `kept in ${values.db}` : 'kept in memory until you stop the server'
-    process.stdout.write(
+    banner.write(
       [
         `nid ${version}`,
         `  web view    ${listening.url}`,
@@ -101,17 +151,95 @@ async function serve(args: string[]) {
           shown.password = ''
           return `  webhooks    ${name} to ${shown.href}`
         }),
+        ...(autoWebhook ? [`  auto        ${autoWebhook} webhook after each send`] : []),
+        ...(token ? ['  auth        token required'] : []),
         `  mail is ${where}`,
         '',
       ].join('\n'),
     )
   }
+  return { server, listening }
+}
+
+async function serve(args: string[]) {
+  const { values } = parseArgs({ args, options: serverOptionConfig })
+  const { server } = await startServer(values)
   const stop = async () => {
     await server.close()
     process.exit(0)
   }
   process.once('SIGINT', stop)
   process.once('SIGTERM', stop)
+}
+
+async function run(args: string[]) {
+  const dashDash = args.indexOf('--')
+  if (dashDash === -1) fail('Usage: nid run [options] -- <command...>')
+  const nidArgs = args.slice(0, dashDash)
+  const commandArgs = args.slice(dashDash + 1)
+  const { values } = parseArgs({
+    args: nidArgs,
+    options: {
+      ...serverOptionConfig,
+      url: { type: 'string' },
+    },
+  })
+  const command = commandArgs[0]
+  if (!command) fail('Usage: nid run [options] -- <command...>')
+
+  let targetUrl: string
+  let serverToClose: { close(): Promise<void> } | null = null
+  const childToken = tokenFrom(values.token)
+  if (values.url) {
+    targetUrl = baseUrl(values.url)
+  } else {
+    const started = await startServer(values, process.stderr)
+    serverToClose = started.server
+    const { host, port, url } = started.listening
+    targetUrl = host === '0.0.0.0' ? `http://127.0.0.1:${port}` : host === '::' ? `http://[::1]:${port}` : url
+  }
+
+  const importFlag = `--import ${new URL('./intercept.js', import.meta.url).href}`
+  const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
+  const nodeOptions = existingNodeOptions ? `${existingNodeOptions} ${importFlag}` : importFlag
+
+  const child = spawn(command, commandArgs.slice(1), {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      NID_URL: targetUrl,
+      ...(childToken ? { NID_TOKEN: childToken } : {}),
+      RESEND_BASE_URL: targetUrl,
+      RESEND_API_URL: targetUrl,
+      AWS_ENDPOINT_URL_SESV2: targetUrl,
+      AWS_ENDPOINT_URL_SES: targetUrl,
+      NODE_OPTIONS: nodeOptions,
+    },
+  })
+
+  let interrupted = false
+  const forward = (signal: NodeJS.Signals) => {
+    interrupted = true
+    child.kill(signal)
+  }
+  process.on('SIGINT', forward)
+  process.on('SIGTERM', forward)
+
+  const exitCode = await new Promise<number>((resolve) => {
+    child.once('error', (err) => {
+      process.stderr.write(`nid: failed to start ${command}: ${err.message}\n`)
+      resolve(1)
+    })
+    child.once('exit', (code, signal) => {
+      if (code !== null) resolve(code)
+      else resolve(signal || interrupted ? 1 : 0)
+    })
+  })
+
+  process.off('SIGINT', forward)
+  process.off('SIGTERM', forward)
+  await serverToClose?.close()
+  process.exit(exitCode)
 }
 
 const controlCharacters = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g
@@ -239,6 +367,9 @@ try {
   switch (command) {
     case 'serve':
       await serve(rest)
+      break
+    case 'run':
+      await run(rest)
       break
     case 'read':
       await read(rest)
