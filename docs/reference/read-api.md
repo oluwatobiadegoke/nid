@@ -124,7 +124,7 @@ Lists recorded webhook delivery attempts for the message, oldest first. Returns 
 
 ### POST /api/messages/{id}/events
 
-Sends the webhook the message's provider would send to your app, signed the provider's way, and waits up to 10 seconds for your app's answer. The body names the event and optional overrides:
+Sends the webhook the message's provider would send to your app, signed the provider's way, and waits up to 10 seconds for your app's answer. The body is JSON, sent with `content-type: application/json`. It names the event and optional overrides:
 
 ```json
 {"type": "bounced", "recipient": "ada@inbox.test", "reason": "Mailbox full"}
@@ -143,11 +143,11 @@ Returns `200` with your app's answer, whatever status your app gave:
 | `durationMs` | How long your app took. |
 | `error` | Only when nid could not reach your app: why. |
 
-Returns `400` for an unknown `type`, for mail sent over SMTP, or when the provider has no URL set, or needs a secret and has none. Returns `404` when there is no such message.
+Returns `400` for an unknown `type`, for mail sent over SMTP, or when the provider has no URL set, or needs a secret and has none. Returns `404` when there is no such message. Returns `415` when the body is not sent as `application/json`.
 
 ### GET /api/messages/{id}/attachments/{n}
 
-Downloads attachment number `n` (counting from 0, as in `attachments[].n`) with its own content type. Returns `404` when there is no such attachment.
+Downloads attachment number `n` (counting from 0, as in `attachments[].n`) with its own content type and file name. Returns `404` when there is no such attachment.
 
 ### GET /api/rejections
 
@@ -257,7 +257,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | `code` | The most likely one-time code, or `null`. |
 | `codes` | Every code-like token found, in order. |
 | `link` | The most likely action link, skipping `mailto:`, `tel:`, images and unsubscribe links, or `null`. |
-| `links` | Every link, as `{href, text}`. |
+| `links` | Every link, as `{href, text}`, except `javascript:`, `vbscript:` and `data:` links. |
 
 ### Rejection
 

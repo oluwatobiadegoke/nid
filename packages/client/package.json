@@ -1,8 +1,13 @@
 {
   "name": "@nid-inbox/client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A tiny client for reading mail from nid in tests, with a Playwright fixture.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oluwatobiadegoke/nid.git",
+    "directory": "packages/client"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.13"
