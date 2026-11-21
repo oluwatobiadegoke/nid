@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import https from 'node:https'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { test } from 'node:test'
@@ -27,6 +28,8 @@ test('shouldInterceptHost matches supported provider endpoints only', () => {
     'email.eu-west-2.amazonaws.com',
     'email-fips.us-east-1.amazonaws.com',
     'email.cn-north-1.amazonaws.com.cn',
+    'email.us-east-1.api.aws',
+    'email-fips.us-east-1.api.aws',
   ]) {
     assert.equal(shouldInterceptHost(host), true, host)
   }
@@ -263,4 +266,38 @@ test('a cleanup from a replaced interceptor leaves the newer one in place', asyn
   assert.equal(globalThis.fetch, patched)
   restoreSecond()
   assert.equal(globalThis.fetch, original)
+})
+
+test('the interceptor keeps a Request body, array headers and credentials in the URL', async (t) => {
+  const server = await createServer()
+  const listening = await server.listen({ port: 0, smtpPort: false })
+  t.after(() => server.close())
+  const { installInterceptor } = await import('../src/intercept-core.js')
+  t.after(installInterceptor(listening.url))
+
+  const body = JSON.stringify({ from: 'a@acme.com', to: 'request@inbox.test', subject: 'Request', text: 'Hi' })
+  const noKey = await fetch(new Request('https://api.resend.com/emails', { method: 'POST', body }))
+  assert.equal(noKey.status, 401)
+  const withKey = await fetch(
+    new Request('https://api.resend.com/emails', { method: 'POST', headers: { authorization: 'Bearer re_test' }, body }),
+  )
+  assert.equal(withKey.status, 200)
+
+  const nodeStatus = (url: string, options: https.RequestOptions, payload: string) =>
+    new Promise<number>((resolve, reject) => {
+      const req = https.request(url, { servername: 'api.resend.com', ...options }, (res) => {
+        res.resume()
+        resolve(res.statusCode ?? 0)
+      })
+      req.on('error', reject)
+      req.end(payload)
+    })
+  const arrayHeaders = ['Authorization', 'Bearer re_test', 'Content-Type', 'application/json'] as unknown as https.RequestOptions['headers']
+  assert.equal(await nodeStatus('https://api.resend.com/emails', { method: 'POST', headers: arrayHeaders }, body), 200)
+  const mailgun = await nodeStatus(
+    'https://api:key-test@api.mailgun.net/v3/mg.acme.com/messages',
+    { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' } },
+    'from=a%40acme.com&to=basic%40inbox.test&subject=Basic&text=Hi',
+  )
+  assert.equal(mailgun, 200)
 })

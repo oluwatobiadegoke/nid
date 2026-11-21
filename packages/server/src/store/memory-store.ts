@@ -237,7 +237,7 @@ export class MemoryStore implements Store {
     const id = ++this.#nextRejectionId
     const stored: Rejection = {
       ...rejection,
-      to: [...rejection.to],
+      to: rejection.to.map((a) => a.trim().toLowerCase()),
       id,
       projectId,
       createdAt: new Date().toISOString(),

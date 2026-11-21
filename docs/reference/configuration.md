@@ -76,5 +76,6 @@ It returns `{ url, host, port, smtpPort, close() }`. `port` and `smtpPort` are t
 | `server.app` | The Hono app. Call `server.app.request(path, init)` to send a request without a network. |
 | `server.store` | The store passed in or created. |
 | `server.events` | The event bus passed in or created. |
+| `server.faults` | The fault rules passed in or created. |
 | `server.version` | The package version. |
 | `server.close()` | Stops the listeners and closes the store. |

@@ -89,6 +89,16 @@ test('SES v2 raw and template sends parse MIME and TemplateData', async (t) => {
   assert.equal(rawStored?.provider, 'ses')
   assert.equal(rawStored?.extracted.code, '912345')
 
+  const kindsRes = await sendV2(server, {
+    Destination: { ToAddresses: ['kinds@inbox.test'], CcAddresses: ['kinds-cc@inbox.test'], BccAddresses: ['kinds-bcc@inbox.test'] },
+    Content: { Raw: { Data: rawMime.toString('base64') } },
+  })
+  assert.equal(kindsRes.status, 200)
+  assert.deepEqual(
+    (await server.store.listMessages('default', { to: 'kinds@inbox.test' }))[0]?.recipients.map((r) => r.kind),
+    ['to', 'cc', 'bcc'],
+  )
+
   const tplRes = await sendV2(server, {
     FromEmailAddress: 'hello@acme.com',
     Destination: { ToAddresses: ['tpl@inbox.test'] },

@@ -103,7 +103,7 @@ NID_RESEND_WEBHOOK_SECRET=whsec_... \
 npx nid-inbox serve --auto-webhook delivered
 ```
 
-In local mode, nid also recognizes special recipient addresses at `inbox.test`. The same names at any other domain are ordinary addresses:
+Unless the server has an `auth` function, nid also recognizes special recipient addresses at `inbox.test`. The same names at any other domain are ordinary addresses:
 
 - `bounce@inbox.test` or `bounce+anything@inbox.test`: stores the email and sends a `bounced` webhook.
 - `defer@inbox.test` or `defer+anything@inbox.test`: stores the email and sends a `deferred` webhook.
@@ -113,7 +113,7 @@ In local mode, nid also recognizes special recipient addresses at `inbox.test`. 
 ## Limits
 
 - By default, nid sends an event only when you ask for one, unless `--auto-webhook` or a magic address is used.
-- Without `recipient` in the request body, the event names the email's first `to` address. You can override `recipient`, `url` (for `clicked`) and `reason` (for `bounced` and `deferred`).
+- Without `recipient` in the request body, the event names the email's first `to` address. A Resend event names every `to` address. You can override `recipient`, `url` (for `clicked`) and `reason` (for `bounced` and `deferred`).
 - Mail sent over SMTP has no provider, so it has no webhooks.
 - Every attempt is saved and can be read via `GET /api/messages/{id}/events` or `inbox.events(id)`.
 - nid sends each event once and does not retry.
