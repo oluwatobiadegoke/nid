@@ -278,4 +278,10 @@ test('the interceptor keeps a Request body, array headers and credentials in the
     'from=a%40acme.com&to=basic%40inbox.test&subject=Basic&text=Hi',
   )
   assert.equal(mailgun, 200)
+  const percent = await nodeStatus(
+    'https://api:50%off@api.mailgun.net/v3/mg.acme.com/messages',
+    { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' } },
+    'from=a%40acme.com&to=percent%40inbox.test&subject=Percent&text=Hi',
+  )
+  assert.equal(percent, 200)
 })

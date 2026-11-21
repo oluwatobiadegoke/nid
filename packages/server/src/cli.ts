@@ -188,7 +188,6 @@ async function run(args: string[]) {
 
   const child = spawn(command, commandArgs.slice(1), {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
     env: {
       ...process.env,
       NID_URL: targetUrl,

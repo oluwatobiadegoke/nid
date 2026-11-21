@@ -14,6 +14,8 @@ When your app runs on Node.js, start it with `nid run`. Nothing in your app or i
 npx nid-inbox run -- npm run dev
 ```
 
+On Windows, put `cmd /c` before a command that is a `.cmd` file, such as `npm`: `npx nid-inbox run -- cmd /c npm run dev`.
+
 `nid run` starts nid and preloads `nid-inbox/intercept`, which redirects outbound requests to `api.resend.com`, `api.brevo.com`, `api.sendinblue.com`, `api.sendgrid.com`, `api.eu.sendgrid.com`, `api.postmarkapp.com`, `api.mailgun.net`, `api.eu.mailgun.net` and Amazon SES endpoints (`email.<region>.amazonaws.com` and the dual-stack `email.<region>.api.aws`) to nid. It also sets `RESEND_BASE_URL`, `RESEND_API_URL`, `AWS_ENDPOINT_URL_SESV2` and `AWS_ENDPOINT_URL_SES`.
 
 If nid is already running in another terminal or container, pass `--url`:
