@@ -95,9 +95,29 @@ Returns refused sends as `Rejection[]`, newest first. With `to`, only those addr
 
 Deletes mail for `address`, or every message when you leave it out. Also forgets the matching cursors. Returns how many messages it deleted.
 
-### triggerWebhook(id, type)
+### delete(id)
 
-Sends the provider's webhook for message `id` to your app and returns your app's answer as `{ url, delivered, appStatus, appBody, durationMs, error? }`. `type` is `'delivered'`, `'deferred'`, `'bounced'`, `'complained'`, `'opened'` or `'clicked'`. A 4xx or 5xx from your app is not an error: check `delivered` or `appStatus`. It throws `InboxError` when nid cannot send it, for example when no webhook URL is set. See [Test your webhook handler](../how-to/test-webhooks.md).
+Deletes one message by `id`. Throws `InboxError` if the message does not exist.
+
+### clearRejections(address?)
+
+Deletes refused sends for `address`, or all rejections when omitted. Returns how many rejections it deleted.
+
+### events(id)
+
+Returns the recorded webhook delivery attempts (`WebhookDelivery[]`) for message `id`.
+
+### triggerWebhook(id, type, options?)
+
+Sends the provider's webhook for message `id` to your app and returns your app's answer as `{ url, delivered, appStatus, appBody, durationMs, error? }`. `type` is `'delivered'`, `'deferred'`, `'bounced'`, `'complained'`, `'opened'` or `'clicked'`. Pass optional `{ recipient, url, reason }` to override the recipient address, clicked link or bounce/defer reason. A 4xx or 5xx from your app is not an error: check `delivered` or `appStatus`. It throws `InboxError` when nid cannot send it, for example when no webhook URL is set. See [Test your webhook handler](../how-to/test-webhooks.md).
+
+### failNext(rule)
+
+Adds a fault or latency rule on the server (`POST /api/faults`) and returns the created `FaultRule`. Useful for testing provider `429` rate limits, `500`/`503` retries, or timeouts.
+
+### clearFaults()
+
+Clears all active fault rules on the server and returns how many were removed.
 
 ## Email
 

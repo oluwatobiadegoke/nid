@@ -23,6 +23,10 @@ test('shouldInterceptHost matches supported provider endpoints only', () => {
     'api.postmarkapp.com',
     'api.mailgun.net',
     'api.eu.mailgun.net',
+    'email.us-east-1.amazonaws.com',
+    'email.eu-west-2.amazonaws.com',
+    'email-fips.us-east-1.amazonaws.com',
+    'email.cn-north-1.amazonaws.com.cn',
   ]) {
     assert.equal(shouldInterceptHost(host), true, host)
   }
@@ -45,6 +49,7 @@ test('preload hook redirects default production SDK constructors to nid with zer
     import sgMail from '@sendgrid/mail'
     import { ServerClient } from 'postmark'
     import Mailgun from 'mailgun.js'
+    import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
 
     const resend = new Resend('re_test')
     const resendRes = await resend.emails.send({
@@ -86,12 +91,28 @@ test('preload hook redirects default production SDK constructors to nid with zer
       subject: 'Mailgun intercept',
       text: 'Code 555555',
     })
+
+    const ses = new SESv2Client({
+      region: 'us-east-1',
+      credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+    })
+    await ses.send(
+      new SendEmailCommand({
+        FromEmailAddress: 'hello@acme.com',
+        Destination: { ToAddresses: ['ses@inbox.test'] },
+        Content: {
+          Simple: { Subject: { Data: 'SES intercept' }, Body: { Text: { Data: 'Code 666666' } } },
+        },
+      }),
+    )
   `
 
   const interceptUrl = pathToFileURL(interceptJs).href
   const env = { ...process.env, NID_URL: listening.url, NODE_OPTIONS: `--import ${interceptUrl}` }
   delete env.RESEND_BASE_URL
   delete env.RESEND_API_URL
+  delete env.AWS_ENDPOINT_URL_SESV2
+  delete env.AWS_ENDPOINT_URL_SES
   await runExec(process.execPath, ['--input-type=module', '-e', script], { env })
 
   const expected: Array<[string, string, string]> = [
@@ -100,6 +121,7 @@ test('preload hook redirects default production SDK constructors to nid with zer
     ['sendgrid@inbox.test', 'sendgrid', '333333'],
     ['postmark@inbox.test', 'postmark', '444444'],
     ['mailgun@inbox.test', 'mailgun', '555555'],
+    ['ses@inbox.test', 'ses', '666666'],
   ]
   for (const [to, provider, code] of expected) {
     const messages = await server.store.listMessages('default', { to })
@@ -163,7 +185,7 @@ test('nid run starts nid, injects interception, and preserves the child exit cod
   assert.match(missingDash.stderr, /Usage: nid run \[options\] -- <command\.\.\.>/)
 })
 
-test('importing nid-inbox with NID_URL does not patch globals and //host paths stay on nid origin', async (t) => {
+test('importing nid-inbox with NID_URL does not patch globals and double-slash paths stay on nid origin', async (t) => {
   const indexJs = distFile('index.js')
   const interceptJs = distFile('intercept.js')
   assert.equal(existsSync(indexJs), true)

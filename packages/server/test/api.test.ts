@@ -122,11 +122,17 @@ test('only localhost-like hosts are answered unless allowed', async (t) => {
 })
 
 test('healthz, providers and the openapi document are served', async (t) => {
-  const server = await createServer()
+  const server = await createServer({ webhooks: { resend: { url: 'http://127.0.0.1:3000/hook' } } })
   t.after(() => server.close())
   assert.equal((await get(server, '/healthz')).body.ok, true)
-  const providers = (await get(server, '/api/providers')).body.providers as { name: string }[]
-  assert.deepEqual(providers.map((p) => p.name), ['resend', 'brevo', 'sendgrid', 'postmark', 'mailgun'])
+  const provBody = (await get(server, '/api/providers')).body as {
+    providers: { name: string }[]
+    smtpPort: number
+    webhooks: string[]
+  }
+  assert.deepEqual(provBody.providers.map((p) => p.name), ['resend', 'brevo', 'sendgrid', 'postmark', 'mailgun', 'ses'])
+  assert.equal(provBody.smtpPort, 1025)
+  assert.deepEqual(provBody.webhooks, ['resend'])
   const spec = await get(server, '/api/openapi.json')
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')
@@ -265,4 +271,84 @@ test('stream drains more than 100 backlog messages and resumes via Last-Event-ID
   }
   await resumedReader.cancel()
   assert.equal(resumedSeen.includes('"subject":"Backlog 120"'), false)
+})
+
+test('delete single message, delete rejections, and render sandboxed html preview with cid images', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  await sendResend(server, {
+    ...base,
+    subject: 'Inline',
+    html: '<img src="cid:logo@acme.com"><img src="https://cdn.acme.com/banner.png">',
+    attachments: [
+      {
+        filename: 'logo.png',
+        content: Buffer.from('pngbytes').toString('base64'),
+        content_type: 'image/png',
+        content_id: '<logo@acme.com>',
+      },
+    ],
+  })
+  await sendResend(server, { ...base, subject: 'Keep', text: 'Keep me' })
+  await sendResend(server, { to: 'bad@inbox.test', subject: 'Bad', text: 'Bad' })
+  await sendResend(server, { to: 'other-bad@inbox.test', subject: 'Bad2', text: 'Bad2' })
+
+  const list = (await get(server, '/api/messages')).body.messages as Array<{ id: number; subject: string }>
+  const inlineId = list.find((m) => m.subject === 'Inline')!.id
+  const keepId = list.find((m) => m.subject === 'Keep')!.id
+
+  const preview = await server.app.request(`/api/messages/${inlineId}/html`)
+  assert.equal(preview.status, 200)
+  const csp = preview.headers.get('content-security-policy') ?? ''
+  assert.match(csp, /sandbox/)
+  assert.match(csp, /default-src 'none'/)
+  assert.match(csp, /img-src \* data: blob:/)
+  assert.match(csp, /form-action 'none'/)
+  assert.match(csp, /base-uri 'none'/)
+  const html = await preview.text()
+  assert.match(html, /data:image\/png;base64,cG5nYnl0ZXM=/)
+  assert.match(html, /https:\/\/cdn\.acme\.com\/banner\.png/)
+
+  const delOne = await server.app.request(`/api/messages/${inlineId}`, { method: 'DELETE' })
+  assert.equal(delOne.status, 200)
+  assert.equal((await get(server, `/api/messages/${inlineId}`)).status, 404)
+  assert.equal((await get(server, `/api/messages/${keepId}`)).status, 200)
+
+  const delOneRej = await server.app.request('/api/rejections?to=bad@inbox.test', { method: 'DELETE' })
+  assert.deepEqual(await delOneRej.json(), { deleted: 1 })
+  assert.equal(((await get(server, '/api/rejections')).body.rejections as unknown[]).length, 1)
+
+  const delAllRej = await server.app.request('/api/rejections', { method: 'DELETE' })
+  assert.deepEqual(await delAllRej.json(), { deleted: 1 })
+  assert.equal(((await get(server, '/api/rejections')).body.rejections as unknown[]).length, 0)
+})
+
+test('read API refuses cross-origin mutating requests from disallowed origins', async (t) => {
+  const server = await createServer({ allowHosts: ['app.local.test'] })
+  t.after(() => server.close())
+  await sendResend(server, { ...base, subject: 'CSRF', text: 'CSRF' })
+  const messages = (await get(server, '/api/messages')).body.messages as Array<{ id: number }>
+  const id = messages[0]!.id
+
+  const faultRes = await server.app.request('/api/faults', {
+    method: 'POST',
+    headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+    body: JSON.stringify({ status: 503 }),
+  })
+  assert.equal(faultRes.status, 403)
+  assert.equal(((await get(server, '/api/faults')).body.faults as unknown[]).length, 0)
+
+  const eventRes = await server.app.request(`/api/messages/${id}/events`, {
+    method: 'POST',
+    headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+    body: JSON.stringify({ type: 'complained' }),
+  })
+  assert.equal(eventRes.status, 403)
+
+  const allowedOrigin = await server.app.request('/api/faults', {
+    method: 'POST',
+    headers: { origin: 'http://app.local.test', 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 503 }),
+  })
+  assert.equal(allowedOrigin.status, 201)
 })

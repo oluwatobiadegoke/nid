@@ -40,10 +40,21 @@ export const streamQuery = z.strictObject({
   after: cursor.optional(),
 })
 
+export const faultBodySchema = z.strictObject({
+  provider: z.string().trim().min(1).optional(),
+  to: z.string().trim().min(1).optional(),
+  status: z.number().int().min(100).max(599).optional(),
+  body: z.unknown().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  delayMs: z.number().int().min(0).max(30_000).optional(),
+  count: z.number().int().min(1).nullable().optional(),
+})
+
 export type QueryIssue = { error: string; details: string[] }
 
 export function parseQuery<T extends z.ZodType>(schema: T, params: URLSearchParams): z.infer<T> | QueryIssue {
-  const result = schema.safeParse(Object.fromEntries(params.entries()))
+  const entries = [...params.entries()].filter(([key]) => key !== 'token')
+  const result = schema.safeParse(Object.fromEntries(entries))
   if (result.success) return result.data as z.infer<T>
   return {
     error: 'Invalid query',

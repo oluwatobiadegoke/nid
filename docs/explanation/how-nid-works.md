@@ -92,6 +92,5 @@ Every stored message and every query carries a project id. On your machine there
 
 Today:
 
-- Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
-- nid calls your app's webhook route only when you [ask it to](../how-to/test-webhooks.md). It never sends "delivered" or "bounced" by itself after a send.
+- Only Resend, Amazon SES, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
 - The only built-in persistent store is SQLite.

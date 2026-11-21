@@ -1,0 +1,110 @@
+export interface FaultInput {
+  provider?: string | undefined
+  to?: string | undefined
+  status?: number | undefined
+  body?: unknown
+  headers?: Record<string, string> | undefined
+  delayMs?: number | undefined
+  count?: number | null | undefined
+}
+
+export interface FaultRule {
+  id: number
+  projectId: string
+  provider: string | null
+  to: string | null
+  status: number
+  body: unknown
+  headers: Record<string, string>
+  delayMs: number
+  remaining: number | null
+  createdAt: string
+}
+
+export interface FaultStore {
+  add(projectId: string, input: FaultInput): FaultRule
+  list(projectId: string): FaultRule[]
+  clear(projectId: string): number
+  consume(projectId: string, provider: string, recipients: string[]): FaultRule | null
+}
+
+export type MagicAction = 'ratelimit' | 'bounced' | 'deferred' | 'complained'
+
+export interface MagicMatch {
+  action: MagicAction
+  recipient: string
+}
+
+export function magicMatchFor(recipients: string[]): MagicMatch | null {
+  for (const address of recipients) {
+    const normalized = address.trim().toLowerCase()
+    const local = normalized.split('@')[0] ?? ''
+    if (/^ratelimit(?:\+|$)/.test(local)) return { action: 'ratelimit', recipient: normalized }
+    if (/^bounce(?:\+|$)/.test(local)) return { action: 'bounced', recipient: normalized }
+    if (/^defer(?:\+|$)/.test(local)) return { action: 'deferred', recipient: normalized }
+    if (/^complain(?:\+|$)/.test(local)) return { action: 'complained', recipient: normalized }
+  }
+  return null
+}
+
+export function magicActionFor(recipients: string[]): MagicAction | null {
+  return magicMatchFor(recipients)?.action ?? null
+}
+
+export function createFaultStore(): FaultStore {
+  const rulesByProject = new Map<string, FaultRule[]>()
+  let nextId = 0
+
+  return {
+    add(projectId, input) {
+      const delayMs = input.delayMs ?? 0
+      const status = input.status ?? (delayMs > 0 ? 200 : 500)
+      const rule: FaultRule = {
+        id: ++nextId,
+        projectId,
+        provider: input.provider ? input.provider.trim().toLowerCase() : null,
+        to: input.to ? input.to.trim().toLowerCase() : null,
+        status,
+        body: input.body,
+        headers: { ...(input.headers ?? {}) },
+        delayMs,
+        remaining: input.count === undefined ? 1 : input.count,
+        createdAt: new Date().toISOString(),
+      }
+      const list = rulesByProject.get(projectId) ?? []
+      list.push(rule)
+      rulesByProject.set(projectId, list)
+      return rule
+    },
+
+    list(projectId) {
+      return [...(rulesByProject.get(projectId) ?? [])]
+    },
+
+    clear(projectId) {
+      const list = rulesByProject.get(projectId)
+      if (!list) return 0
+      const count = list.length
+      rulesByProject.delete(projectId)
+      return count
+    },
+
+    consume(projectId, provider, recipients) {
+      const list = rulesByProject.get(projectId)
+      if (!list || list.length === 0) return null
+      const providerKey = provider.trim().toLowerCase()
+      const recipientKeys = recipients.map((r) => r.trim().toLowerCase())
+      for (let i = 0; i < list.length; i++) {
+        const rule = list[i]!
+        if (rule.provider !== null && rule.provider !== providerKey) continue
+        if (rule.to !== null && !recipientKeys.includes(rule.to)) continue
+        if (rule.remaining !== null) {
+          rule.remaining -= 1
+          if (rule.remaining <= 0) list.splice(i, 1)
+        }
+        return rule
+      }
+      return null
+    },
+  }
+}

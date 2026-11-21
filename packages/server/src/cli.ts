@@ -14,7 +14,7 @@ const defaultHost = '127.0.0.1'
 const help = `nid ${version}
 
 Usage:
-  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--auto-webhook event]
   nid run [serve options] [--url <url>] -- <command...>
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
@@ -26,7 +26,7 @@ Options for read, clear, webhook, mcp, healthcheck and run:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
-  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT
+  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK
   NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
 
@@ -37,6 +37,7 @@ const serverOptionConfig = {
   db: { type: 'string', default: process.env.NID_DB },
   cors: { type: 'boolean', default: false },
   'allow-host': { type: 'string', multiple: true, default: [] as string[] },
+  'auto-webhook': { type: 'string', default: process.env.NID_AUTO_WEBHOOK },
   quiet: { type: 'boolean', default: false },
 } as const
 
@@ -67,12 +68,21 @@ async function startServer(values: {
   db?: string | undefined
   cors: boolean
   'allow-host': string[]
+  'auto-webhook'?: string | undefined
   quiet: boolean
 }) {
-  const [{ createServer }, { providers }] = await Promise.all([
+  const [{ createServer }, { providers }, { webhookEvents }] = await Promise.all([
     import('./server.js'),
     import('./providers/index.js'),
+    import('./providers/types.js'),
   ])
+  let autoWebhook: (typeof webhookEvents)[number] | undefined
+  if (values['auto-webhook']) {
+    if (!webhookEvents.includes(values['auto-webhook'] as (typeof webhookEvents)[number])) {
+      fail(`--auto-webhook must be one of ${webhookEvents.join(', ')}`)
+    }
+    autoWebhook = values['auto-webhook'] as (typeof webhookEvents)[number]
+  }
   let store
   if (values.db) {
     const { createSqliteStore } = await import('./store/index.js')
@@ -90,6 +100,7 @@ async function startServer(values: {
     cors: values.cors,
     allowHosts: values['allow-host'],
     webhooks,
+    ...(autoWebhook ? { autoWebhook } : {}),
     onError: (err) => process.stderr.write(`nid: ${err.message}\n`),
   }).catch((err: Error) => fail(err.message))
   const listening = await server.listen({
@@ -111,6 +122,7 @@ async function startServer(values: {
           shown.password = ''
           return `  webhooks    ${name} to ${shown.href}`
         }),
+        ...(autoWebhook ? [`  auto        ${autoWebhook} webhook after each send`] : []),
         `  mail is ${where}`,
         '',
       ].join('\n'),
@@ -172,6 +184,8 @@ async function run(args: string[]) {
       NID_URL: targetUrl,
       RESEND_BASE_URL: targetUrl,
       RESEND_API_URL: targetUrl,
+      AWS_ENDPOINT_URL_SESV2: targetUrl,
+      AWS_ENDPOINT_URL_SES: targetUrl,
       NODE_OPTIONS: nodeOptions,
     },
   })

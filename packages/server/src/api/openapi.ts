@@ -72,6 +72,41 @@ const rejection = {
   },
 }
 
+const webhookDelivery = {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    projectId: { type: 'string' },
+    messageId: { type: 'integer' },
+    provider: { type: 'string' },
+    event: { type: 'string', enum: [...webhookEvents] },
+    recipient: { type: 'string' },
+    url: { type: 'string' },
+    delivered: { type: 'boolean' },
+    appStatus: { type: 'integer', nullable: true },
+    appBody: { type: 'string' },
+    durationMs: { type: 'integer' },
+    error: { type: 'string', nullable: true },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+}
+
+const faultRule = {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    projectId: { type: 'string' },
+    provider: { type: 'string', nullable: true },
+    to: { type: 'string', nullable: true },
+    status: { type: 'integer' },
+    body: {},
+    headers: { type: 'object', additionalProperties: { type: 'string' } },
+    delayMs: { type: 'integer' },
+    remaining: { type: 'integer', nullable: true },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+}
+
 const queryError = {
   description: 'A parameter is unknown or malformed.',
   content: {
@@ -189,8 +224,40 @@ export function openapi(version: string) {
             '404': { description: 'No such message' },
           },
         },
+        delete: {
+          summary: 'Delete one message.',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          responses: {
+            '200': {
+              description: 'Deleted',
+              content: { 'application/json': { schema: { type: 'object', properties: { deleted: { type: 'boolean' } } } } },
+            },
+            '404': { description: 'No such message' },
+          },
+        },
+      },
+      '/api/messages/{id}/html': {
+        get: {
+          summary: 'Sandboxed HTML preview with inline cid: attachments resolved.',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          responses: {
+            '200': { description: 'HTML preview' },
+            '404': { description: 'No such message or no HTML body' },
+          },
+        },
       },
       '/api/messages/{id}/events': {
+        get: {
+          summary: 'List webhook delivery attempts for a message.',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          responses: {
+            '200': {
+              description: 'Webhook delivery attempts',
+              content: { 'application/json': { schema: { type: 'object', properties: { events: { type: 'array', items: webhookDelivery } } } } },
+            },
+            '404': { description: 'No such message' },
+          },
+        },
         post: {
           summary: "Send the provider's signed webhook for this message to your app, and return your app's answer.",
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
@@ -201,7 +268,12 @@ export function openapi(version: string) {
                 schema: {
                   type: 'object',
                   required: ['type'],
-                  properties: { type: { type: 'string', enum: [...webhookEvents] } },
+                  properties: {
+                    type: { type: 'string', enum: [...webhookEvents] },
+                    recipient: { type: 'string' },
+                    url: { type: 'string' },
+                    reason: { type: 'string' },
+                  },
                 },
               },
             },
@@ -255,6 +327,65 @@ export function openapi(version: string) {
             },
           },
         },
+        delete: {
+          summary: 'Delete rejections for one address, or everything.',
+          parameters: [param('to', { type: 'string' }, 'Clear only this address.')],
+          responses: {
+            '200': {
+              description: 'How many were deleted',
+              content: { 'application/json': { schema: { type: 'object', properties: { deleted: { type: 'integer' } } } } },
+            },
+          },
+        },
+      },
+      '/api/faults': {
+        get: {
+          summary: 'List active fault rules.',
+          responses: {
+            '200': {
+              description: 'Fault rules',
+              content: { 'application/json': { schema: { type: 'object', properties: { faults: { type: 'array', items: faultRule } } } } },
+            },
+          },
+        },
+        post: {
+          summary: 'Add a fault or latency injection rule.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    provider: { type: 'string' },
+                    to: { type: 'string' },
+                    status: { type: 'integer' },
+                    body: {},
+                    headers: { type: 'object', additionalProperties: { type: 'string' } },
+                    delayMs: { type: 'integer' },
+                    count: { type: 'integer', nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Created fault rule',
+              content: { 'application/json': { schema: { type: 'object', properties: { fault: faultRule } } } },
+            },
+            '400': queryError,
+          },
+        },
+        delete: {
+          summary: 'Clear all fault rules.',
+          responses: {
+            '200': {
+              description: 'Cleared count',
+              content: { 'application/json': { schema: { type: 'object', properties: { cleared: { type: 'integer' } } } } },
+            },
+          },
+        },
       },
       '/api/stream': {
         get: {
@@ -265,7 +396,7 @@ export function openapi(version: string) {
       },
       '/api/providers': {
         get: {
-          summary: 'The provider APIs this server answers, with the setting that points each SDK at it.',
+          summary: 'The provider APIs this server answers, SMTP port, and configured webhook providers.',
           responses: { '200': { description: 'Providers' } },
         },
       },
@@ -276,6 +407,6 @@ export function openapi(version: string) {
         },
       },
     },
-    components: { schemas: { Message: message, Rejection: rejection } },
+    components: { schemas: { Message: message, Rejection: rejection, WebhookDelivery: webhookDelivery, FaultRule: faultRule } },
   }
 }

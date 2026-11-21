@@ -29,6 +29,7 @@ Each provider has its own pair, such as `NID_RESEND_WEBHOOK_URL` and `NID_RESEND
 | SendGrid | Not used. nid signs with its own test key, so give your app nid's public key. See [SendGrid webhooks](../reference/providers.md#sendgrid-webhooks). |
 | Postmark | Not used. Put a user and password in the URL, such as `http://user:pass@127.0.0.1:3000/hooks`, and nid sends them as basic auth. |
 | Mailgun | Required. Your app's HTTP webhook signing key. |
+| Amazon SES | Optional. Sent as `Authorization: Bearer <secret>`. |
 
 When nid runs in Docker, `127.0.0.1` is the container itself, so point it at your machine with `host.docker.internal`:
 
@@ -92,9 +93,27 @@ Could not reach your app at http://127.0.0.1:3000/api/communications/webhooks/br
 
 `nid webhook` prints that sentence, or your app's status and body, and exits with code 1 unless your app answered 2xx. See [nid webhook](../reference/cli.md#nid-webhook).
 
+## Automatic webhooks and magic addresses
+
+To send a webhook automatically after every stored email, start nid with `--auto-webhook`:
+
+```sh
+NID_RESEND_WEBHOOK_URL=http://127.0.0.1:3000/api/webhooks/resend \
+NID_RESEND_WEBHOOK_SECRET=whsec_... \
+npx nid-inbox serve --auto-webhook delivered
+```
+
+In local mode, nid also recognizes special recipient addresses:
+
+- `bounce@inbox.test` or `bounce+anything@inbox.test`: stores the email and sends a `bounced` webhook.
+- `defer@inbox.test` or `defer+anything@inbox.test`: stores the email and sends a `deferred` webhook.
+- `complain@inbox.test` or `complain+anything@inbox.test`: stores the email and sends a `complained` webhook.
+- `ratelimit@inbox.test` or `ratelimit+anything@inbox.test`: refuses the send with HTTP `429` (`Retry-After: 1`) and records a rejection.
+
 ## Limits
 
-- nid sends an event only when you ask for one. It never sends one by itself after a send.
-- The event names the email's first `to` address.
+- By default, nid sends an event only when you ask for one, unless `--auto-webhook` or a magic address is used.
+- Without `recipient` in the request body, the event names the email's first `to` address. You can override `recipient`, `url` (for `clicked`) and `reason` (for `bounced` and `deferred`).
 - Mail sent over SMTP has no provider, so it has no webhooks.
+- Every attempt is saved and can be read via `GET /api/messages/{id}/events` or `inbox.events(id)`.
 - nid sends each event once and does not retry.

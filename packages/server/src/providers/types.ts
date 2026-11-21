@@ -62,6 +62,8 @@ export interface WebhookInput {
   recipient: string
   secret: string | undefined
   now: Date
+  url?: string | undefined
+  reason?: string | undefined
 }
 
 export interface WebhookRequest {

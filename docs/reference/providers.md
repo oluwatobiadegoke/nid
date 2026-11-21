@@ -9,6 +9,7 @@ nid answers the HTTP APIs of these email providers, plus SMTP. Each one stores m
 | [SendGrid](#sendgrid) | `sendgrid` | `POST /v3/mail/send` |
 | [Postmark](#postmark) | `postmark` | `POST /email`, `POST /email/batch`, `POST /email/withTemplate`, `POST /email/batchWithTemplates` |
 | [Mailgun](#mailgun) | `mailgun` | `POST /v3/{domain}/messages`, `POST /v3/{domain}/messages.mime` |
+| [Amazon SES](#amazon-ses) | `ses` | `POST /v2/email/outbound-emails`, `POST /v2/email/outbound-bulk-emails`, `POST /` |
 | [SMTP](#smtp) | `smtp` | Port 1025 |
 
 All routes are on the HTTP port, 4400 by default. Any key value works, but it must be present and in the right place. A send that nid refuses gets the provider's own error status and body, and nid keeps it as a [rejection](read-api.md#get-apirejections). The rejection lists every `to`, `cc` and `bcc` address nid can read from the request, so a test waiting on any of them sees why its mail never came.
@@ -166,6 +167,24 @@ Sends a message you built yourself, for example with Nodemailer. The form needs 
 
 With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message with its own provider id, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
 
+## Amazon SES
+
+Point the AWS SDK v3 `SESv2Client` at nid with `AWS_ENDPOINT_URL_SESV2=http://127.0.0.1:4400` (legacy SES v1 clients read `AWS_ENDPOINT_URL_SES`), or run your app with `nid run`.
+
+**Key:** `Authorization: AWS4-HMAC-SHA256 ...` header (the AWS SDK sends this automatically). Without it: `403 {"message": "Missing Authentication Token"}` with header `x-amzn-errortype: MissingAuthenticationTokenException`.
+
+### POST /v2/email/outbound-emails
+
+Supports `Content.Simple` (`Subject`, `Body.Text`, `Body.Html`, `Headers`), `Content.Raw` (base64 or bytes MIME), and `Content.Template` (`TemplateName` or `TemplateArn` plus JSON `TemplateData` stored in `meta.templateId` and `meta.variables`). Returns `200 {"MessageId": "..."}`.
+
+### POST /v2/email/outbound-bulk-emails
+
+Sends up to 50 `BulkEmailEntries` using `DefaultContent.Template` and `ReplacementTemplateData`. Returns `200 {"BulkEmailEntryResults": [...]}` with `SUCCESS` or `MESSAGE_REJECTED` per entry. Failed entries are recorded as rejections.
+
+### POST /
+
+Handles SES v1 form-encoded `Action=SendEmail` and `Action=SendRawEmail` requests and returns XML `<SendEmailResponse>` or `<SendRawEmailResponse>` receipts (`text/xml`), or XML `<ErrorResponse>` with `x-amzn-errortype` on missing or invalid fields.
+
 ## SMTP
 
 | Setting | Value |
@@ -185,14 +204,14 @@ When a send uses a template and has no body, nid has nothing to show but the tem
 
 [`POST /api/messages/{id}/events`](read-api.md#post-apimessagesidevents) sends the provider's webhook for a message to your app. See [Test your webhook handler](../how-to/test-webhooks.md). Each event becomes the provider's own:
 
-| nid event | Resend | Brevo | SendGrid | Postmark | Mailgun |
-| --- | --- | --- | --- | --- | --- |
-| `delivered` | `email.delivered` | `delivered` | `delivered` | `Delivery` | `delivered` |
-| `deferred` | `email.delivery_delayed` | `deferred` | `deferred` | `Bounce`, type `Transient` | `failed`, severity `temporary` |
-| `bounced` | `email.bounced`, type `Permanent` | `hard_bounce` | `bounce` | `Bounce`, type `HardBounce` | `failed`, severity `permanent` |
-| `complained` | `email.complained` | `spam` | `spamreport` | `SpamComplaint` | `complained` |
-| `opened` | `email.opened` | `opened` | `open` | `Open` | `opened` |
-| `clicked` | `email.clicked` | `click` | `click` | `Click` | `clicked` |
+| nid event | Resend | Brevo | SendGrid | Postmark | Mailgun | Amazon SES |
+| --- | --- | --- | --- | --- | --- | --- |
+| `delivered` | `email.delivered` | `delivered` | `delivered` | `Delivery` | `delivered` | `Delivery` |
+| `deferred` | `email.delivery_delayed` | `deferred` | `deferred` | `Bounce`, type `Transient` | `failed`, severity `temporary` | `DeliveryDelay` |
+| `bounced` | `email.bounced`, type `Permanent` | `hard_bounce` | `bounce` | `Bounce`, type `HardBounce` | `failed`, severity `permanent` | `Bounce` |
+| `complained` | `email.complained` | `spam` | `spamreport` | `SpamComplaint` | `complained` | `Complaint` |
+| `opened` | `email.opened` | `opened` | `open` | `Open` | `opened` | `Open` |
+| `clicked` | `email.clicked` | `click` | `click` | `Click` | `clicked` | `Click` |
 
 The payload carries the ids your app got back when it sent, so it can find the email:
 
@@ -203,6 +222,7 @@ The payload carries the ids your app got back when it sent, so it can find the e
 | SendGrid | `sg_message_id`, which starts with the `X-Message-Id` | `custom_args`, categories as `category` | nid's test key. See below. |
 | Postmark | `MessageID` | `Tag`, `Metadata`, `MessageStream` | Not signed. A user and password in the URL become basic auth. |
 | Mailgun | `message.headers.message-id`, without `<` and `>` | `v:` variables as `user-variables`, `tags` | `signature.signature`, an HMAC-SHA256 of `timestamp` and `token` with your signing key. |
+| Amazon SES | `mail.messageId` | `EmailTags` as `mail.tags` | Not signed. With a secret, `Authorization: Bearer <secret>`. |
 
 ### SendGrid webhooks
 

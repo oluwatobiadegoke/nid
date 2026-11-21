@@ -178,7 +178,7 @@ const bounces: Partial<Record<WebhookEvent, object>> = {
   },
 }
 
-function webhook({ message: m, event, recipient, now }: WebhookInput) {
+function webhook({ message: m, event, recipient, now, url, reason }: WebhookInput) {
   const common = {
     MessageID: m.providerId,
     MessageStream: (m.meta.messageStream as string | undefined) ?? 'outbound',
@@ -189,11 +189,13 @@ function webhook({ message: m, event, recipient, now }: WebhookInput) {
   const at = now.toISOString()
   const reader = { Platform: 'Desktop', UserAgent: 'nid', Client: { Name: 'nid', Company: 'nid', Family: 'nid' }, OS: { Name: 'nid', Company: 'nid', Family: 'nid' }, Geo: {} }
   const bounce = bounces[event]
+  const details = event === 'bounced' ? (reason ?? bounceReason) : event === 'deferred' ? (reason ?? deferReason) : undefined
   const payload = bounce
     ? {
         RecordType: event === 'complained' ? 'SpamComplaint' : 'Bounce',
         ID: now.getTime(),
         ...bounce,
+        ...(details !== undefined ? { Details: details } : {}),
         ...common,
         Email: recipient,
         From: senderAddress(m.from),
@@ -207,7 +209,7 @@ function webhook({ message: m, event, recipient, now }: WebhookInput) {
       ? { RecordType: 'Delivery', ...common, Recipient: recipient, DeliveredAt: at, Details: 'Test delivery webhook details' }
       : event === 'opened'
         ? { RecordType: 'Open', ...common, ...reader, FirstOpen: true, ReadSeconds: 0, Recipient: recipient, ReceivedAt: at }
-        : { RecordType: 'Click', ...common, ...reader, ClickLocation: 'HTML', OriginalLink: m.extracted.link ?? '', Recipient: recipient, ReceivedAt: at }
+        : { RecordType: 'Click', ...common, ...reader, ClickLocation: 'HTML', OriginalLink: url ?? m.extracted.link ?? '', Recipient: recipient, ReceivedAt: at }
   return { body: JSON.stringify(payload), headers: {} }
 }
 

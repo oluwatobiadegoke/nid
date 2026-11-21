@@ -1,14 +1,17 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import type { EventBus } from '../events/index.js'
+import type { FaultStore } from '../ingest/faults.js'
 import type { Ingest } from '../ingest/types.js'
 import { webhookEvents, type Provider, type WebhookEvent } from '../providers/types.js'
+import { originCheck } from '../security/host.js'
 import type { Store } from '../store/types.js'
-import type { Project } from '../types.js'
+import type { Message, Project } from '../types.js'
 import { openapi } from './openapi.js'
 import {
   compilePattern,
   deleteQuery,
+  faultBodySchema,
   isIssue,
   messagesQuery,
   parseQuery,
@@ -18,7 +21,7 @@ import {
 } from './query.js'
 import { serializeMessage, serializeRejection } from './serialize.js'
 import { defaultTimeoutSeconds, describeTimeout, waitForMessage } from './wait.js'
-import { sendWebhook, type WebhookTarget } from './webhook.js'
+import { dispatchWebhook, type WebhookTarget } from './webhook.js'
 
 export interface ApiOptions {
   store: Store
@@ -26,6 +29,9 @@ export interface ApiOptions {
   ingest: Ingest
   providers: Provider[]
   webhooks: Record<string, WebhookTarget>
+  faults: FaultStore
+  allowHosts?: string[] | undefined
+  getSmtpPort: () => number
   version: string
 }
 
@@ -36,10 +42,26 @@ function bearerToken(header: string | undefined): string | null {
   return match?.[1] ?? null
 }
 
+async function renderHtmlPreview(store: Store, projectId: string, message: Message): Promise<string> {
+  let html = message.html ?? ''
+  for (const info of message.attachments) {
+    if (!info.contentId) continue
+    const cleanId = info.contentId.replace(/^<|>$/g, '').replace(/^cid:/i, '').trim()
+    if (!cleanId) continue
+    const attachment = await store.getAttachment(projectId, message.id, info.n)
+    if (!attachment) continue
+    const dataUrl = `data:${attachment.contentType};base64,${Buffer.from(attachment.content).toString('base64')}`
+    const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    html = html.replace(new RegExp(`cid:${escaped}`, 'gi'), dataUrl)
+  }
+  return html
+}
+
 export function readApi(options: ApiOptions): Hono<Env> {
-  const { store, events } = options
+  const { store, events, faults } = options
   const app = new Hono<Env>()
 
+  app.use('*', originCheck(options.allowHosts ?? []))
   app.use('*', async (c, next) => {
     const token = bearerToken(c.req.header('authorization')) ?? c.req.query('token') ?? ''
     const project = await options.ingest.resolveProject({ kind: 'http', provider: 'api', value: token })
@@ -113,13 +135,61 @@ export function readApi(options: ApiOptions): Hono<Env> {
     return c.json({ message: serializeMessage(message, { raw: true }) })
   })
 
+  app.delete('/messages/:id', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
+    const deleted = await store.deleteMessage(c.get('project').projectId, id)
+    if (!deleted) return c.json({ error: `No message with id ${id}` }, 404)
+    return c.json({ deleted: true })
+  })
+
+  app.get('/messages/:id/html', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
+    const projectId = c.get('project').projectId
+    const message = await store.getMessage(projectId, id)
+    if (!message) return c.json({ error: `No message with id ${id}` }, 404)
+    if (!message.html) return c.json({ error: `Message ${id} has no HTML body` }, 404)
+    const html = await renderHtmlPreview(store, projectId, message)
+    return c.html(html, 200, {
+      'content-security-policy':
+        "sandbox; default-src 'none'; img-src * data: blob:; style-src 'unsafe-inline' https: http:; font-src * data:; form-action 'none'; base-uri 'none'",
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+    })
+  })
+
+  app.get('/messages/:id/events', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
+    const projectId = c.get('project').projectId
+    const message = await store.getMessage(projectId, id)
+    if (!message) return c.json({ error: `No message with id ${id}` }, 404)
+    const deliveries = await store.listWebhookDeliveries(projectId, id)
+    return c.json({ events: deliveries })
+  })
+
   app.post('/messages/:id/events', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
-    const body = (await c.req.json().catch(() => null)) as { type?: unknown } | null
+    const body = (await c.req.json().catch(() => null)) as {
+      type?: unknown
+      recipient?: unknown
+      url?: unknown
+      reason?: unknown
+    } | null
     const event = body?.type as WebhookEvent
     if (!webhookEvents.includes(event)) {
       return c.json({ error: `type must be one of ${webhookEvents.join(', ')}` }, 400)
+    }
+    if (body?.recipient !== undefined && (typeof body.recipient !== 'string' || !body.recipient.trim())) {
+      return c.json({ error: 'recipient must be a non-empty string' }, 400)
+    }
+    if (body?.url !== undefined && typeof body.url !== 'string') {
+      return c.json({ error: 'url must be a string' }, 400)
+    }
+    if (body?.reason !== undefined && typeof body.reason !== 'string') {
+      return c.json({ error: 'reason must be a string' }, 400)
     }
     const projectId = c.get('project').projectId
     const message = await store.getMessage(projectId, id)
@@ -135,34 +205,23 @@ export function readApi(options: ApiOptions): Hono<Env> {
         400,
       )
     }
-    const recipient = message.recipients[0]?.address ?? ''
-    let request
     try {
-      request = provider.webhook({
+      const outcome = await dispatchWebhook({
+        store,
+        events,
+        provider,
+        target,
+        projectId,
         message,
         event,
-        recipient,
-        secret: target.secret,
-        now: new Date(),
+        recipient: typeof body?.recipient === 'string' ? body.recipient.trim() : undefined,
+        url: typeof body?.url === 'string' ? body.url : undefined,
+        reason: typeof body?.reason === 'string' ? body.reason : undefined,
       })
+      return c.json(outcome)
     } catch (err) {
       return c.json({ error: (err as Error).message }, 400)
     }
-    const outcome = await sendWebhook(target, request)
-    const delivery = await store.insertWebhookDelivery(projectId, {
-      messageId: message.id,
-      provider: provider.name,
-      event,
-      recipient,
-      url: outcome.url,
-      delivered: outcome.delivered,
-      appStatus: outcome.appStatus,
-      appBody: outcome.appBody,
-      durationMs: outcome.durationMs,
-      error: outcome.error ?? null,
-    })
-    events.emit(projectId, { kind: 'webhook', delivery })
-    return c.json(outcome)
   })
 
   app.get('/messages/:id/attachments/:n', async (c) => {
@@ -188,6 +247,40 @@ export function readApi(options: ApiOptions): Hono<Env> {
       limit: query.limit,
     })
     return c.json({ rejections: rejections.map((r) => serializeRejection(r, { raw: true })) })
+  })
+
+  app.delete('/rejections', async (c) => {
+    const query = parseQuery(deleteQuery, new URL(c.req.url).searchParams)
+    if (isIssue(query)) return c.json(query, 400)
+    const deleted = await store.deleteRejections(c.get('project').projectId, query.to)
+    return c.json({ deleted })
+  })
+
+  app.get('/faults', (c) => {
+    return c.json({ faults: faults.list(c.get('project').projectId) })
+  })
+
+  app.post('/faults', async (c) => {
+    const raw = await c.req.json().catch(() => undefined)
+    const parsed = faultBodySchema.safeParse(raw)
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: 'Invalid body',
+          details: parsed.error.issues.map((i) => {
+            const path = i.path.join('.')
+            return path ? `${path}: ${i.message}` : i.message
+          }),
+        },
+        400,
+      )
+    }
+    const rule = faults.add(c.get('project').projectId, parsed.data)
+    return c.json({ fault: rule }, 201)
+  })
+
+  app.delete('/faults', (c) => {
+    return c.json({ cleared: faults.clear(c.get('project').projectId) })
   })
 
   app.get('/stream', async (c) => {
@@ -271,6 +364,8 @@ export function readApi(options: ApiOptions): Hono<Env> {
   app.get('/providers', (c) => {
     return c.json({
       providers: options.providers.map((p) => ({ name: p.name, label: p.label, setup: p.setup })),
+      smtpPort: options.getSmtpPort(),
+      webhooks: Object.keys(options.webhooks),
     })
   })
 
