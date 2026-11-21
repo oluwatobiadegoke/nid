@@ -2,7 +2,7 @@
 
 Local email API, inbox, and webhook simulator for testing apps and AI agents.
 
-While you build or run tests, your app sends email to nid instead of real recipients. nid intercepts official email SDKs with zero app-code changes, validates requests with provider-shaped errors, triggers signed webhooks back to your app, and wakes waiting tests and AI agents when mail arrives. Nothing leaves your machine.
+While you build or run tests, your app sends email to nid instead of real recipients. nid intercepts official email SDKs with zero app-code changes, validates requests with provider-shaped errors, triggers signed webhooks back to your app, and wakes waiting tests and AI agents when mail arrives. No email leaves your machine. nid calls out only to the webhook URLs you set.
 
 ![Two emails arrive in the nid web view. Opening one shows its sign-in code and link.](https://raw.githubusercontent.com/oluwatobiadegoke/nid/main/docs/assets/demo.gif)
 

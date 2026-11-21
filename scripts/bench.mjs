@@ -109,7 +109,7 @@ for (let i = 0; i < waitIterations; i++) {
   const waitPromise = fetch(
     `${waitListening.url}/api/wait?to=${encodeURIComponent(recipient)}&timeout=5`,
   )
-  await new Promise((resolve) => setTimeout(resolve, 1))
+  await new Promise((resolve) => setTimeout(resolve, 10))
   const sentAt = performance.now()
   const sendPromise = fetch(`${waitListening.url}/emails`, {
     method: 'POST',
