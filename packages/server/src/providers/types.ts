@@ -76,7 +76,7 @@ export interface Provider {
   name: string
   label: string
   credential(req: IncomingRequest): string | null
-  unauthorized(): ProviderReply
+  unauthorized(req?: IncomingRequest): ProviderReply
   routes: ProviderRoute[]
   setup: { env: string; note: string }
   webhook?(input: WebhookInput): WebhookRequest

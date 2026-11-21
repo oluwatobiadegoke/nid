@@ -560,7 +560,10 @@ export const ses: Provider = {
     const match = auth.match(/\bCredential=([^/,\s]+)\//)
     return match?.[1] ?? null
   },
-  unauthorized() {
+  unauthorized(req?: IncomingRequest) {
+    if (req?.path === sendV1.path) {
+      return { ...xmlError('InvalidClientTokenId', 'The security token included in the request is invalid.').reply, status: 403 }
+    }
     return {
       status: 403,
       headers: { 'x-amzn-errortype': 'MissingAuthenticationTokenException' },
