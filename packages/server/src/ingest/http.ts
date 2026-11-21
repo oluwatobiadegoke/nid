@@ -79,7 +79,8 @@ async function authenticate(
 }
 
 function waitDelay(ms: number, signal?: AbortSignal): Promise<boolean> {
-  if (ms <= 0) return Promise.resolve(!signal?.aborted)
+  if (signal?.aborted) return Promise.resolve(false)
+  if (ms <= 0) return Promise.resolve(true)
   return new Promise((resolve) => {
     const done = (ok: boolean) => {
       signal?.removeEventListener('abort', onAbort)

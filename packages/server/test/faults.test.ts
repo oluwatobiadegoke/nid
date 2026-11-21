@@ -91,6 +91,24 @@ test('fault rules return custom errors, respect count/provider/to scoping, and r
   assert.equal((await server.store.listRejections('default', { to: 'redir@inbox.test' })).length, 0)
 })
 
+test('a delayed fault stops at once for a request that is already cut off', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  await server.app.request('/api/faults', json({ status: 500, delayMs: 500 }, { 'content-type': 'application/json' }))
+  const started = performance.now()
+  const res = await server.app.request('/emails', {
+    ...json(
+      { from: 'a@acme.com', to: 'gone@inbox.test', subject: 'Gone', text: 'Gone' },
+      { authorization: 'Bearer re_x', 'content-type': 'application/json' },
+    ),
+    signal: AbortSignal.abort(),
+  })
+  assert.equal(res.status, 499)
+  assert.ok(performance.now() - started < 400)
+  assert.equal((await server.store.listMessages('default', { to: 'gone@inbox.test' })).length, 0)
+  assert.equal((await server.store.listRejections('default', { to: 'gone@inbox.test' })).length, 0)
+})
+
 test('magic addresses simulate ratelimit 429 and automatic webhooks, and autoWebhook fires on sends', async (t) => {
   const received: Array<{ path: string; body: Record<string, unknown> }> = []
   const app = createHttpServer((req, res) => {
