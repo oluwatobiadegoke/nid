@@ -37,7 +37,9 @@ export async function createSmtpServer(options: SmtpOptions): Promise<SMTPServer
     },
     onData(stream, session, callback) {
       const chunks: Buffer[] = []
-      stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+      stream.on('data', (chunk: Buffer) => {
+        if (!stream.sizeExceeded) chunks.push(chunk)
+      })
       stream.on('end', () => {
         if (stream.sizeExceeded) {
           const err = Object.assign(new Error('Message exceeds the size limit'), { responseCode: 552 })

@@ -53,6 +53,22 @@ test('extracts links from html with their text, skipping unsubscribe and images'
   assert.equal(result.links[1]?.text, 'Verify email')
 })
 
+test('a script or data link in an email never becomes a link to click', () => {
+  const result = extract({
+    subject: 'Verify your email',
+    text: null,
+    html: [
+      '<a href=" JaVa&#x09;Script:alert(1)">Verify</a>',
+      '<a href="data:text/html;base64,PGI+aGk8L2I+">Open</a>',
+      '<a href="VBScript:msgbox(1)">Verify</a>',
+      '<a href="https://app.acme.com/verify?t=1">Verify</a>',
+      '<a href="acme://sign-in?token=abc">Open the app</a>',
+    ].join(''),
+  })
+  assert.equal(result.link, 'https://app.acme.com/verify?t=1')
+  assert.deepEqual(result.links.map((l) => l.href), ['https://app.acme.com/verify?t=1', 'acme://sign-in?token=abc'])
+})
+
 test('finds bare urls in text and trims trailing punctuation', () => {
   const result = extract({ subject: 'Invite', text: 'Join here: https://app.acme.com/invite/9f2k.', html: null })
   assert.equal(result.link, 'https://app.acme.com/invite/9f2k')

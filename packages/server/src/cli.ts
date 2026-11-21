@@ -11,7 +11,7 @@ const defaultHost = '127.0.0.1'
 const help = `nid ${version}
 
 Usage:
-  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name]
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors origin] [--allow-host name]
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
   nid webhook <message-id> <delivered|deferred|bounced|complained|opened|clicked>
@@ -54,7 +54,7 @@ async function serve(args: string[]) {
       'smtp-port': { type: 'string', default: process.env.NID_SMTP_PORT ?? String(defaultSmtpPort) },
       host: { type: 'string', default: process.env.NID_HOST ?? defaultHost },
       db: { type: 'string', default: process.env.NID_DB },
-      cors: { type: 'boolean', default: false },
+      cors: { type: 'string', multiple: true, default: [] },
       'allow-host': { type: 'string', multiple: true, default: [] },
       quiet: { type: 'boolean', default: false },
     },
@@ -114,15 +114,21 @@ async function serve(args: string[]) {
   process.once('SIGTERM', stop)
 }
 
+const controlCharacters = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g
+
+function print(text: string) {
+  process.stdout.write(`${text.replace(controlCharacters, '')}\n`)
+}
+
 function printMessage(message: SerializedMessage, flags: { code: boolean; links: boolean; json: boolean }) {
   if (flags.json) return process.stdout.write(`${JSON.stringify(message, null, 2)}\n`)
   if (flags.code) {
     if (!message.extracted.code) fail('No code found in the message', 1)
-    return process.stdout.write(`${message.extracted.code}\n`)
+    return print(message.extracted.code)
   }
   if (flags.links) {
     if (message.extracted.links.length === 0) fail('No links found in the message', 1)
-    return process.stdout.write(`${message.extracted.links.map((l) => l.href).join('\n')}\n`)
+    return print(message.extracted.links.map((l) => l.href).join('\n'))
   }
   const lines = [
     `#${message.id}  ${message.provider}  ${message.createdAt}`,
@@ -133,7 +139,7 @@ function printMessage(message: SerializedMessage, flags: { code: boolean; links:
   if (message.extracted.code) lines.push(`Code:    ${message.extracted.code}`)
   if (message.extracted.link) lines.push(`Link:    ${message.extracted.link}`)
   lines.push('', message.text ?? message.html ?? '')
-  process.stdout.write(`${lines.join('\n')}\n`)
+  print(lines.join('\n'))
 }
 
 async function read(args: string[]) {
@@ -172,7 +178,7 @@ async function read(args: string[]) {
   if (values.json) return process.stdout.write(`${JSON.stringify(body.messages, null, 2)}\n`)
   for (const m of body.messages) {
     const code = m.extracted.code ? `  code ${m.extracted.code}` : ''
-    process.stdout.write(`#${m.id}  ${m.createdAt}  ${m.provider}  ${m.subject}${code}\n`)
+    print(`#${m.id}  ${m.createdAt}  ${m.provider}  ${m.subject}${code}`)
   }
 }
 
@@ -229,35 +235,40 @@ async function healthcheck(args: string[]) {
 
 const [command, ...rest] = process.argv.slice(2)
 
-switch (command) {
-  case 'serve':
-    await serve(rest)
-    break
-  case 'read':
-    await read(rest)
-    break
-  case 'clear':
-    await clear(rest)
-    break
-  case 'webhook':
-    await webhook(rest)
-    break
-  case 'mcp':
-    await mcp(rest)
-    break
-  case 'healthcheck':
-    await healthcheck(rest)
-    break
-  case '--version':
-  case '-v':
-    process.stdout.write(`${version}\n`)
-    break
-  case undefined:
-  case 'help':
-  case '--help':
-  case '-h':
-    process.stdout.write(help)
-    break
-  default:
-    fail(`Unknown command: ${command}\n\n${help}`)
+try {
+  switch (command) {
+    case 'serve':
+      await serve(rest)
+      break
+    case 'read':
+      await read(rest)
+      break
+    case 'clear':
+      await clear(rest)
+      break
+    case 'webhook':
+      await webhook(rest)
+      break
+    case 'mcp':
+      await mcp(rest)
+      break
+    case 'healthcheck':
+      await healthcheck(rest)
+      break
+    case '--version':
+    case '-v':
+      process.stdout.write(`${version}\n`)
+      break
+    case undefined:
+    case 'help':
+    case '--help':
+    case '-h':
+      process.stdout.write(help)
+      break
+    default:
+      fail(`Unknown command: ${command}\n\n${help}`)
+  }
+} catch (err) {
+  if ((err as { code?: string }).code?.startsWith('ERR_PARSE_ARGS_')) fail(`${(err as Error).message}\n\n${help}`)
+  throw err
 }
