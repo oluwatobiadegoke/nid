@@ -579,7 +579,9 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
               body: JSON.stringify({ type: eventName }),
             })
             const updated = await api('/api/messages/' + message.id + '/events')
-            renderDeliveries(updated.events)
+            if (seq === openSeq) renderDeliveries(updated.events)
+          } catch (err) {
+            if (seq === openSeq) $('webhook-log').replaceChildren(el('pre', '', err.message))
           } finally {
             btn.disabled = false
           }
@@ -743,7 +745,7 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
       if (controller.signal.aborted || streamController !== controller) return
       text(where, 'reconnecting'); where.classList.add('off')
       reconnectTimer = setTimeout(() => {
-        if (!controller.signal.aborted && streamController === controller) void connect()
+        if (!controller.signal.aborted && streamController === controller) load().then(connect, scheduleReconnect)
       }, 2000)
     }
     const dispatchEvent = (evtName, evtData, evtId) => {

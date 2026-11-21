@@ -37,7 +37,7 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--cors <origin>` | none | Lets web pages from this origin, such as `http://localhost:3000`, call nid. Repeat it for more origins. See [Security](../explanation/security.md). |
 | `--allow-host <name>` | none | Accepts requests whose `Host` header is this name. Repeat it for more names. See [Security](../explanation/security.md). |
 | `--auto-webhook <event>` | none, or `NID_AUTO_WEBHOOK` | Automatically sends this webhook event (`delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`) after each send when a webhook URL is configured. |
-| `--token <secret>` | none, or `NID_AUTH_TOKEN` | Requires this token on provider APIs, SMTP logins, MCP and the read API. See [Security](../explanation/security.md). |
+| `--token <secret>` | none, or `NID_AUTH_TOKEN` | Requires this token on provider APIs, SMTP logins, MCP and the read API. It also turns off the [magic addresses](../how-to/test-webhooks.md#automatic-webhooks-and-magic-addresses). See [Security](../explanation/security.md). |
 | `--quiet` | off | Prints nothing on start. |
 
 An option on the command line wins over the environment variable.
@@ -56,7 +56,7 @@ nid run [serve options] [--url <url>] -- <command...>
 
 All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command.
 
-When `nid run` starts the server with `--token` or `NID_AUTH_TOKEN`, it also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup.
+When `nid run` starts the server with `--token` or `NID_AUTH_TOKEN`, it also passes the token to your command as `NID_TOKEN`, so `@nid-inbox/client` can read mail without more setup. Your app must still send with the token: set its provider API key, its SES access key id or its SMTP username to the token, or nid answers `401`.
 
 ## nid read
 

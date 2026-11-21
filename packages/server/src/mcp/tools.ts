@@ -44,7 +44,7 @@ async function request<T>(api: ApiFetch, path: string, init: RequestInit): Promi
   const body = (await response.json().catch(() => null)) as (T & { error?: string; details?: string[]; timedOut?: boolean }) | null
   if (!body) throw new Error(`The server answered ${response.status} and not like nid. ${wrongUrl}`)
   if (response.ok) return body
-  const hint = response.status === 404 && !body.timedOut ? [wrongUrl] : []
+  const hint = response.status === 404 && (!body.error || body.error.startsWith('No route for ')) ? [wrongUrl] : []
   throw new Error([body.error ?? `nid answered ${response.status}`, ...(body.details ?? []), ...hint].join('. '))
 }
 

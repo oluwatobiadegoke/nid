@@ -211,6 +211,10 @@ test('agent reads full message, lists rejections, triggers webhooks, and cancels
   assert.equal(full.value.events.length, 1)
   assert.equal(full.value.events[0].event, 'bounced')
 
+  const missing = await call(client, 'get_message', { id: 99999 })
+  assert.equal(missing.isError, true)
+  assert.doesNotMatch(missing.text, /without \/mcp/)
+
   const rejections = await call(client, 'list_rejections', { to: 'badmcp@inbox.test' })
   assert.equal(rejections.value.length, 1)
   assert.equal(rejections.value[0].status, 422)
