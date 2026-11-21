@@ -37,5 +37,7 @@ You can repeat `--allow-host` for more names.
 
 On your machine nid accepts any provider key, any SMTP login and no read API token. That is fine on 127.0.0.1, because only you can reach it.
 
-If you run nid where other people can reach it, [embed it](../how-to/embed-nid.md) and pass an `auth` function that checks keys. Then every send and every read needs a key the function accepts.
+If you run nid where other people can reach it, such as on a shared staging server, pass `--token <secret>` (or set `NID_AUTH_TOKEN`). Then every send, read, MCP call and web view session requires that token.
+
+To split mail across multiple teams with different keys, [embed it](../how-to/embed-nid.md) and pass an `auth` function. Then every send and every read needs a key the function accepts.
 

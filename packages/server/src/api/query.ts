@@ -53,8 +53,7 @@ export const faultBodySchema = z.strictObject({
 export type QueryIssue = { error: string; details: string[] }
 
 export function parseQuery<T extends z.ZodType>(schema: T, params: URLSearchParams): z.infer<T> | QueryIssue {
-  const entries = [...params.entries()].filter(([key]) => key !== 'token')
-  const result = schema.safeParse(Object.fromEntries(entries))
+  const result = schema.safeParse(Object.fromEntries(params))
   if (result.success) return result.data as z.infer<T>
   return {
     error: 'Invalid query',

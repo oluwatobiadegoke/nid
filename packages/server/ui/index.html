@@ -66,24 +66,26 @@ body {
 }
 a { color: var(--primary); text-decoration: none; background-image: linear-gradient(to right, currentColor, currentColor); background-size: 100% 1.5px; background-repeat: no-repeat; background-position: 0 92%; }
 a:hover { background-size: 0 1.5px; }
-code, pre { font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.875rem; }
+code, pre, input { font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.875rem; }
 pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: var(--muted); padding: 16px 18px; border-radius: 6px; line-height: 1.55; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 h1, h2, h3 { margin: 0; letter-spacing: -0.01em; font-weight: 650; }
 h1 { font-size: 1.375rem; line-height: 1.3; }
 h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
 [hidden] { display: none !important; }
-.sketch { border: 1.5px solid var(--hand-ink); border-radius: var(--sketch); }
 .ink { display: inline-block; padding: 6px 16px; border: 1.5px dashed var(--ink-button-line); border-radius: var(--sketch); font-size: 0.875rem; line-height: 1.55; transition: background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out); }
 .ink:hover { background: var(--leaf); border-style: solid; }
-.ink:focus-visible, .row:focus-visible, a:focus-visible, .link-button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
+.ink:focus-visible, .row:focus-visible, a:focus-visible, .mini:focus-visible, .tab:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 .ink.warn { border-color: var(--clay-ink); color: var(--clay-ink); }
+.mini { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1.2px solid var(--hand-ink); border-radius: var(--sketch-small); font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.75rem; line-height: 1.5; color: var(--foreground); transition: background-color var(--duration-fast) var(--ease-out); }
+.mini:hover { background: var(--leaf); }
+.mini.active { background: var(--leaf); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+.mini.warn { border-color: var(--clay-ink); color: var(--clay-ink); }
+.mini:disabled { opacity: 0.5; cursor: default; }
 .pill { display: inline-block; padding: 0 8px; border: 1.2px solid var(--hand-ink); border-radius: var(--sketch-small); font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.75rem; line-height: 1.5; color: var(--muted-foreground); white-space: nowrap; }
 .pill.clay { border-color: var(--clay-ink); color: var(--clay-ink); }
-.link-button { color: var(--primary); font-size: 0.875rem; background-image: linear-gradient(to right, currentColor, currentColor); background-size: 100% 1.5px; background-repeat: no-repeat; background-position: 0 92%; }
-.link-button:hover { background-size: 0 1.5px; }
 
-.top { display: flex; align-items: center; gap: 24px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.top { display: flex; align-items: center; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--border); }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--foreground); background: none; }
 .brand svg { width: 28px; height: 28px; color: var(--primary); }
 .wordmark { font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 1; font-weight: 500; font-size: 1.125rem; letter-spacing: 0.01em; }
@@ -91,11 +93,22 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
 .where::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50% 45% 55% 50%; background: var(--moss); vertical-align: 1px; transition: background-color var(--duration-base); }
 .where.off::before { background: var(--clay-ink); }
 
-.layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); min-height: calc(100vh - 73px); }
+.auth-panel { max-width: 420px; margin: 64px auto; padding: 28px; border: 1.5px solid var(--hand-ink); border-radius: 18px 7px 16px 9px / 9px 16px 7px 18px; background: var(--leaf); }
+.auth-panel h1 { font-size: 1.125rem; margin-bottom: 8px; }
+.auth-panel p { margin: 0 0 16px; font-size: 0.9375rem; color: var(--muted-foreground); }
+.auth-form { display: flex; gap: 10px; }
+.auth-form input { flex: 1; min-width: 0; padding: 8px 12px; border: 1.5px solid var(--hand-ink); border-radius: 8px; background: var(--background); color: var(--foreground); }
+.auth-error { margin-top: 10px; font-size: 0.875rem; color: var(--clay-ink); }
+
+.layout { display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); min-height: calc(100vh - 73px); }
 .list { border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-.count { margin: 0; padding: 14px 24px 10px; font-size: 0.8125rem; color: var(--muted-foreground); }
+.toolbar { padding: 14px 20px 10px; border-bottom: 1px solid var(--border); display: grid; gap: 10px; }
+.search { width: 100%; padding: 7px 12px; border: 1.2px solid var(--hand-ink); border-radius: 8px; background: var(--background); color: var(--foreground); font-size: 0.8125rem; }
+.toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.filters { display: flex; gap: 6px; }
+.count { margin: 0; font-size: 0.75rem; color: var(--muted-foreground); }
 .rows { list-style: none; margin: 0; padding: 0 0 24px; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "to when" "subject subject" "via via"; gap: 2px 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-out); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "to when" "subject subject" "via via"; gap: 2px 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-out); }
 .row:hover { background: color-mix(in oklab, var(--leaf) 55%, var(--background)); }
 .row.selected { background: var(--leaf); }
 .row .to { grid-area: to; font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; font-size: 0.8125rem; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -114,28 +127,49 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
 .empty dd code { display: block; background: var(--muted); padding: 8px 12px; border-radius: 6px; font-size: 0.8125rem; word-break: break-all; }
 .empty dd small { display: block; margin-top: 4px; font-size: 0.8125rem; color: var(--muted-foreground); }
 
-.detail { padding: 28px 40px 48px; max-width: 960px; min-width: 0; }
+.detail { padding: 28px 40px 48px; max-width: 980px; min-width: 0; }
+.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .back { margin: 0 0 16px; font-size: 0.875rem; display: none; }
 .detail h1 { overflow-wrap: anywhere; }
 .meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 16px 0 0; font-size: 0.875rem; }
 .meta dt { color: var(--muted-foreground); }
 .meta dd { margin: 0; overflow-wrap: anywhere; }
 .meta dd code { font-size: 0.8125rem; }
-.found { display: flex; flex-wrap: wrap; gap: 24px 40px; align-items: flex-start; margin: 28px 0 0; padding: 20px 24px; background: var(--leaf); border: 1.5px solid var(--hand-ink); border-radius: 18px 7px 16px 9px / 9px 16px 7px 18px; }
+.found { display: flex; flex-wrap: wrap; gap: 20px 36px; align-items: flex-start; margin: 24px 0 0; padding: 18px 22px; background: var(--leaf); border: 1.5px solid var(--hand-ink); border-radius: 18px 7px 16px 9px / 9px 16px 7px 18px; }
 .found h2 { margin-bottom: 6px; }
+.found-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .found .big { display: inline-block; font-size: 1.75rem; font-weight: 500; letter-spacing: 0.14em; line-height: 1.2; color: var(--foreground); }
 .found a { overflow-wrap: anywhere; font-size: 0.9375rem; }
-.section { margin-top: 32px; }
-.section h2 { margin-bottom: 12px; }
+
+.tabs-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 28px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { padding: 5px 12px; border-radius: 6px; font-size: 0.875rem; color: var(--muted-foreground); transition: background-color var(--duration-fast); }
+.tab:hover { background: var(--muted); color: var(--foreground); }
+.tab.active { background: var(--leaf); color: var(--primary); font-weight: 600; }
+.viewport-toggle { display: flex; gap: 6px; }
+
+.tab-panel { margin-top: 16px; }
+.preview-wrap { display: flex; justify-content: center; background: var(--muted); padding: 12px; border-radius: 12px; }
+.preview { width: 100%; height: 540px; background: #fff; border: 1.5px solid var(--hand-ink); border-radius: 12px; transition: width var(--duration-base) var(--ease-out); }
+.preview.mobile { width: 375px; max-width: 100%; }
+
+.section { margin-top: 28px; }
+.section h2 { margin-bottom: 10px; }
 .section ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 0.9375rem; }
 .section li { overflow-wrap: anywhere; }
 .section li .label { color: var(--muted-foreground); font-size: 0.8125rem; margin-left: 8px; }
-.preview { width: 100%; height: 540px; background: #fff; border: 1.5px solid var(--hand-ink); border-radius: 18px 7px 16px 9px / 9px 16px 7px 18px; }
+
+.webhook-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.webhook-log { display: grid; gap: 8px; margin-top: 10px; }
+.webhook-entry { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); font-size: 0.8125rem; }
+.webhook-entry-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.webhook-entry pre { margin-top: 6px; padding: 8px 10px; background: var(--background); font-size: 0.75rem; }
+
 .rejection p { margin: 8px 0 0; }
 .rejection .status { font-family: var(--font-mono); font-variation-settings: "MONO" 1, "CASL" 0; color: var(--clay-ink); }
 
 @media (max-width: 880px) {
-  .top { padding: 16px; gap: 16px; }
+  .top { padding: 16px; gap: 12px; }
   .where { display: none; }
   .layout { grid-template-columns: 1fr; min-height: 0; }
   .list { border-right: 0; }
@@ -159,33 +193,89 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     <span class="wordmark">nid</span>
   </a>
   <p class="where" id="where">connecting</p>
+  <button class="mini" id="signout" type="button" hidden>Sign out</button>
   <button class="ink" id="clear" type="button">Clear everything</button>
 </header>
-<main class="layout">
+<section class="auth-panel" id="auth-panel" hidden>
+  <h1>Token required</h1>
+  <p>This nid server requires a token. Enter your read API token to open the inbox.</p>
+  <form class="auth-form" id="auth-form">
+    <input id="auth-input" type="password" autocomplete="current-password" placeholder="Bearer token" required>
+    <button class="ink" type="submit">Unlock</button>
+  </form>
+  <p class="auth-error" id="auth-error" hidden></p>
+</section>
+<main class="layout" id="layout">
   <section class="list" aria-label="Mail">
-    <p class="count" id="count">Loading</p>
+    <div class="toolbar">
+      <input class="search" id="search" type="search" placeholder="Search address, subject, provider, error" aria-label="Search mail">
+      <div class="toolbar-row">
+        <div class="filters" role="group" aria-label="Filter items">
+          <button class="mini active" type="button" data-filter="all">All</button>
+          <button class="mini" type="button" data-filter="message">Messages</button>
+          <button class="mini" type="button" data-filter="rejection">Rejections</button>
+        </div>
+        <p class="count" id="count">Loading</p>
+      </div>
+    </div>
     <ol class="rows" id="rows"></ol>
     <section class="empty" id="empty" hidden>
       <h2>Nothing has arrived yet.</h2>
-      <p>Point your app at this server. Nothing in the app changes except one setting.</p>
+      <p>Run your app with <code>npx nid-inbox run -- npm run dev</code> or point a provider setting below at this server.</p>
       <dl id="setup"></dl>
     </section>
   </section>
   <article class="detail" id="detail" hidden>
     <p class="back"><a href="#" id="back">All mail</a></p>
     <div id="message">
-      <h1 id="subject"></h1>
+      <div class="detail-head">
+        <h1 id="subject"></h1>
+        <button class="mini warn" id="delete-message" type="button">Delete</button>
+      </div>
       <dl class="meta" id="meta"></dl>
       <section class="found" id="found" hidden>
-        <div id="found-code" hidden><h2>Code</h2><code class="big" id="code"></code></div>
-        <div id="found-link" hidden><h2>Link</h2><a id="link" rel="noreferrer noopener" target="_blank"></a></div>
+        <div id="found-code" hidden>
+          <h2>Code</h2>
+          <div class="found-row">
+            <code class="big" id="code"></code>
+            <button class="mini" id="copy-code" type="button">Copy</button>
+          </div>
+        </div>
+        <div id="found-link" hidden>
+          <h2>Link</h2>
+          <div class="found-row">
+            <a id="link" rel="noreferrer noopener" target="_blank"></a>
+            <button class="mini" id="copy-link" type="button">Copy</button>
+          </div>
+        </div>
       </section>
       <section class="section" id="links-section" hidden><h2>Links</h2><ul id="links"></ul></section>
-      <section class="section" id="html-section" hidden><h2>HTML</h2><iframe class="preview" id="preview" sandbox="" referrerpolicy="no-referrer" title="Email HTML, scripts blocked"></iframe></section>
-      <section class="section" id="text-section" hidden><h2>Text</h2><pre id="text"></pre></section>
       <section class="section" id="attachments-section" hidden><h2>Attachments</h2><ul id="attachments"></ul></section>
-      <section class="section" id="variables-section" hidden><h2>Template</h2><pre id="variables"></pre></section>
-      <section class="section"><button class="link-button" id="toggle-raw" type="button">Show the request as received</button><pre id="raw" hidden></pre></section>
+      <div class="tabs-bar">
+        <div class="tabs" role="tablist">
+          <button class="tab active" type="button" role="tab" data-tab="preview" id="tab-preview">Preview</button>
+          <button class="tab" type="button" role="tab" data-tab="text" id="tab-text">Text</button>
+          <button class="tab" type="button" role="tab" data-tab="headers" id="tab-headers">Headers &amp; Meta</button>
+          <button class="tab" type="button" role="tab" data-tab="raw" id="tab-raw">Raw</button>
+        </div>
+        <div class="viewport-toggle" id="viewport-toggle" hidden>
+          <button class="mini active" type="button" id="view-desktop">Desktop</button>
+          <button class="mini" type="button" id="view-mobile">Mobile</button>
+        </div>
+      </div>
+      <div class="tab-panel" id="panel-preview" hidden>
+        <div class="preview-wrap">
+          <iframe class="preview" id="preview" sandbox="" referrerpolicy="no-referrer" title="Email HTML, scripts blocked"></iframe>
+        </div>
+      </div>
+      <div class="tab-panel" id="panel-text" hidden><pre id="text"></pre></div>
+      <div class="tab-panel" id="panel-headers" hidden><pre id="headers-meta"></pre></div>
+      <div class="tab-panel" id="panel-raw" hidden><pre id="raw"></pre></div>
+      <section class="section" id="webhooks-section" hidden>
+        <h2>Simulate webhook</h2>
+        <div class="webhook-buttons" id="webhook-buttons"></div>
+        <div class="webhook-log" id="webhook-log"></div>
+      </section>
     </div>
     <div id="rejection" class="rejection" hidden>
       <h1>Rejected send</h1>
@@ -199,9 +289,21 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
 (() => {
   const $ = (id) => document.getElementById(id)
   const rows = $('rows'), count = $('count'), empty = $('empty'), detail = $('detail'), where = $('where')
+  const authPanel = $('auth-panel'), layout = $('layout'), authError = $('auth-error'), signoutBtn = $('signout')
   const items = new Map()
   let selected = null
+  let currentMessage = null
   let providers = []
+  let webhooksConfigured = []
+  let smtpPort = 1025
+  let filterKind = 'all'
+  let searchTerm = ''
+  let activeTab = 'preview'
+  let streamController = null
+  let lastEventId = ''
+  let openSeq = 0
+  const tokenKey = 'nid.token'
+  const webhookEventNames = ['delivered', 'deferred', 'bounced', 'complained', 'opened', 'clicked']
 
   const text = (node, value) => { node.textContent = value ?? '' }
   const safeHref = (href, allowMailto) => {
@@ -221,19 +323,72 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
   const key = (item) => item.kind + ':' + item.id
+  const getToken = () => sessionStorage.getItem(tokenKey) || ''
+  const stopStream = () => {
+    if (streamController) { streamController.abort(); streamController = null }
+  }
+  const fetchAuthed = async (path, init = {}) => {
+    const headers = new Headers(init.headers)
+    const token = getToken()
+    if (token) headers.set('authorization', 'Bearer ' + token)
+    const res = await fetch(path, { ...init, headers })
+    if (res.status === 401) {
+      const body = await res.json().catch(() => ({}))
+      const err = new Error(body.error || 'Unauthorized')
+      err.status = 401
+      showAuth(token ? 'That token was refused.' : '')
+      throw err
+    }
+    return res
+  }
 
-  const api = async (path, init) => {
-    const res = await fetch(path, init)
+  const showAuth = (message) => {
+    stopStream()
+    openSeq++
+    $('preview').removeAttribute('srcdoc')
+    layout.hidden = true
+    authPanel.hidden = false
+    signoutBtn.hidden = true
+    if (message) { text(authError, message); authError.hidden = false }
+    else authError.hidden = true
+    $('auth-input').focus()
+  }
+
+  const hideAuth = () => {
+    authPanel.hidden = true
+    layout.hidden = false
+    signoutBtn.hidden = !getToken()
+  }
+
+  const api = async (path, init = {}) => {
+    const res = await fetchAuthed(path, init)
     const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(body.error || res.statusText)
+    if (!res.ok) {
+      const err = new Error(body.error || res.statusText)
+      err.status = res.status
+      throw err
+    }
     return body
+  }
+
+  function matchesFilter(item) {
+    if (filterKind !== 'all' && item.kind !== filterKind) return false
+    if (!searchTerm) return true
+    const haystack = [
+      ...(item.to || []),
+      item.from || '',
+      item.subject || '',
+      item.provider || '',
+      item.error || '',
+    ].join(' ').toLowerCase()
+    return haystack.includes(searchTerm)
   }
 
   function rowFor(item) {
     const li = el('li', 'row' + (item.kind === 'rejection' ? ' rejected' : ''))
     li.tabIndex = 0
     li.dataset.key = key(item)
-    const to = item.kind === 'message' ? item.to.join(', ') : item.to.join(', ') || 'no recipient'
+    const to = item.to.join(', ') || 'no recipient'
     li.append(el('span', 'to', to))
     const when = el('span', 'when', ago(item.createdAt)); when.dataset.iso = item.createdAt
     li.append(when)
@@ -255,12 +410,19 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
   }
 
   function render() {
-    const list = [...items.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id)
-    rows.replaceChildren(...list.map(rowFor))
-    const messages = list.filter((i) => i.kind === 'message').length
-    const rejections = list.length - messages
-    text(count, list.length === 0 ? '' : messages + (messages === 1 ? ' message' : ' messages') + (rejections ? ', ' + rejections + ' rejected' : ''))
-    empty.hidden = list.length > 0
+    const all = [...items.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id)
+    const visible = all.filter(matchesFilter)
+    rows.replaceChildren(...visible.map(rowFor))
+    const messages = all.filter((i) => i.kind === 'message').length
+    const rejections = all.length - messages
+    if (all.length === 0) {
+      text(count, '')
+    } else if (visible.length !== all.length) {
+      text(count, visible.length + ' of ' + all.length)
+    } else {
+      text(count, messages + (messages === 1 ? ' message' : ' messages') + (rejections ? ', ' + rejections + ' rejected' : ''))
+    }
+    empty.hidden = all.length > 0
     if (selected) markSelected()
   }
 
@@ -279,21 +441,64 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     }
   }
 
+  function setTab(name) {
+    if (name === 'preview' && !currentMessage?.html) name = 'text'
+    activeTab = name
+    for (const tab of document.querySelectorAll('.tab')) {
+      const active = tab.dataset.tab === name
+      tab.classList.toggle('active', active)
+      tab.setAttribute('aria-selected', String(active))
+    }
+    $('panel-preview').hidden = name !== 'preview'
+    $('panel-text').hidden = name !== 'text'
+    $('panel-headers').hidden = name !== 'headers'
+    $('panel-raw').hidden = name !== 'raw'
+    $('viewport-toggle').hidden = name !== 'preview' || !currentMessage?.html
+  }
+
+  function renderDeliveries(deliveries) {
+    const log = $('webhook-log')
+    if (!deliveries || deliveries.length === 0) {
+      log.replaceChildren()
+      return
+    }
+    log.replaceChildren(...[...deliveries].reverse().map((d) => {
+      const box = el('div', 'webhook-entry')
+      const head = el('div', 'webhook-entry-head')
+      head.append(el('span', d.delivered ? 'pill' : 'pill clay', d.event))
+      const statusText = d.appStatus === null ? 'unreachable' : String(d.appStatus)
+      head.append(el('span', '', statusText + ' · ' + d.durationMs + ' ms · ' + d.recipient))
+      box.append(head)
+      if (d.error) box.append(el('pre', '', d.error))
+      else if (d.appBody) box.append(el('pre', '', d.appBody))
+      return box
+    }))
+  }
+
   async function open(item) {
+    const seq = ++openSeq
     selected = item
     markSelected()
     document.body.classList.add('showing')
     detail.hidden = false
     $('message').hidden = item.kind !== 'message'
     $('rejection').hidden = item.kind !== 'rejection'
+    $('preview').removeAttribute('srcdoc')
     if (item.kind === 'rejection') {
+      currentMessage = null
       text($('rejection-status'), item.provider + ' · ' + item.status)
       text($('rejection-error'), item.error)
       metaList($('rejection-meta'), [['To', item.to.join(', ')], ['When', new Date(item.createdAt).toLocaleString()]])
       text($('rejection-raw'), pretty(item.raw))
       return
     }
-    const { message } = await api('/api/messages/' + item.id)
+    const canWebhook = webhooksConfigured.includes(item.provider)
+    const [{ message }, history] = await Promise.all([
+      api('/api/messages/' + item.id),
+      canWebhook ? api('/api/messages/' + item.id + '/events') : Promise.resolve({ events: [] }),
+    ])
+    if (seq !== openSeq) return
+    currentMessage = message
     text($('subject'), message.subject || '(no subject)')
     metaList($('meta'), [
       ['From', message.from],
@@ -322,23 +527,70 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
       if (l.text) li.append(el('span', 'label', l.text))
       return li
     }))
-    $('html-section').hidden = !message.html
-    $('preview').srcdoc = message.html || ''
-    $('text-section').hidden = !message.text
-    text($('text'), message.text)
     $('attachments-section').hidden = message.attachments.length === 0
     $('attachments').replaceChildren(...message.attachments.map((at) => {
       const li = el('li')
-      const la = el('a', '', at.filename); la.href = at.url
+      const la = el('a', '', at.filename); la.href = '#'
+      la.addEventListener('click', async (e) => {
+        e.preventDefault()
+        const res = await fetchAuthed(at.url)
+        if (!res.ok) return
+        const blob = await res.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        const dl = document.createElement('a')
+        dl.href = objectUrl
+        dl.download = at.filename || 'attachment'
+        document.body.append(dl)
+        dl.click()
+        dl.remove()
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+      })
       li.append(la, el('span', 'label', at.contentType + ' · ' + size(at.size)))
       return li
     }))
-    const variables = message.meta && message.meta.variables
-    $('variables-section').hidden = !variables && !message.meta.templateId
-    text($('variables'), JSON.stringify({ templateId: message.meta.templateId, variables }, null, 2))
-    $('raw').hidden = true
-    text($('toggle-raw'), 'Show the request as received')
+
+    $('tab-preview').hidden = !message.html
+    if (message.html) {
+      setTab(activeTab === 'preview' || !['text', 'headers', 'raw'].includes(activeTab) ? 'preview' : activeTab)
+      void fetchAuthed('/api/messages/' + message.id + '/html').then(async (res) => {
+        if (!res.ok || seq !== openSeq) return
+        const html = await res.text()
+        if (seq !== openSeq) return
+        $('preview').srcdoc = html
+      }).catch(() => {})
+    } else {
+      setTab(activeTab === 'preview' ? 'text' : activeTab)
+    }
+    text($('text'), message.text || '(no plain text)')
+    text($('headers-meta'), JSON.stringify({ headers: message.headers, meta: message.meta }, null, 2))
     text($('raw'), pretty(message.raw))
+
+    $('webhooks-section').hidden = !canWebhook
+    if (canWebhook) {
+      $('webhook-buttons').replaceChildren(...webhookEventNames.map((eventName) => {
+        const btn = el('button', 'mini', eventName)
+        btn.type = 'button'
+        btn.addEventListener('click', async () => {
+          btn.disabled = true
+          try {
+            await api('/api/messages/' + message.id + '/events', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ type: eventName }),
+            })
+            const updated = await api('/api/messages/' + message.id + '/events')
+            renderDeliveries(updated.events)
+          } finally {
+            btn.disabled = false
+          }
+        })
+        return btn
+      }))
+      renderDeliveries(history.events)
+    } else {
+      $('webhook-buttons').replaceChildren()
+      renderDeliveries([])
+    }
   }
 
   function size(bytes) {
@@ -363,15 +615,65 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     }
     dl.append(el('dt', '', 'SMTP'))
     const dd = el('dd')
-    dd.append(el('code', '', 'host localhost, port ' + (window.__smtpPort || 1025) + ', no TLS, any username and password'))
+    dd.append(el('code', '', smtpPort ? 'host localhost, port ' + smtpPort + ', no TLS, any username and password' : 'SMTP disabled'))
     dl.append(dd)
   }
 
-  $('toggle-raw').addEventListener('click', () => {
-    const raw = $('raw')
-    raw.hidden = !raw.hidden
-    text($('toggle-raw'), raw.hidden ? 'Show the request as received' : 'Hide the request')
+  function bindCopy(buttonId, getter) {
+    const btn = $(buttonId)
+    let timer = null
+    btn.addEventListener('click', async () => {
+      const val = getter()
+      if (!val) return
+      try { await navigator.clipboard.writeText(val) } catch {}
+      text(btn, 'Copied')
+      clearTimeout(timer)
+      timer = setTimeout(() => text(btn, 'Copy'), 1500)
+    })
+  }
+  bindCopy('copy-code', () => currentMessage?.extracted?.code || '')
+  bindCopy('copy-link', () => $('link').getAttribute('href') || '')
+
+  for (const tab of document.querySelectorAll('.tab')) {
+    tab.addEventListener('click', () => setTab(tab.dataset.tab))
+  }
+  $('view-desktop').addEventListener('click', () => {
+    $('preview').classList.remove('mobile')
+    $('view-desktop').classList.add('active')
+    $('view-mobile').classList.remove('active')
   })
+  $('view-mobile').addEventListener('click', () => {
+    $('preview').classList.add('mobile')
+    $('view-mobile').classList.add('active')
+    $('view-desktop').classList.remove('active')
+  })
+
+  $('search').addEventListener('input', (e) => {
+    searchTerm = e.target.value.trim().toLowerCase()
+    render()
+  })
+  for (const btn of document.querySelectorAll('.filters .mini')) {
+    btn.addEventListener('click', () => {
+      filterKind = btn.dataset.filter
+      for (const b of document.querySelectorAll('.filters .mini')) b.classList.toggle('active', b === btn)
+      render()
+    })
+  }
+
+  $('delete-message').addEventListener('click', async () => {
+    if (!selected || selected.kind !== 'message') return
+    const id = selected.id
+    await api('/api/messages/' + id, { method: 'DELETE' })
+    items.delete('message:' + id)
+    selected = null
+    currentMessage = null
+    openSeq++
+    $('preview').removeAttribute('srcdoc')
+    detail.hidden = true
+    document.body.classList.remove('showing')
+    render()
+  })
+
   $('back').addEventListener('click', (e) => { e.preventDefault(); document.body.classList.remove('showing') })
 
   let armed = null
@@ -385,12 +687,34 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
     }
     clearTimeout(armed); armed = null
     button.classList.remove('warn'); text(button, 'Clear everything')
-    await api('/api/messages', { method: 'DELETE' })
-    for (const k of [...items.keys()]) if (k.startsWith('message:')) items.delete(k)
+    await Promise.all([api('/api/messages', { method: 'DELETE' }), api('/api/rejections', { method: 'DELETE' })])
+    items.clear()
     selected = null
+    currentMessage = null
+    openSeq++
+    $('preview').removeAttribute('srcdoc')
     detail.hidden = true
     document.body.classList.remove('showing')
     render()
+  })
+
+  $('auth-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const value = $('auth-input').value.trim()
+    if (!value) return
+    sessionStorage.setItem(tokenKey, value)
+    $('auth-input').value = ''
+    start()
+  })
+
+  signoutBtn.addEventListener('click', () => {
+    sessionStorage.removeItem(tokenKey)
+    items.clear()
+    selected = null
+    currentMessage = null
+    lastEventId = ''
+    detail.hidden = true
+    showAuth('')
   })
 
   async function load() {
@@ -399,7 +723,10 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
       api('/api/rejections?limit=100'),
       api('/api/providers'),
     ])
+    hideAuth()
     providers = provs.providers
+    webhooksConfigured = provs.webhooks || []
+    smtpPort = provs.smtpPort ?? 1025
     renderSetup()
     items.clear()
     for (const m of messages.messages) items.set('message:' + m.id, { kind: 'message', ...m })
@@ -408,16 +735,96 @@ h2 { font-size: 0.8125rem; line-height: 1.45; font-weight: 650; text-transform: 
   }
 
   function listen() {
-    const source = new EventSource('/api/stream')
-    source.addEventListener('ready', () => { text(where, 'listening on ' + location.host); where.classList.remove('off') })
-    source.addEventListener('message', (e) => { const m = JSON.parse(e.data); items.set('message:' + m.id, { kind: 'message', ...m }); render() })
-    source.addEventListener('rejection', (e) => { const r = JSON.parse(e.data); items.set('rejection:' + r.id, { kind: 'rejection', ...r }); render() })
-    source.onerror = () => { text(where, 'reconnecting'); where.classList.add('off') }
+    stopStream()
+    const controller = new AbortController()
+    streamController = controller
+    let reconnectTimer = null
+    const scheduleReconnect = () => {
+      if (controller.signal.aborted || streamController !== controller) return
+      text(where, 'reconnecting'); where.classList.add('off')
+      reconnectTimer = setTimeout(() => {
+        if (!controller.signal.aborted && streamController === controller) void connect()
+      }, 2000)
+    }
+    const dispatchEvent = (evtName, evtData, evtId) => {
+      if (evtId) lastEventId = evtId
+      if (evtName === 'ready') {
+        text(where, 'listening on ' + location.host); where.classList.remove('off')
+      } else if (evtName === 'message' && evtData) {
+        const m = JSON.parse(evtData)
+        items.set('message:' + m.id, { kind: 'message', ...m })
+        render()
+      } else if (evtName === 'rejection' && evtData) {
+        const r = JSON.parse(evtData)
+        items.set('rejection:' + r.id, { kind: 'rejection', ...r })
+        render()
+      }
+    }
+    const connect = async () => {
+      try {
+        const headers = new Headers()
+        const token = getToken()
+        if (token) headers.set('authorization', 'Bearer ' + token)
+        if (lastEventId) headers.set('last-event-id', lastEventId)
+        const res = await fetch('/api/stream', { headers, signal: controller.signal })
+        if (res.status === 401) {
+          showAuth(token ? 'That token was refused.' : '')
+          return
+        }
+        if (!res.ok || !res.body) { scheduleReconnect(); return }
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let evtName = 'message'
+        let evtData = []
+        let evtId = ''
+        const flushFrame = () => {
+          if (evtData.length > 0 || evtName !== 'message' || evtId) {
+            dispatchEvent(evtName, evtData.join('\n'), evtId)
+          }
+          evtName = 'message'
+          evtData = []
+          evtId = ''
+        }
+        while (!controller.signal.aborted) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split(/\r?\n/)
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (line === '') { flushFrame(); continue }
+            if (line.startsWith(':')) continue
+            const colon = line.indexOf(':')
+            const field = colon === -1 ? line : line.slice(0, colon)
+            let val = colon === -1 ? '' : line.slice(colon + 1)
+            if (val.startsWith(' ')) val = val.slice(1)
+            if (field === 'event') evtName = val
+            else if (field === 'data') evtData.push(val)
+            else if (field === 'id' && !val.includes('\0')) evtId = val
+          }
+        }
+        scheduleReconnect()
+      } catch {
+        scheduleReconnect()
+      }
+    }
+    controller.signal.addEventListener('abort', () => clearTimeout(reconnectTimer), { once: true })
+    void connect()
+  }
+
+  function start() {
+    load().then(listen).catch((err) => {
+      if (err && err.status === 401) return
+      text(count, 'Could not load: ' + err.message)
+      where.classList.add('off')
+      text(where, 'not reachable')
+    })
   }
 
   setInterval(() => { for (const n of document.querySelectorAll('.when')) text(n, ago(n.dataset.iso)) }, 30000)
 
-  load().then(listen).catch((err) => { text(count, 'Could not load: ' + err.message); where.classList.add('off'); text(where, 'not reachable') })
+  start()
 })()
 </script>
 </body>

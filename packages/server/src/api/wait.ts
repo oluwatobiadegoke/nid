@@ -119,6 +119,7 @@ export async function waitForMessage(
         params.signal?.addEventListener('abort', onAbort, { once: true })
       })
       if (hit) return { message: hit.message, code: hit.code, timedOut: false, arrived: [], rejections: [] }
+      if (params.signal?.aborted) return { message: null, code: null, timedOut: true, arrived: [], rejections: [] }
     }
     const arrived = await store.listMessages(projectId, { to: params.to, after: params.after, limit: 10 })
     const rejections = await store.listRejections(projectId, { to: params.to, since: startedAt, limit: 10 })

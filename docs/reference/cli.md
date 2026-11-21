@@ -25,7 +25,7 @@ Run it with `npx nid-inbox <command>` when nid is not installed in your project,
 Starts the HTTP server (provider APIs, read API and web view) and the SMTP server. It runs until it gets Ctrl+C (`SIGINT`) or `SIGTERM`.
 
 ```
-nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--auto-webhook event] [--quiet]
+nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--auto-webhook event] [--token secret] [--quiet]
 ```
 
 | Option | Default | What it does |
@@ -37,6 +37,7 @@ nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite]
 | `--cors` | off | Sends CORS headers, so web pages on other origins can call nid. |
 | `--allow-host <name>` | none | Accepts requests whose `Host` header is this name. Repeat it for more names. See [Security](../explanation/security.md). |
 | `--auto-webhook <event>` | none, or `NID_AUTO_WEBHOOK` | Automatically sends this webhook event (`delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`) after each send when a webhook URL is configured. |
+| `--token <secret>` | none, or `NID_AUTH_TOKEN` | Requires this token on provider APIs, SMTP logins, MCP and the read API. See [Security](../explanation/security.md). |
 | `--quiet` | off | Prints nothing on start. |
 
 An option on the command line wins over the environment variable.

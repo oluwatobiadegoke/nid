@@ -11,8 +11,9 @@ nid has no config file. You set it with command line options, environment variab
 | `NID_HOST` | `nid serve` | `127.0.0.1` | Address both servers listen on. |
 | `NID_DB` | `nid serve` | none (memory) | SQLite file to keep mail in. |
 | `NID_URL` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | `http://127.0.0.1:4400` | Server to talk to. |
-| `NID_TOKEN` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses a custom `auth` function. |
-| `NID_DOMAIN` | `@nid-inbox/client` | `inbox.test` | Domain for addresses made by `inbox.address()`. |
+| `NID_TOKEN` | `nid read`, `nid clear`, `nid webhook`, `nid mcp`, `nid healthcheck`, `@nid-inbox/client` | none | Token sent as `Authorization: Bearer <token>`. Only needed when the server uses `--token` or a custom `auth` function. |
+| `NID_AUTH_TOKEN` | `nid serve`, `nid run` | none | Protects the server with a required bearer token (and SMTP username). |
+| `NID_DOMAIN` | `@nid-inbox/client`, MCP (`new_address`) | `inbox.test` | Default domain for generated addresses. |
 | `NID_INTERCEPT` | `nid-inbox/intercept` | enabled when `NID_URL` is set | Set to `0` to turn off automatic Node.js HTTP interception when preloading `nid-inbox/intercept`. |
 | `NID_<PROVIDER>_WEBHOOK_URL` | `nid serve` | none | Your app's webhook route for that provider, such as `NID_BREVO_WEBHOOK_URL`. It must start with `http://` or `https://`, or nid stops at startup. `<PROVIDER>` is `RESEND`, `BREVO`, `SENDGRID`, `POSTMARK`, `MAILGUN` or `SES`. See [Test your webhook handler](../how-to/test-webhooks.md). |
 | `NID_<PROVIDER>_WEBHOOK_SECRET` | `nid serve` | none | The secret your app checks webhooks with, such as `NID_RESEND_WEBHOOK_SECRET`. What it is depends on the provider. |

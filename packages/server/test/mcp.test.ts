@@ -45,7 +45,13 @@ test('an agent signs up with a fresh address and reads the code and link over HT
     await running.close()
   })
   const tools = await client.listTools()
-  assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), ['clear', 'get_code', 'get_links', 'list_messages', 'new_address', 'wait_for_email'])
+  assert.deepEqual(
+    tools.tools.map((tool) => tool.name).sort(),
+    ['clear', 'get_code', 'get_links', 'get_message', 'list_messages', 'list_rejections', 'new_address', 'trigger_webhook', 'wait_for_email'],
+  )
+
+  const customDomain = await call(client, 'new_address', { prefix: 'Custom', domain: 'acme.example' })
+  assert.match(customDomain.value.address, /^custom\.[0-9a-f]{8}@acme\.example$/)
 
   const fresh = await call(client, 'new_address', { prefix: 'Sign Up' })
   assert.match(fresh.value.address, /^sign-up\.[0-9a-f]{8}@inbox\.test$/)
@@ -165,4 +171,82 @@ test('nid mcp pointed at the /mcp URL says the URL is wrong instead of pretendin
   const result = await call(client, 'clear')
   assert.equal(result.isError, true)
   assert.match(result.text, /without \/mcp/)
+})
+
+test('agent reads full message, lists rejections, triggers webhooks, and cancels HTTP wait', async (t) => {
+  const { createServer: createHttpServer } = await import('node:http')
+  let receivedWebhook: Record<string, unknown> | null = null
+  const app = createHttpServer((req, res) => {
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', () => {
+      receivedWebhook = JSON.parse(body) as Record<string, unknown>
+      res.writeHead(200).end('{"ok":true}')
+    })
+  })
+  await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => app.close(() => resolve())))
+  const port = (app.address() as { port: number }).port
+
+  const secret = `whsec_${Buffer.from('mcp-secret').toString('base64')}`
+  const running = await start({ webhooks: { resend: { url: `http://127.0.0.1:${port}`, secret } } })
+  const client = await connectHttp(running)
+  t.after(async () => {
+    await client.close()
+    await running.close()
+  })
+
+  await sendResend(running.server, signInEmail('mcp@inbox.test', '998877'))
+  await sendResend(running.server, { to: 'badmcp@inbox.test', subject: 'Bad', text: 'Bad' })
+
+  const listed = await call(client, 'list_messages', { to: 'mcp@inbox.test' })
+  const messageId = listed.value[0].id as number
+
+  const hook = await call(client, 'trigger_webhook', { id: messageId, type: 'bounced' })
+  assert.equal(hook.value.delivered, true)
+  assert.equal(receivedWebhook?.type, 'email.bounced')
+
+  const full = await call(client, 'get_message', { id: messageId })
+  assert.equal(full.value.code, '998877')
+  assert.equal(full.value.events.length, 1)
+  assert.equal(full.value.events[0].event, 'bounced')
+
+  const rejections = await call(client, 'list_rejections', { to: 'badmcp@inbox.test' })
+  assert.equal(rejections.value.length, 1)
+  assert.equal(rejections.value[0].status, 422)
+  assert.equal('raw' in rejections.value[0], false)
+
+  const badDomainAt = await call(client, 'new_address', { domain: 'foo@bar' })
+  assert.equal(badDomainAt.isError, true)
+  const badDomainSpace = await call(client, 'new_address', { domain: 'bad domain' })
+  assert.equal(badDomainSpace.isError, true)
+
+  let activeSubs = 0
+  const origSubscribe = running.server.events.subscribe.bind(running.server.events)
+  running.server.events.subscribe = (projectId, listener) => {
+    activeSubs++
+    const unsub = origSubscribe(projectId, listener)
+    return () => {
+      activeSubs--
+      unsub()
+    }
+  }
+  const clientB = await connectHttp(running)
+  t.after(async () => {
+    await clientB.close()
+  })
+
+  const waitA = client.callTool({ name: 'wait_for_email', arguments: { to: 'cancel-a@inbox.test', timeout: 20 } })
+  const waitB = call(clientB, 'wait_for_email', { to: 'stay-b@inbox.test', timeout: 20 })
+  await sleep(100)
+  assert.equal(activeSubs, 2)
+  await client.close()
+  await assert.rejects(waitA)
+  await sleep(100)
+  assert.equal(activeSubs, 1)
+  await sendResend(running.server, signInEmail('stay-b@inbox.test', '777888'))
+  const bResult = await waitB
+  assert.equal(bResult.isError, false)
+  assert.equal(bResult.value.code, '777888')
+  assert.equal(activeSubs, 0)
 })

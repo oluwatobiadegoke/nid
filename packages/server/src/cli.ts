@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -14,7 +15,7 @@ const defaultHost = '127.0.0.1'
 const help = `nid ${version}
 
 Usage:
-  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--auto-webhook event]
+  nid serve [--port 4400] [--smtp-port 1025] [--host 127.0.0.1] [--db mail.sqlite] [--cors] [--allow-host name] [--auto-webhook event] [--token secret]
   nid run [serve options] [--url <url>] -- <command...>
   nid read <address> [--latest] [--code] [--links] [--wait 30] [--json]
   nid clear [<address>]
@@ -26,7 +27,7 @@ Options for read, clear, webhook, mcp, healthcheck and run:
   --url <url>   The server to talk to (default: $NID_URL or http://127.0.0.1:4400)
 
 Environment:
-  NID_URL, NID_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK
+  NID_URL, NID_TOKEN, NID_AUTH_TOKEN, NID_PORT, NID_SMTP_PORT, NID_HOST, NID_DB, NID_INTERCEPT, NID_AUTO_WEBHOOK
   NID_<PROVIDER>_WEBHOOK_URL, NID_<PROVIDER>_WEBHOOK_SECRET, such as NID_BREVO_WEBHOOK_URL
 `
 
@@ -38,6 +39,7 @@ const serverOptionConfig = {
   cors: { type: 'boolean', default: false },
   'allow-host': { type: 'string', multiple: true, default: [] as string[] },
   'auto-webhook': { type: 'string', default: process.env.NID_AUTO_WEBHOOK },
+  token: { type: 'string', default: process.env.NID_AUTH_TOKEN },
   quiet: { type: 'boolean', default: false },
 } as const
 
@@ -61,6 +63,14 @@ async function api(url: string, path: string, init: RequestInit = {}): Promise<R
   }
 }
 
+function createTokenAuth(expected: string) {
+  const expectedHash = createHash('sha256').update(expected).digest()
+  return (credential: { value: string }) => {
+    const actualHash = createHash('sha256').update(credential.value).digest()
+    return timingSafeEqual(expectedHash, actualHash) ? { projectId: 'default', plan: 'local' } : null
+  }
+}
+
 async function startServer(values: {
   port: string
   'smtp-port': string
@@ -69,6 +79,7 @@ async function startServer(values: {
   cors: boolean
   'allow-host': string[]
   'auto-webhook'?: string | undefined
+  token?: string | undefined
   quiet: boolean
 }) {
   const [{ createServer }, { providers }, { webhookEvents }] = await Promise.all([
@@ -82,6 +93,10 @@ async function startServer(values: {
       fail(`--auto-webhook must be one of ${webhookEvents.join(', ')}`)
     }
     autoWebhook = values['auto-webhook'] as (typeof webhookEvents)[number]
+  }
+  const token = values.token?.trim()
+  if (values.token !== undefined && !token) {
+    fail('--token must not be empty')
   }
   let store
   if (values.db) {
@@ -97,6 +112,7 @@ async function startServer(values: {
   )
   const server = await createServer({
     ...(store ? { store } : {}),
+    ...(token ? { auth: createTokenAuth(token) } : {}),
     cors: values.cors,
     allowHosts: values['allow-host'],
     webhooks,
@@ -123,6 +139,7 @@ async function startServer(values: {
           return `  webhooks    ${name} to ${shown.href}`
         }),
         ...(autoWebhook ? [`  auto        ${autoWebhook} webhook after each send`] : []),
+        ...(token ? ['  auth        token required'] : []),
         `  mail is ${where}`,
         '',
       ].join('\n'),
