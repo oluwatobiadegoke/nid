@@ -155,7 +155,11 @@ async function handleSend(
       error: 'Rate limit exceeded',
       raw: req.rawBody,
     })
-    return send(c, { status: 429, headers: { 'retry-after': '1' }, body: { error: 'Rate limit exceeded' } })
+    return send(c, {
+      status: 429,
+      headers: { 'retry-after': '1' },
+      body: { statusCode: 429, name: 'rate_limit_exceeded', message: 'Rate limit exceeded', error: 'Rate limit exceeded' },
+    })
   }
 
   const outcomes: Array<Message | SendError> = []

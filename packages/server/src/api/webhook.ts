@@ -75,6 +75,7 @@ export async function dispatchWebhook(options: DispatchWebhookOptions): Promise<
     reason: options.reason,
   })
   const outcome = await sendWebhook(options.target, request)
+  if (!(await options.store.getMessage(options.projectId, options.message.id))) return outcome
   const delivery = await options.store.insertWebhookDelivery(options.projectId, {
     messageId: options.message.id,
     provider: options.provider.name,

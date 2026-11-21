@@ -108,7 +108,7 @@ Unless the server has an `auth` function, nid also recognizes special recipient 
 - `bounce@inbox.test` or `bounce+anything@inbox.test`: stores the email and sends a `bounced` webhook.
 - `defer@inbox.test` or `defer+anything@inbox.test`: stores the email and sends a `deferred` webhook.
 - `complain@inbox.test` or `complain+anything@inbox.test`: stores the email and sends a `complained` webhook.
-- `ratelimit@inbox.test` or `ratelimit+anything@inbox.test`: refuses the send with HTTP `429` (`Retry-After: 1`) and records a rejection.
+- `ratelimit@inbox.test` or `ratelimit+anything@inbox.test`: refuses the send with HTTP `429` (`Retry-After: 1`) and records a rejection. The body has the same `statusCode`, `name` and `message` fields as a Resend error, so the Resend SDK reports it as `rate_limit_exceeded`.
 
 ## Limits
 
