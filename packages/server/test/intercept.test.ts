@@ -17,6 +17,7 @@ test('shouldInterceptHost matches supported provider endpoints only', () => {
   for (const host of [
     'api.resend.com',
     'API.RESEND.COM',
+    'api.resend.com.',
     'api.brevo.com',
     'api.sendinblue.com',
     'api.sendgrid.com',

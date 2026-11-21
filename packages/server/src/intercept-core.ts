@@ -45,7 +45,7 @@ interface InterceptorState {
 }
 
 export function shouldInterceptHost(hostname: string): boolean {
-  const clean = hostname.trim().toLowerCase()
+  const clean = hostname.trim().toLowerCase().replace(/\.$/, '')
   return interceptedHosts.has(clean)
 }
 
