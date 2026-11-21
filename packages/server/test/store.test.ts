@@ -185,6 +185,10 @@ for (const driver of drivers) {
     assert.deepEqual(await store.listWebhookDeliveries('default', first.id), [])
     assert.equal(await store.latestWebhookEvent('default', first.id), null)
     assert.ok(await store.getMessage('default', second.id))
+    const twin = await store.insertMessage('default', message({ providerId: 'p2' }), noCode, null)
+    assert.equal((await store.findByProviderId('default', 'resend', 'p2'))?.id, second.id)
+    await store.deleteMessage('default', second.id)
+    assert.equal((await store.findByProviderId('default', 'resend', 'p2'))?.id, twin.id)
     await store.close()
   })
 
