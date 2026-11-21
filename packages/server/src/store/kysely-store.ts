@@ -264,7 +264,7 @@ export class KyselyStore implements Store {
         .values({
           project_id: projectId,
           provider: rejection.provider,
-          to_addresses: JSON.stringify(rejection.to.map((a) => a.toLowerCase())),
+          to_addresses: JSON.stringify(rejection.to.map((a) => a.trim().toLowerCase())),
           status: rejection.status,
           error: rejection.error,
           raw: rejection.raw,

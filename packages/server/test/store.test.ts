@@ -133,10 +133,10 @@ for (const driver of drivers) {
   test(`[${driver.name}] rejections are listed newest first, filtered by address, and deleted`, async () => {
     const store = await driver.create()
     await store.insertRejection('default', { provider: 'resend', to: ['x@y.co'], status: 422, error: 'bad', raw: '{}' })
-    await store.insertRejection('default', { provider: 'brevo', to: ['Z@y.co'], status: 400, error: 'worse', raw: '{}' })
+    await store.insertRejection('default', { provider: 'brevo', to: [' Z@y.co '], status: 400, error: 'worse', raw: '{}' })
     const all = await store.listRejections('default', {})
     assert.deepEqual(all.map((r) => r.provider), ['brevo', 'resend'])
-    assert.equal((await store.listRejections('default', { to: 'z@y.co' })).length, 1)
+    assert.deepEqual((await store.listRejections('default', { to: 'z@y.co' })).map((r) => r.to), [['z@y.co']])
     assert.equal(await store.deleteRejections('default', 'z@y.co'), 1)
     assert.deepEqual((await store.listRejections('default', {})).map((r) => r.provider), ['resend'])
     assert.equal(await store.deleteRejections('default'), 1)

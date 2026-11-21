@@ -267,3 +267,21 @@ test('stream drains more than 100 backlog messages and resumes via Last-Event-ID
   await resumedReader.cancel()
   assert.equal(resumedSeen.includes('"subject":"Backlog 120"'), false)
 })
+
+test('a stream resumed with an id from before a restart still delivers new mail', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const response = await server.app.request('/api/stream', { headers: { 'last-event-id': '57' } })
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  await sendResend(server, { ...base, subject: 'After restart', text: 'Hello' })
+  let seen = ''
+  while (!seen.includes('"subject":"After restart"')) {
+    const { value, done } = await reader.read()
+    if (done) break
+    seen += decoder.decode(value)
+  }
+  await reader.cancel()
+  assert.ok(seen.includes('"cursor":0'))
+  assert.ok(seen.includes('"subject":"After restart"'))
+})
