@@ -54,6 +54,8 @@ nid run [serve options] [--url <url>] -- <command...>
 
 All [`nid serve`](#nid-serve) options are accepted before `--`. Put `--` between nid options and your command. `nid run` prints its start lines to standard error, so your command's output stays its own.
 
+On Windows, `nid run` starts programs such as `node` directly. To start a command that is a `.cmd` file, such as `npm`, `pnpm` or `npx`, run it through `cmd`: `nid run -- cmd /c npm run dev`.
+
 ## nid read
 
 Reads mail for one address from a running server.

@@ -33,6 +33,12 @@ test('a busy port ends nid with one line that says what to do, and nid run keeps
   assert.equal(busy.stderr, `Port ${port} is already in use. Pass --port 0 and --smtp-port 0 to pick free ports, or with nid run pass --url to use the nid that is already running.\n`)
 
   const built = fileURLToPath(new URL('../dist/cli.js', import.meta.url))
+  const smtpBusy = await run(['serve', '--port', '0', '--smtp-port', String(running.smtpPort)]).then(
+    () => assert.fail('expected the busy SMTP port to stop nid'),
+    (err: { stderr: string }) => err,
+  )
+  assert.match(smtpBusy.stderr, new RegExp(`^Port ${running.smtpPort} is already in use\\.[^\\n]*\\n$`))
+
   const child = await promisify(execFile)(process.execPath, [built, 'run', '--port', '0', '--smtp-port', '0', '--', process.execPath, '-e', 'console.log("child output")'])
   assert.equal(child.stdout, 'child output\n')
   assert.match(child.stderr, /web view/)

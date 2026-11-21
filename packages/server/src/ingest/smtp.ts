@@ -63,7 +63,9 @@ export async function createSmtpServer(options: SmtpOptions): Promise<SMTPServer
       })
     },
   })
-  server.on('error', (err) => options.onError?.(err))
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.syscall !== 'listen') options.onError?.(err)
+  })
   return server
 }
 
