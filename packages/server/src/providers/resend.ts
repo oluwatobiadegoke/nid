@@ -173,7 +173,16 @@ const batch: SendRoute = {
   },
 }
 
-function emailShape(m: Message) {
+const resendEventNames: Record<string, string> = {
+  delivered: 'delivered',
+  deferred: 'delivery_delayed',
+  bounced: 'bounced',
+  complained: 'complained',
+  opened: 'opened',
+  clicked: 'clicked',
+}
+
+function emailShape(m: Message, lastEvent: string | null) {
   const list = (kind: Recipient['kind']) => {
     const addresses = toAddresses(m.recipients, kind)
     return addresses.length > 0 ? addresses : null
@@ -190,7 +199,7 @@ function emailShape(m: Message) {
     bcc: list('bcc'),
     cc: list('cc'),
     reply_to: m.replyTo.length > 0 ? m.replyTo : null,
-    last_event: 'delivered',
+    last_event: (lastEvent && resendEventNames[lastEvent]) ?? 'delivered',
     scheduled_at: (m.meta.scheduledAt as string | undefined) ?? null,
     tags: (m.meta.tags as unknown[] | undefined) ?? [],
     message_id: `<${m.providerId}@nid.local>`,
@@ -204,7 +213,8 @@ const get: ReadRoute = {
   async handle(req, { store, projectId }): Promise<ProviderReply> {
     const message = await store.findByProviderId(projectId, name, req.params.id ?? '')
     if (!message) return { status: 404, body: { statusCode: 404, message: 'Email not found', name: 'not_found' } }
-    return { status: 200, body: emailShape(message) }
+    const lastEvent = await store.latestWebhookEvent(projectId, message.id)
+    return { status: 200, body: emailShape(message, lastEvent) }
   },
 }
 
@@ -217,21 +227,21 @@ const webhookTypes: Record<WebhookEvent, string> = {
   clicked: 'email.clicked',
 }
 
-function webhook({ message: m, event, secret, now }: WebhookInput) {
+function webhook({ message: m, event, recipientOverride, secret, now, url, reason }: WebhookInput) {
   const key = Buffer.from(webhookSecret(secret, name, 'Resend').replace(/^whsec_/, ''), 'base64')
   const tags = (m.meta.tags as Array<{ name: string; value: string }> | undefined) ?? []
   const data: Record<string, unknown> = {
     email_id: m.providerId,
     message_id: `<${m.providerId}@nid.local>`,
     from: m.from,
-    to: toAddresses(m.recipients, 'to'),
+    to: recipientOverride ? [recipientOverride] : toAddresses(m.recipients, 'to'),
     subject: m.subject,
     created_at: m.createdAt,
   }
   if (tags.length > 0) data.tags = Object.fromEntries(tags.map((t) => [t.name, t.value]))
-  if (event === 'bounced') data.bounce = { message: bounceReason, subType: 'General', type: 'Permanent' }
+  if (event === 'bounced') data.bounce = { message: reason ?? bounceReason, subType: 'General', type: 'Permanent' }
   if (event === 'clicked') {
-    data.click = { ipAddress: '127.0.0.1', link: m.extracted.link ?? '', timestamp: now.toISOString(), userAgent: 'nid' }
+    data.click = { ipAddress: '127.0.0.1', link: url ?? m.extracted.link ?? '', timestamp: now.toISOString(), userAgent: 'nid' }
   }
   const body = JSON.stringify({ type: webhookTypes[event], created_at: now.toISOString(), data })
   const id = `msg_${randomBytes(12).toString('hex')}`

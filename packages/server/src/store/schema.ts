@@ -51,11 +51,35 @@ export interface RejectionsTable {
   created_at: string
 }
 
+export interface RejectionRecipientsTable {
+  rejection_id: number
+  project_id: string
+  address: string
+}
+
+export interface WebhookDeliveriesTable {
+  id: Generated<number>
+  project_id: string
+  message_id: number
+  provider: string
+  event: string
+  recipient: string
+  url: string
+  delivered: number
+  app_status: number | null
+  app_body: string
+  duration_ms: number
+  error: string | null
+  created_at: string
+}
+
 export interface Database {
   messages: MessagesTable
   recipients: RecipientsTable
   attachments: AttachmentsTable
   rejections: RejectionsTable
+  rejection_recipients: RejectionRecipientsTable
+  webhook_deliveries: WebhookDeliveriesTable
 }
 
 const migrations: Record<string, Migration> = {
@@ -153,6 +177,61 @@ const migrations: Record<string, Migration> = {
         .createIndex('rejections_project_id_id')
         .on('rejections')
         .columns(['project_id', 'id'])
+        .execute()
+    },
+  },
+  '0002_webhooks_and_rejection_recipients': {
+    async up(db: Kysely<Database>) {
+      await db.schema
+        .createTable('rejection_recipients')
+        .addColumn('rejection_id', 'integer', (c) => c.notNull())
+        .addColumn('project_id', 'text', (c) => c.notNull())
+        .addColumn('address', 'text', (c) => c.notNull())
+        .execute()
+      await db.schema
+        .createIndex('rejection_recipients_address')
+        .on('rejection_recipients')
+        .columns(['project_id', 'address', 'rejection_id'])
+        .execute()
+      await db.schema
+        .createIndex('rejection_recipients_rejection_id')
+        .on('rejection_recipients')
+        .column('rejection_id')
+        .execute()
+
+      const existing = await db.selectFrom('rejections').select(['id', 'project_id', 'to_addresses']).execute()
+      const rows: Array<{ rejection_id: number; project_id: string; address: string }> = []
+      for (const row of existing) {
+        const parsed = JSON.parse(row.to_addresses) as string[]
+        const unique = [...new Set(parsed.map((a) => a.trim().toLowerCase()).filter(Boolean))]
+        for (const address of unique) {
+          rows.push({ rejection_id: row.id, project_id: row.project_id, address })
+        }
+      }
+      for (let i = 0; i < rows.length; i += 200) {
+        await db.insertInto('rejection_recipients').values(rows.slice(i, i + 200)).execute()
+      }
+
+      await db.schema
+        .createTable('webhook_deliveries')
+        .addColumn('id', 'integer', (c) => c.primaryKey().autoIncrement())
+        .addColumn('project_id', 'text', (c) => c.notNull())
+        .addColumn('message_id', 'integer', (c) => c.notNull())
+        .addColumn('provider', 'text', (c) => c.notNull())
+        .addColumn('event', 'text', (c) => c.notNull())
+        .addColumn('recipient', 'text', (c) => c.notNull())
+        .addColumn('url', 'text', (c) => c.notNull())
+        .addColumn('delivered', 'integer', (c) => c.notNull())
+        .addColumn('app_status', 'integer')
+        .addColumn('app_body', 'text', (c) => c.notNull())
+        .addColumn('duration_ms', 'integer', (c) => c.notNull())
+        .addColumn('error', 'text')
+        .addColumn('created_at', 'text', (c) => c.notNull())
+        .execute()
+      await db.schema
+        .createIndex('webhook_deliveries_message_id')
+        .on('webhook_deliveries')
+        .columns(['project_id', 'message_id', 'id'])
         .execute()
     },
   },

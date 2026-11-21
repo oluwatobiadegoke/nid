@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net'
-import { SMTPServer, type SMTPServerSession } from 'smtp-server'
+import type { SMTPServer, SMTPServerSession } from 'smtp-server'
 import type { NewMessage, Project } from '../types.js'
 import { fromMime } from '../providers/mime.js'
 import type { Ingest } from './types.js'
@@ -17,7 +17,8 @@ async function toMessage(raw: Buffer, session: SMTPServerSession): Promise<NewMe
   return message
 }
 
-export function createSmtpServer(options: SmtpOptions): SMTPServer {
+export async function createSmtpServer(options: SmtpOptions): Promise<SMTPServer> {
+  const { SMTPServer } = await import('smtp-server')
   const projects = new WeakMap<SMTPServerSession, Project>()
   const server = new SMTPServer({
     authOptional: true,
@@ -55,14 +56,16 @@ export function createSmtpServer(options: SmtpOptions): SMTPServer {
             await options.ingest.accept(project, message)
             callback()
           })
-          .catch((err: Error) => {
-            options.onError?.(err)
+          .catch((err: Error & { responseCode?: number }) => {
+            if (!err.responseCode) options.onError?.(err)
             callback(err)
           })
       })
     },
   })
-  server.on('error', (err) => options.onError?.(err))
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.syscall !== 'listen') options.onError?.(err)
+  })
   return server
 }
 

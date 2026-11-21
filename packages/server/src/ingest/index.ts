@@ -1,3 +1,4 @@
+import type { EventBus } from '../events/index.js'
 import { extract as extractFrom } from '../extract/index.js'
 import type { Store } from '../store/types.js'
 import type { AuthHook, Credential, Limits, LimitsHook, NewMessage, NewRejection, Project } from '../types.js'
@@ -11,6 +12,7 @@ export const defaultLimits: Limits = { maxBodyBytes: 50 * 1024 * 1024, retention
 
 export interface IngestOptions {
   store: Store
+  events?: EventBus | undefined
   auth?: AuthHook | undefined
   limits?: LimitsHook | undefined
   onMessage?: ((message: Awaited<ReturnType<Store['insertMessage']>>) => void) | undefined
@@ -42,11 +44,14 @@ export function createIngest(options: IngestOptions): Ingest {
           ? null
           : new Date(Date.now() + current.retentionHours * 3600_000).toISOString()
       const stored = await options.store.insertMessage(project.projectId, message, extracted, expiresAt)
+      options.events?.emit(project.projectId, { kind: 'message', message: stored })
       options.onMessage?.(stored)
       return stored
     },
     async reject(project, rejection: NewRejection) {
-      return options.store.insertRejection(project.projectId, rejection)
+      const stored = await options.store.insertRejection(project.projectId, rejection)
+      options.events?.emit(project.projectId, { kind: 'rejection', rejection: stored })
+      return stored
     },
   }
 }

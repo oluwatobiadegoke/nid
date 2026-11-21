@@ -14,6 +14,16 @@ npx nid-inbox serve
 
 Stop it with Ctrl+C.
 
+## Run your app with nid
+
+To start nid and your Node.js app in one command with provider requests redirected automatically, use `nid run`:
+
+```sh
+npx nid-inbox run -- npm run dev
+```
+
+nid stops when your app exits. See [Point your app at nid](connect-your-app.md#zero-code-setup-for-nodejs-nid-run) for how interception works.
+
 ## Add it to a project
 
 Use this when your tests start nid, so everyone on the team gets the same version.
@@ -53,7 +63,7 @@ docker run --rm \
   ghcr.io/oluwatobiadegoke/nid
 ```
 
-The image is `ghcr.io/oluwatobiadegoke/nid`. The `latest` tag follows the newest release. Pin a version, such as `ghcr.io/oluwatobiadegoke/nid:0.2.0`, for repeatable builds.
+The image is `ghcr.io/oluwatobiadegoke/nid`. The `latest` tag follows the newest release. Pin a version, such as `ghcr.io/oluwatobiadegoke/nid:0.4.1`, for repeatable builds.
 
 Keep the `127.0.0.1:` part of each `-p` flag. It means only your own machine can reach nid. Inside the container nid listens on all interfaces so that Docker can forward the ports.
 
@@ -78,7 +88,7 @@ The container runs as the `node` user, so the folder must be writable by that us
 ```yaml
 services:
   nid:
-    image: ghcr.io/oluwatobiadegoke/nid:0.2.0
+    image: ghcr.io/oluwatobiadegoke/nid:0.4.1
     ports:
       - "127.0.0.1:4400:4400"
       - "127.0.0.1:1025:1025"
@@ -128,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       nid:
-        image: ghcr.io/oluwatobiadegoke/nid:0.2.0
+        image: ghcr.io/oluwatobiadegoke/nid:0.4.1
         ports:
           - 4400:4400
           - 1025:1025
@@ -160,7 +170,7 @@ Port `0` asks the system for any free port. This is useful when you [embed nid i
 
 ## Keep mail across restarts
 
-By default nid keeps mail in memory, so it is gone when nid stops. To keep it, give nid a SQLite file:
+By default nid keeps mail in memory (up to 5,000 messages and 1,000 rejections per project), so it is gone when nid stops or evicts older entries. To keep it, give nid a SQLite file:
 
 ```sh
 npx nid-inbox serve --db mail.sqlite
@@ -174,7 +184,7 @@ nid creates the file if it does not exist.
 npx nid-inbox healthcheck
 ```
 
-This prints `ok 0.2.0` and exits with code 0 when nid answers. It exits with code 2 when nothing is listening. You can also call `GET /healthz` directly.
+This prints `ok 0.4.1` and exits with code 0 when nid answers. It exits with code 2 when nothing is listening. You can also call `GET /healthz` directly.
 
 ## Related
 

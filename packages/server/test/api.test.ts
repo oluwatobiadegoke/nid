@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createServer } from '../src/index.js'
+import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
+import { createServer, createSqliteStore } from '../src/index.js'
 import { get, resendHeaders, sendResend, sleep } from './helpers.js'
 
 const base = { from: 'a@acme.com', to: 'signup@inbox.test' }
@@ -123,15 +124,22 @@ test('only localhost-like hosts are answered unless allowed', async (t) => {
 })
 
 test('healthz, providers and the openapi document are served', async (t) => {
-  const server = await createServer()
+  const server = await createServer({ webhooks: { resend: { url: 'http://127.0.0.1:3000/hook' } } })
   t.after(() => server.close())
   assert.equal((await get(server, '/healthz')).body.ok, true)
-  const providers = (await get(server, '/api/providers')).body.providers as { name: string }[]
-  assert.deepEqual(providers.map((p) => p.name), ['resend', 'brevo', 'sendgrid', 'postmark', 'mailgun'])
+  const provBody = (await get(server, '/api/providers')).body as {
+    providers: { name: string }[]
+    smtpPort: number
+    webhooks: string[]
+  }
+  assert.deepEqual(provBody.providers.map((p) => p.name), ['resend', 'brevo', 'sendgrid', 'postmark', 'mailgun', 'ses'])
+  assert.equal(provBody.smtpPort, 1025)
+  assert.deepEqual(provBody.webhooks, ['resend'])
   const spec = await get(server, '/api/openapi.json')
   assert.equal(spec.body.openapi, '3.0.3')
   const page = await server.app.request('/')
   assert.equal(page.status, 200)
+  assert.match(page.headers.get('content-security-policy') ?? '', /img-src \* data: blob:/)
   assert.match(await page.text(), /nid/)
 })
 
@@ -152,4 +160,338 @@ test('the auth and limits hooks pick the project and its retention', async (t) =
   assert.equal(unauthenticated.status, 401)
   const authenticated = await server.app.request('/api/messages', { headers: { authorization: 'Bearer ti_live' } })
   assert.equal(authenticated.status, 200)
+})
+
+test('wait wakes up immediately via EventBus with zero polling and cleans up on abort', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  let listCalls = 0
+  const origList = server.store.listMessages.bind(server.store)
+  server.store.listMessages = (...args) => {
+    listCalls++
+    return origList(...args)
+  }
+  let activeSubs = 0
+  const origSubscribe = server.events.subscribe.bind(server.events)
+  server.events.subscribe = (projectId, listener) => {
+    activeSubs++
+    const unsub = origSubscribe(projectId, listener)
+    return () => {
+      activeSubs--
+      unsub()
+    }
+  }
+
+  const started = performance.now()
+  const pending = get(server, '/api/wait?to=signup@inbox.test&timeout=5')
+  await sleep(10)
+  await sendResend(server, { ...base, subject: 'Fast', text: 'Code 918273' })
+  const res = await pending
+  const elapsed = performance.now() - started
+  assert.equal(res.status, 200)
+  assert.ok(elapsed < 100, `expected <100ms, got ${elapsed}ms`)
+  assert.equal(listCalls, 1)
+  assert.equal(activeSubs, 0)
+
+  const controller = new AbortController()
+  const aborted = server.app.request('/api/wait?to=never@inbox.test&timeout=20', { signal: controller.signal })
+  await sleep(10)
+  assert.equal(activeSubs, 1)
+  const callsBeforeAbort = listCalls
+  controller.abort()
+  await aborted
+  assert.equal(activeSubs, 0)
+  assert.equal(listCalls, callsBeforeAbort)
+})
+
+test('a wait with a subject filter matches arriving mail the way the store matches stored mail', async (t) => {
+  const server = await createServer({ store: await createSqliteStore() })
+  t.after(() => server.close())
+  const pending = get(server, `/api/wait?to=signup@inbox.test&timeout=5&subject=${encodeURIComponent('übersicht')}`)
+  await sleep(10)
+  await sendResend(server, { ...base, subject: 'ÜBERSICHT', text: 'Upper' })
+  await sendResend(server, { ...base, subject: 'Die übersicht', text: 'Lower' })
+  const res = await pending
+  assert.equal(res.status, 200)
+  assert.equal((res.body.message as { subject: string }).subject, 'Die übersicht')
+})
+
+test('wait with code_pattern finds a match past more than 50 earlier messages', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  for (let i = 0; i < 60; i++) {
+    await sendResend(server, { ...base, subject: `Noise ${i}`, text: `Nothing to match ${i}` })
+  }
+  await sendResend(server, { ...base, subject: 'Key', text: 'Your access key is PAGE-2-OK' })
+  const res = await get(server, `/api/wait?to=signup@inbox.test&timeout=1&code_pattern=${encodeURIComponent('key is ([A-Z0-9-]+)')}`)
+  assert.equal(res.status, 200)
+  assert.equal((res.body.message as { extracted: { code: string } }).extracted.code, 'PAGE-2-OK')
+})
+
+test('expired messages are hidden from read routes and attachment downloads', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const expired = await server.store.insertMessage(
+    'default',
+    {
+      provider: 'resend',
+      providerId: 'exp-1',
+      from: 'a@acme.com',
+      replyTo: [],
+      recipients: [{ address: 'signup@inbox.test', name: null, kind: 'to' }],
+      subject: 'Expired',
+      text: 'Old',
+      html: null,
+      headers: {},
+      attachments: [{ filename: 'a.txt', contentType: 'text/plain', contentId: null, content: new Uint8Array([1]) }],
+      raw: '{}',
+      meta: {},
+      idempotencyKey: null,
+    },
+    { code: null, codes: [], link: null, links: [] },
+    '2000-01-01T00:00:00.000Z',
+  )
+  assert.deepEqual((await get(server, '/api/messages')).body.messages, [])
+  assert.equal((await get(server, `/api/messages/${expired.id}`)).status, 404)
+  const file = await server.app.request(`/api/messages/${expired.id}/attachments/0`)
+  assert.equal(file.status, 404)
+})
+
+test('stream drains more than 100 backlog messages and resumes via Last-Event-ID', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  for (let i = 1; i <= 120; i++) {
+    await sendResend(server, { ...base, subject: `Backlog ${i}`, text: `Msg ${i}` })
+  }
+  const response = await server.app.request('/api/stream?after=0')
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let seen = ''
+  while (!seen.includes('"subject":"Backlog 120"')) {
+    const { value, done } = await reader.read()
+    if (done) break
+    seen += decoder.decode(value)
+  }
+  await reader.cancel()
+  assert.ok(seen.includes('"subject":"Backlog 1"'))
+  assert.ok(seen.includes('"subject":"Backlog 101"'))
+  assert.ok(seen.includes('"subject":"Backlog 120"'))
+
+  await sendResend(server, { ...base, subject: 'After disconnect 121', text: 'Msg 121' })
+  const resumed = await server.app.request('/api/stream?after=0', { headers: { 'last-event-id': '120' } })
+  const resumedReader = resumed.body!.getReader()
+  let resumedSeen = ''
+  while (!resumedSeen.includes('"subject":"After disconnect 121"')) {
+    const { value, done } = await resumedReader.read()
+    if (done) break
+    resumedSeen += decoder.decode(value)
+  }
+  await resumedReader.cancel()
+  assert.equal(resumedSeen.includes('"subject":"Backlog 120"'), false)
+})
+
+test('delete single message, delete rejections, and render sandboxed html preview with cid images', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  await sendResend(server, {
+    ...base,
+    subject: 'Inline',
+    html: '<img src="cid:logo@acme.com"><img src="https://cdn.acme.com/banner.png">',
+    attachments: [
+      {
+        filename: 'logo.png',
+        content: Buffer.from('pngbytes').toString('base64'),
+        content_type: 'image/png',
+        content_id: '<logo@acme.com>',
+      },
+    ],
+  })
+  await sendResend(server, { ...base, subject: 'Keep', text: 'Keep me' })
+  await sendResend(server, { to: 'bad@inbox.test', subject: 'Bad', text: 'Bad' })
+  await sendResend(server, { to: 'other-bad@inbox.test', subject: 'Bad2', text: 'Bad2' })
+
+  const list = (await get(server, '/api/messages')).body.messages as Array<{ id: number; subject: string }>
+  const inlineId = list.find((m) => m.subject === 'Inline')!.id
+  const keepId = list.find((m) => m.subject === 'Keep')!.id
+
+  const preview = await server.app.request(`/api/messages/${inlineId}/html`)
+  assert.equal(preview.status, 200)
+  const csp = preview.headers.get('content-security-policy') ?? ''
+  assert.match(csp, /sandbox/)
+  assert.match(csp, /default-src 'none'/)
+  assert.match(csp, /img-src \* data: blob:/)
+  assert.match(csp, /form-action 'none'/)
+  assert.match(csp, /base-uri 'none'/)
+  const html = await preview.text()
+  assert.match(html, /data:image\/png;base64,cG5nYnl0ZXM=/)
+  assert.match(html, /https:\/\/cdn\.acme\.com\/banner\.png/)
+
+  const delOne = await server.app.request(`/api/messages/${inlineId}`, { method: 'DELETE' })
+  assert.equal(delOne.status, 200)
+  assert.equal((await get(server, `/api/messages/${inlineId}`)).status, 404)
+  assert.equal((await get(server, `/api/messages/${keepId}`)).status, 200)
+
+  const delOneRej = await server.app.request('/api/rejections?to=bad@inbox.test', { method: 'DELETE' })
+  assert.deepEqual(await delOneRej.json(), { deleted: 1 })
+  assert.equal(((await get(server, '/api/rejections')).body.rejections as unknown[]).length, 1)
+
+  const delAllRej = await server.app.request('/api/rejections', { method: 'DELETE' })
+  assert.deepEqual(await delAllRej.json(), { deleted: 1 })
+  assert.equal(((await get(server, '/api/rejections')).body.rejections as unknown[]).length, 0)
+})
+
+test('read API refuses cross-origin mutating requests from disallowed origins', async (t) => {
+  const server = await createServer({ allowHosts: ['app.local.test'] })
+  t.after(() => server.close())
+  await sendResend(server, { ...base, subject: 'CSRF', text: 'CSRF' })
+  const messages = (await get(server, '/api/messages')).body.messages as Array<{ id: number }>
+  const id = messages[0]!.id
+
+  const faultRes = await server.app.request('/api/faults', {
+    method: 'POST',
+    headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+    body: JSON.stringify({ status: 503 }),
+  })
+  assert.equal(faultRes.status, 403)
+  assert.equal(((await get(server, '/api/faults')).body.faults as unknown[]).length, 0)
+
+  const eventRes = await server.app.request(`/api/messages/${id}/events`, {
+    method: 'POST',
+    headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+    body: JSON.stringify({ type: 'complained' }),
+  })
+  assert.equal(eventRes.status, 403)
+
+  const allowedOrigin = await server.app.request('/api/faults', {
+    method: 'POST',
+    headers: { origin: 'http://app.local.test', 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 503 }),
+  })
+  assert.equal(allowedOrigin.status, 201)
+})
+
+test('nid serve --token enforces authentication on provider and read routes', async (t) => {
+  const { spawn } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const cliJs = fileURLToPath(new URL('../dist/cli.js', import.meta.url))
+  const child = spawn(process.execPath, [cliJs, 'serve', '--port', '0', '--smtp-port', '0', '--token', 'stage-secret'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  t.after(() => {
+    if (!child.killed) child.kill('SIGTERM')
+  })
+
+  const url = await new Promise<string>((resolve, reject) => {
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (chunk: Buffer) => {
+      out += chunk.toString()
+      const match = out.match(/web view\s+(http:\/\/[^\s]+)/)
+      if (match?.[1]) resolve(match[1])
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      err += chunk.toString()
+    })
+    child.once('exit', (code) => reject(new Error(`cli exited ${code}: ${err}`)))
+  })
+
+  const unauthRead = await fetch(`${url}/api/messages`)
+  assert.equal(unauthRead.status, 401)
+  const badSend = await fetch(`${url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer wrong', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: 'u@inbox.test', subject: 'Hi', text: 'Hi' }),
+  })
+  assert.equal(badSend.status, 401)
+
+  const okSend = await fetch(`${url}/emails`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer stage-secret', 'content-type': 'application/json' },
+    body: JSON.stringify({ from: 'a@acme.com', to: 'u@inbox.test', subject: 'Hi', text: 'Code 102030' }),
+  })
+  assert.equal(okSend.status, 200)
+
+  const queryTokenRead = await fetch(`${url}/api/messages?token=stage-secret`)
+  assert.equal(queryTokenRead.status, 401)
+
+  const okRead = await fetch(`${url}/api/messages`, { headers: { authorization: 'Bearer stage-secret' } })
+  assert.equal(okRead.status, 200)
+  const data = (await okRead.json()) as { messages: Array<{ id: number; extracted: { code: string } }> }
+  assert.equal(data.messages[0]?.extracted.code, '102030')
+
+  const badSes = new SESv2Client({
+    region: 'us-east-1',
+    endpoint: url,
+    credentials: { accessKeyId: 'wrong', secretAccessKey: 'any' },
+  })
+  await assert.rejects(
+    badSes.send(
+      new SendEmailCommand({
+        FromEmailAddress: 'hello@acme.com',
+        Destination: { ToAddresses: ['ses-auth@inbox.test'] },
+        Content: { Simple: { Subject: { Data: 'Denied' }, Body: { Text: { Data: 'Denied' } } } },
+      }),
+    ),
+  )
+
+  const okSes = new SESv2Client({
+    region: 'us-east-1',
+    endpoint: url,
+    credentials: { accessKeyId: 'stage-secret', secretAccessKey: 'any' },
+  })
+  await okSes.send(
+    new SendEmailCommand({
+      FromEmailAddress: 'hello@acme.com',
+      Destination: { ToAddresses: ['ses-auth@inbox.test'] },
+      Content: { Simple: { Subject: { Data: 'Allowed' }, Body: { Text: { Data: 'Code 454545' } } } },
+    }),
+  )
+  const sesRead = await fetch(`${url}/api/messages?to=ses-auth@inbox.test`, {
+    headers: { authorization: 'Bearer stage-secret' },
+  })
+  assert.equal(sesRead.status, 200)
+  const sesData = (await sesRead.json()) as { messages: Array<{ extracted: { code: string } }> }
+  assert.equal(sesData.messages[0]?.extracted.code, '454545')
+
+  const uiPage = await fetch(`${url}/`)
+  assert.equal(uiPage.status, 200)
+})
+
+test('a stream resumed with an id from before a restart still delivers new mail', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const response = await server.app.request('/api/stream', { headers: { 'last-event-id': '57' } })
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  await sendResend(server, { ...base, subject: 'After restart', text: 'Hello' })
+  let seen = ''
+  while (!seen.includes('"subject":"After restart"')) {
+    const { value, done } = await reader.read()
+    if (done) break
+    seen += decoder.decode(value)
+  }
+  await reader.cancel()
+  assert.ok(seen.includes('"cursor":0'))
+  assert.ok(seen.includes('"subject":"After restart"'))
+})
+
+test('the html preview fills each inline image, even when one content id starts with another', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const image = (name: string, bytes: string) => ({
+    filename: `${name}.png`,
+    content: Buffer.from(bytes).toString('base64'),
+    content_type: `image/png; name="${name}.png"`,
+    content_id: name,
+  })
+  await sendResend(server, {
+    ...base,
+    subject: 'Two logos',
+    html: '<img src="cid:logo"><img src="cid:logo-dark">',
+    attachments: [image('logo', 'light'), image('logo-dark', 'dark')],
+  })
+  const id = ((await get(server, '/api/messages')).body.messages as Array<{ id: number }>)[0]!.id
+  const html = await (await server.app.request(`/api/messages/${id}/html`)).text()
+  const data = (bytes: string) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+  assert.equal(html, `<img src="${data('light')}"><img src="${data('dark')}">`)
 })

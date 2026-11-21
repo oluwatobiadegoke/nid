@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { BrevoClient, BrevoError } from '@getbrevo/brevo'
@@ -6,7 +8,10 @@ import Mailgun from 'mailgun.js'
 import MailComposer from 'nodemailer/lib/mail-composer/index.js'
 import { Errors, ServerClient } from 'postmark'
 import { Resend } from 'resend'
+import { BadRequestException, SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
 import { start } from './helpers.js'
+
+const runExec = promisify(execFile)
 
 test('the official Resend SDK sends, reads back and sees typed errors', async (t) => {
   const running = await start()
@@ -147,4 +152,60 @@ test('the official Mailgun SDK sends with an attachment and sees Mailgun errors'
     mg.messages.create('mg.acme.com', { to: ['mg-sdk@inbox.test'], text: 'No from' } as never),
     (err: { status?: number }) => err.status === 400,
   )
+})
+
+test('the official AWS SESv2 SDK sends and surfaces typed SES errors', async (t) => {
+  const running = await start()
+  t.after(() => running.close())
+  const ses = new SESv2Client({
+    region: 'us-east-1',
+    endpoint: running.url,
+    credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+  })
+  const sent = await ses.send(
+    new SendEmailCommand({
+      FromEmailAddress: 'hello@acme.com',
+      Destination: { ToAddresses: ['ses-sdk@inbox.test'] },
+      Content: {
+        Simple: {
+          Subject: { Data: 'Hello from SES' },
+          Body: { Text: { Data: 'Your code is 432109' } },
+        },
+      },
+    }),
+  )
+  assert.ok(sent.MessageId)
+  const stored = (await running.server.store.listMessages('default', { to: 'ses-sdk@inbox.test' }))[0]
+  assert.equal(stored?.provider, 'ses')
+  assert.equal(stored?.extracted.code, '432109')
+
+  await assert.rejects(
+    ses.send(
+      new SendEmailCommand({
+        Destination: { ToAddresses: ['ses-sdk@inbox.test'] },
+        Content: { Simple: { Subject: { Data: 'No from' }, Body: { Text: { Data: 'x' } } } },
+      }),
+    ),
+    (err: unknown) => err instanceof BadRequestException,
+  )
+
+  const envChildScript = `
+    import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2'
+    const client = new SESv2Client({
+      region: 'us-east-1',
+      credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+    })
+    await client.send(
+      new SendEmailCommand({
+        FromEmailAddress: 'hello@acme.com',
+        Destination: { ToAddresses: ['ses-env@inbox.test'] },
+        Content: { Simple: { Subject: { Data: 'Via env' }, Body: { Text: { Data: 'Code 556677' } } } },
+      }),
+    )
+  `
+  const env = { ...process.env, AWS_ENDPOINT_URL_SESV2: running.url }
+  delete env.AWS_ENDPOINT_URL_SES
+  await runExec(process.execPath, ['--input-type=module', '-e', envChildScript], { env })
+  const envStored = (await running.server.store.listMessages('default', { to: 'ses-env@inbox.test' }))[0]
+  assert.equal(envStored?.extracted.code, '556677')
 })

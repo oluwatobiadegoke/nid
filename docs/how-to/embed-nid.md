@@ -36,6 +36,8 @@ const store = await createSqliteStore({ path: 'mail.sqlite' })
 const server = await createServer({ store })
 ```
 
+To build the store on a Kysely instance of your own, import `KyselyStore` and `NodeSqliteDialect` from `nid-inbox/sqlite`. The `nid-inbox` root export does not include them.
+
 ## Run something on every new email
 
 ```js
@@ -78,7 +80,7 @@ Once you pass `auth`, every caller needs a key that it accepts:
 - The read API takes it as `Authorization: Bearer <token>`.
 - SMTP senders log in with the key as the username.
 
-The web view cannot send a token, so it shows no mail once you pass `auth`. To turn it off, pass `ui: false`.
+When you open the web view against a server with `auth`, it asks for your token and stores it in `sessionStorage`. To turn the web view off, pass `ui: false`.
 
 ## All options
 

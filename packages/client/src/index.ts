@@ -93,6 +93,12 @@ export interface ListOptions {
 
 export type WebhookEvent = 'delivered' | 'deferred' | 'bounced' | 'complained' | 'opened' | 'clicked'
 
+export interface TriggerWebhookOptions {
+  recipient?: string | undefined
+  url?: string | undefined
+  reason?: string | undefined
+}
+
 export interface WebhookResult {
   url: string
   delivered: boolean
@@ -100,6 +106,45 @@ export interface WebhookResult {
   appBody: string
   durationMs: number
   error?: string
+}
+
+export interface WebhookDelivery {
+  id: number
+  projectId: string
+  messageId: number
+  provider: string
+  event: string
+  recipient: string
+  url: string
+  delivered: boolean
+  appStatus: number | null
+  appBody: string
+  durationMs: number
+  error: string | null
+  createdAt: string
+}
+
+export interface FaultInput {
+  provider?: string | undefined
+  to?: string | undefined
+  status?: number | undefined
+  body?: unknown
+  headers?: Record<string, string> | undefined
+  delayMs?: number | undefined
+  count?: number | null | undefined
+}
+
+export interface FaultRule {
+  id: number
+  projectId: string
+  provider: string | null
+  to: string | null
+  status: number
+  body: unknown
+  headers: Record<string, string>
+  delayMs: number
+  remaining: number | null
+  createdAt: string
 }
 
 export interface AddressOptions {
@@ -231,6 +276,10 @@ export class Inbox {
     return body.rejections
   }
 
+  async delete(id: number): Promise<void> {
+    await this.#request<{ deleted: boolean }>(`/api/messages/${id}`, { method: 'DELETE' })
+  }
+
   async clear(address?: string): Promise<number> {
     const query = address ? `?${new URLSearchParams({ to: address.trim().toLowerCase() })}` : ''
     const body = await this.#request<{ deleted: number }>(`/api/messages${query}`, { method: 'DELETE' })
@@ -239,12 +288,37 @@ export class Inbox {
     return body.deleted
   }
 
-  async triggerWebhook(id: number, type: WebhookEvent): Promise<WebhookResult> {
+  async clearRejections(address?: string): Promise<number> {
+    const query = address ? `?${new URLSearchParams({ to: address.trim().toLowerCase() })}` : ''
+    const body = await this.#request<{ deleted: number }>(`/api/rejections${query}`, { method: 'DELETE' })
+    return body.deleted
+  }
+
+  async events(id: number): Promise<WebhookDelivery[]> {
+    const body = await this.#request<{ events: WebhookDelivery[] }>(`/api/messages/${id}/events`)
+    return body.events
+  }
+
+  async triggerWebhook(id: number, type: WebhookEvent, options: TriggerWebhookOptions = {}): Promise<WebhookResult> {
     return this.#request<WebhookResult>(`/api/messages/${id}/events`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type, ...options }),
     })
+  }
+
+  async failNext(rule: FaultInput): Promise<FaultRule> {
+    const body = await this.#request<{ fault: FaultRule }>('/api/faults', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(rule),
+    })
+    return body.fault
+  }
+
+  async clearFaults(): Promise<number> {
+    const body = await this.#request<{ cleared: number }>('/api/faults', { method: 'DELETE' })
+    return body.cleared
   }
 
   async #raw(path: string, init: RequestInit = {}): Promise<Response> {

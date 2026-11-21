@@ -20,7 +20,7 @@ your app ──SMTP──────────────┼──> nid stor
 
 ## Why you run the inbox yourself
 
-When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, nothing leaves your machine, and you decide when to clear it.
+When you build an app that sends email, you want to see what it sends: the words, the layout, the sign-in code and the link. nid gives you a place to read that mail on your own computer. Nothing reaches a real person, no email leaves your machine, and you decide when to clear it.
 
 You read the mail in the web view, and your tests read the same mail through the read API. The [web view guide](../how-to/use-the-web-view.md) shows what the page offers.
 
@@ -49,7 +49,7 @@ The client library does this for you:
 
 ## Waiting without polling
 
-`GET /api/wait` holds the HTTP request open until a matching message arrives or the timeout ends. Inside nid it checks the store about four times a second. To the test it is one request that returns the moment the mail is there.
+`GET /api/wait` holds the HTTP request open until a matching message arrives or the timeout ends. Inside nid, an in-process event bus wakes the request the instant a matching message is stored, with no polling loop. To the test it is one request that returns the moment the mail is there.
 
 So a test has no loops and no `sleep`. It also never waits longer than it must, and on a slow CI machine it waits a little more, up to its timeout.
 
@@ -67,7 +67,7 @@ Timed out waiting for mail to signup.6aaee5fd@inbox.test after 30s. 1 resend req
 
 When a message arrives, nid pulls out codes and links once and stores them with the message.
 
-**Codes.** nid looks at the subject and the plain text (or the HTML turned into text). A token counts as a code when it is:
+**Codes.** nid looks at the subject, the plain text and the HTML turned into text. A token counts as a code when it is:
 
 - 4 to 8 digits, or two groups of 3 digits such as `123 456` or `123-456`; or
 - 6 to 8 capital letters and digits with at least one digit, such as `AB12CD`;
@@ -82,7 +82,7 @@ When the guess is wrong, a test passes its own `codePattern`. That pattern runs 
 
 ## Memory by default
 
-nid keeps mail in an in-memory SQLite database unless you pass `--db`. Each run starts empty, which is what most test runs want. With `--db` it uses a SQLite file, so mail survives a restart.
+nid keeps mail in memory by default, with no database file or startup overhead. Each run starts empty, which is what most test runs want, and each project holds up to 5,000 messages and 1,000 rejections before evicting the oldest entries. With `--db` it uses a SQLite file, so mail survives a restart.
 
 ## Projects
 
@@ -92,7 +92,5 @@ Every stored message and every query carries a project id. On your machine there
 
 Today:
 
-- Only Resend, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
-- nid calls your app's webhook route only when you [ask it to](../how-to/test-webhooks.md). It never sends "delivered" or "bounced" by itself after a send.
-- `retentionHours` stamps an expiry time on messages, but nothing deletes expired messages yet.
-- The only built-in store is SQLite.
+- Only Resend, Amazon SES, Brevo, SendGrid, Postmark, Mailgun and SMTP are supported. If your app uses another provider, it can send to nid over SMTP instead.
+- The only built-in persistent store is SQLite.

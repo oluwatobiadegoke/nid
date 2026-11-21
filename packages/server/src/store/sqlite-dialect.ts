@@ -24,6 +24,8 @@ function loadSqlite(): typeof import('node:sqlite') {
   }) as typeof process.emitWarning
   try {
     return require('node:sqlite') as typeof import('node:sqlite')
+  } catch {
+    throw new Error('SQLite storage (--db) requires Node.js 22.13 or later. Omit --db to keep mail in memory.')
   } finally {
     process.emitWarning = original
   }

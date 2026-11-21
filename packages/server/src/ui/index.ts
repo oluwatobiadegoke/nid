@@ -11,7 +11,7 @@ export function webView(): Hono {
     cached ??= readFileSync(pagePath, 'utf8')
     return c.html(cached, 200, {
       'content-security-policy':
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self' data: about:; connect-src 'self'",
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https: http:; script-src 'self' 'unsafe-inline'; img-src * data: blob:; font-src * data:; frame-src 'self' data: about:; connect-src 'self'",
       'referrer-policy': 'no-referrer',
     })
   })

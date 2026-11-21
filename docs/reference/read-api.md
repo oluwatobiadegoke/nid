@@ -8,7 +8,7 @@ The server also describes these routes as an OpenAPI 3 document at `GET /api/ope
 
 ## Common rules
 
-- **Authentication.** By default no token is needed. When the server uses a custom `auth` function, send `Authorization: Bearer <token>`. A missing or wrong token gets `401 {"error": "Invalid or missing token"}`.
+- **Authentication.** By default no token is needed. When the server uses `--token` or a custom `auth` function, send `Authorization: Bearer <token>`. A missing or wrong token gets `401 {"error": "Invalid or missing token"}`.
 - **Addresses.** `to` matches one recipient address exactly, in any case. It matches To, Cc and Bcc recipients.
 - **Strict query parameters.** An unknown parameter, such as a typo, gets a `400`, never a silent match-everything:
 
@@ -28,9 +28,16 @@ The server also describes these routes as an OpenAPI 3 document at `GET /api/ope
 | [`GET /api/messages`](#get-apimessages) | Lists messages. |
 | [`DELETE /api/messages`](#delete-apimessages) | Deletes messages. |
 | [`GET /api/messages/{id}`](#get-apimessagesid) | One message in full. |
+| [`DELETE /api/messages/{id}`](#delete-apimessagesid) | Deletes one message. |
+| [`GET /api/messages/{id}/html`](#get-apimessagesidhtml) | Sandboxed HTML preview with inline images. |
+| [`GET /api/messages/{id}/events`](#get-apimessagesidevents) | Lists webhook delivery attempts for a message. |
 | [`POST /api/messages/{id}/events`](#post-apimessagesidevents) | Sends a provider webhook to your app. |
 | [`GET /api/messages/{id}/attachments/{n}`](#get-apimessagesidattachmentsn) | Downloads an attachment. |
 | [`GET /api/rejections`](#get-apirejections) | Sends nid refused. |
+| [`DELETE /api/rejections`](#delete-apirejections) | Deletes rejections. |
+| [`GET /api/faults`](#get-apifaults) | Lists active fault rules. |
+| [`POST /api/faults`](#post-apifaults) | Adds a fault or latency rule. |
+| [`DELETE /api/faults`](#delete-apifaults) | Clears all fault rules. |
 | [`GET /api/stream`](#get-apistream) | Live events. |
 | [`GET /api/providers`](#get-apiproviders) | Providers this server answers. |
 | [`GET /api/openapi.json`](#get-apiopenapijson) | The OpenAPI document. |
@@ -52,10 +59,10 @@ Holds the request open until a message that matches arrives, then returns the ol
 | --- | --- | --- |
 | `to` | Yes | Recipient address. |
 | `after` | No | Only messages with an id greater than this. Without it, any message matches, including old ones. |
-| `subject` | No | Part of the subject, in any case. |
-| `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `subject` | No | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
+| `provider` | No | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `has_code` | No | Skip messages with no extracted code. |
-| `code_pattern` | No | A regular expression, run without case, over the subject and plain text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
+| `code_pattern` | No | A regular expression, run without case, over the subject, plain text and HTML turned into text. Messages it does not match are skipped. Its first group, or the whole match, becomes `extracted.code` in the answer. |
 | `timeout` | No | Seconds to wait, from 0 to 120. Default 30. |
 
 On success: `200 {"message": Message}`.
@@ -83,8 +90,8 @@ Lists messages, newest first.
 | Parameter | What it does |
 | --- | --- |
 | `to` | Recipient address. |
-| `subject` | Part of the subject, in any case. |
-| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `subject` | Part of the subject, in any case. With `--db`, only the letters A to Z ignore case. |
+| `provider` | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `after` | Only messages with an id greater than this. |
 | `has_code` | Only messages with an extracted code. |
 | `limit` | How many, from 1 to 500. Default 50. |
@@ -103,15 +110,27 @@ Returns one message with its raw request: `200 {"message": Message}`, where the 
 
 Returns `404` when there is no such message.
 
+### DELETE /api/messages/{id}
+
+Deletes one message. Returns `200 {"deleted": true}`, or `404` when there is no such message.
+
+### GET /api/messages/{id}/html
+
+Returns the message's HTML body (`text/html`) with inline `cid:` attachments resolved to `data:` URIs and a strict `Content-Security-Policy` that blocks scripts while allowing images and styles. Returns `404` when there is no such message or no HTML body.
+
+### GET /api/messages/{id}/events
+
+Lists recorded webhook delivery attempts for the message, oldest first. Returns `200 {"events": [WebhookDelivery, ...]}` or `404` when there is no such message.
+
 ### POST /api/messages/{id}/events
 
-Sends the webhook the message's provider would send to your app, signed the provider's way, and waits up to 10 seconds for your app's answer. The body is JSON, sent with `content-type: application/json`, and names the event:
+Sends the webhook the message's provider would send to your app, signed the provider's way, and waits up to 10 seconds for your app's answer. The body is JSON, sent with `content-type: application/json`. It names the event and optional overrides:
 
 ```json
-{"type": "bounced"}
+{"type": "bounced", "recipient": "ada@inbox.test", "reason": "Mailbox full"}
 ```
 
-`type` is `delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`. The URL and secret come from `NID_<PROVIDER>_WEBHOOK_URL` and `NID_<PROVIDER>_WEBHOOK_SECRET`. See [Test your webhook handler](../how-to/test-webhooks.md) and the [payloads](providers.md#webhooks).
+`type` is `delivered`, `deferred`, `bounced`, `complained`, `opened` or `clicked`. Optional `recipient` overrides which recipient address is named. Without it, the event names the first `to` address, and a Resend event names every `to` address. Optional `url` overrides the link in `clicked` events, and optional `reason` overrides the bounce or deferral reason. The URL and secret come from `NID_<PROVIDER>_WEBHOOK_URL` and `NID_<PROVIDER>_WEBHOOK_SECRET`. See [Test your webhook handler](../how-to/test-webhooks.md) and the [payloads](providers.md#webhooks).
 
 Returns `200` with your app's answer, whatever status your app gave:
 
@@ -142,6 +161,40 @@ Lists sends nid refused, newest first.
 
 Returns `200 {"rejections": [Rejection, ...]}`, each with `raw`.
 
+### DELETE /api/rejections
+
+Deletes refused sends. With `to`, only rejections addressed to that address. Without it, every rejection.
+
+Returns `200 {"deleted": 2}`.
+
+### GET /api/faults
+
+Lists active fault and latency rules for this project: `200 {"faults": [FaultRule, ...]}`.
+
+### POST /api/faults
+
+Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays. Fault rules apply to sends through the HTTP provider APIs. Mail sent over SMTP is not affected and does not count against a rule's `count`. The body is JSON, sent with `content-type: application/json`:
+
+```json
+{"provider": "resend", "to": "ada@inbox.test", "status": 429, "headers": {"retry-after": "2"}, "count": 1}
+```
+
+| Field | Default | What it does |
+| --- | --- | --- |
+| `provider` | any HTTP provider | Limit the rule to one provider, such as `resend` or `ses`. |
+| `to` | any recipient | Limit the rule to one recipient address. |
+| `status` | `500` (or `200` when only `delayMs` is set) | HTTP status to return (`200` to `599`). Statuses `400` and above also record a rejection. With a status below `300`, nid waits for `delayMs` and then handles the send as usual. |
+| `body` | `{"error": "Simulated fault (<status>)"}` for statuses `400` and above, empty for `3xx` | Response body to return. |
+| `headers` | `{}` | Extra response headers, such as `retry-after`. `content-length` and `transfer-encoding` are refused. |
+| `delayMs` | `0` | Milliseconds to wait before answering (`0` to `30000`). |
+| `count` | `1` | Number of sends to affect, or `null` to apply until cleared. |
+
+Returns `201 {"fault": FaultRule}`.
+
+### DELETE /api/faults
+
+Clears all active fault rules for this project: `200 {"cleared": 1}`.
+
 ### GET /api/stream
 
 A [server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_events) stream. It sends:
@@ -157,12 +210,14 @@ A [server-sent events](https://developer.mozilla.org/docs/Web/API/Server-sent_ev
 | --- | --- |
 | `after` | Start after this message id instead of now. |
 
+To resume after a dropped connection, send the last message id you saw in the `Last-Event-ID` header. A browser's `EventSource` does this for you when it reconnects. The header wins over `after`. An id newer than the newest stored message, such as one from before nid restarted, counts as the newest. The stream does not replay rejections that arrived while you were disconnected. Read them with [`GET /api/rejections`](#get-apirejections).
+
 ### GET /api/providers
 
-Lists the provider APIs this server answers, with the setting that points each SDK at nid.
+Lists the provider APIs this server answers, the active SMTP port, and the names of providers with a webhook URL configured.
 
 ```json
-{"providers": [{"name": "resend", "label": "Resend", "setup": {"env": "RESEND_BASE_URL=http://localhost:4400", "note": "..."}}]}
+{"providers": [{"name": "resend", "label": "Resend", "setup": {"env": "RESEND_BASE_URL=http://localhost:4400", "note": "..."}}], "smtpPort": 1025, "webhooks": ["resend"]}
 ```
 
 ### GET /api/openapi.json
@@ -171,7 +226,7 @@ The OpenAPI 3 document for the read API.
 
 ### GET /healthz
 
-Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It needs no token.
+Returns `200 {"ok": true, "version": "0.4.1"}` once the server is ready. It needs no token.
 
 ## Objects
 
@@ -180,7 +235,7 @@ Returns `200 {"ok": true, "version": "0.2.0"}` once the server is ready. It need
 | Field | Type | What it is |
 | --- | --- | --- |
 | `id` | integer | nid's id. Use it as a cursor. |
-| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun` or `smtp`. |
+| `provider` | string | `resend`, `brevo`, `sendgrid`, `postmark`, `mailgun`, `ses` or `smtp`. |
 | `providerId` | string | The id nid returned to your app, in the provider's format. |
 | `from` | string | Sender, such as `Acme <hello@acme.com>`. |
 | `replyTo` | string[] | Reply-to addresses. |

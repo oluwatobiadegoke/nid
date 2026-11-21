@@ -87,7 +87,8 @@ function findLinks(html: string | null, text: string | null): Link[] {
   const seen = new Set<string>()
   const push = (href: string, label: string) => {
     const clean = trimUrl(decodeEntities(href.trim()))
-    if (!clean || seen.has(clean) || unsafeSchemes.includes(URL.parse(clean)?.protocol ?? '')) return
+    if (!clean || seen.has(clean)) return
+    if (URL.canParse(clean) && unsafeSchemes.includes(new URL(clean).protocol)) return
     seen.add(clean)
     links.push({ href: clean, text: label.trim() })
   }
@@ -143,16 +144,26 @@ export interface ExtractInput {
   variables?: Record<string, unknown> | undefined
 }
 
+function searchableTexts(message: { text: string | null; html: string | null }): string[] {
+  const parts: string[] = []
+  if (message.text) parts.push(message.text)
+  if (message.html) {
+    const rendered = htmlToText(message.html)
+    if (rendered) parts.push(rendered)
+  }
+  return parts
+}
+
 export function bodyText(message: { text: string | null; html: string | null }): string {
   return message.text ?? (message.html ? htmlToText(message.html) : '')
 }
 
 export function extract(input: ExtractInput): Extracted {
-  const text = bodyText(input)
-  let codes = [...new Set([...findCodes(input.subject), ...findCodes(text)])]
+  const texts = searchableTexts(input)
+  let codes = [...new Set([input.subject, ...texts].flatMap(findCodes))]
   const links = findLinks(input.html, input.text)
   let link = links.find(isPrimaryLink)?.href ?? null
-  if (input.variables && !text && !input.html) {
+  if (input.variables && texts.length === 0 && !input.html) {
     const found = fromVariables(input.variables)
     if (found.code) codes = [found.code, ...codes.filter((c) => c !== found.code)]
     if (codes.length === 0) codes = findCodes(found.values.join('\n'))
@@ -171,8 +182,9 @@ export function extract(input: ExtractInput): Extracted {
 }
 
 export function matchesPattern(message: { subject: string; text: string | null; html: string | null }, pattern: RegExp): string | null {
-  const haystack = [message.subject, bodyText(message)].join('\n')
-  const match = haystack.match(pattern)
-  if (!match) return null
-  return match[1] ?? match[0]
+  for (const part of [message.subject, ...searchableTexts(message)]) {
+    const match = part.match(pattern)
+    if (match) return match[1] ?? match[0]
+  }
+  return null
 }

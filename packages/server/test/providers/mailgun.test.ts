@@ -72,6 +72,8 @@ test('recipient-variables send each person their own copy with their own code', 
   assert.equal(one?.subject, 'Hi One')
   assert.equal(one?.extracted.code, '100200')
   assert.equal(two?.extracted.code, '300400')
+  assert.equal(one?.providerId, res.body.id)
+  assert.equal(two?.providerId, res.body.id)
   assert.deepEqual(two?.recipients.map((r) => r.address), ['two@inbox.test'])
 })
 

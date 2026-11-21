@@ -191,7 +191,8 @@ const send: SendRoute = {
   },
   reply(messages) {
     const id = messages[0]?.providerId.split('.')[0] ?? ''
-    return { status: 202, body: null, headers: { 'x-message-id': id } }
+    const status = messages[0]?.meta.sandbox ? 200 : 202
+    return { status, body: null, headers: { 'x-message-id': id } }
   },
 }
 
@@ -214,7 +215,7 @@ const webhookTypes: Record<WebhookEvent, string> = {
   clicked: 'click',
 }
 
-function webhook({ message: m, event, recipient, now }: WebhookInput) {
+function webhook({ message: m, event, recipient, now, url, reason }: WebhookInput) {
   const timestamp = String(Math.floor(now.getTime() / 1000))
   const payload: Record<string, unknown> = {
     ...(m.meta.customArgs as Record<string, unknown> | undefined),
@@ -226,10 +227,10 @@ function webhook({ message: m, event, recipient, now }: WebhookInput) {
     sg_message_id: m.providerId,
   }
   if (m.meta.tags) payload.category = m.meta.tags
-  if (event === 'bounced') Object.assign(payload, { type: 'bounce', status: '5.1.1', reason: bounceReason })
-  if (event === 'deferred') Object.assign(payload, { attempt: '1', response: deferReason })
+  if (event === 'bounced') Object.assign(payload, { type: 'bounce', status: '5.1.1', reason: reason ?? bounceReason })
+  if (event === 'deferred') Object.assign(payload, { attempt: '1', response: reason ?? deferReason })
   if (event === 'opened' || event === 'clicked') Object.assign(payload, { ip: '127.0.0.1', useragent: 'nid' })
-  if (event === 'clicked') payload.url = m.extracted.link ?? ''
+  if (event === 'clicked') payload.url = url ?? m.extracted.link ?? ''
   const body = JSON.stringify([payload])
   const signature = sign('sha256', Buffer.from(timestamp + body), signingKey).toString('base64')
   return {

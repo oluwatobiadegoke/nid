@@ -144,3 +144,40 @@ test('a closing tag with a space and a last link left open still end where a bro
   assert.equal(open.link, 'https://app.acme.com/verify?t=1')
   assert.equal(htmlToText('<p>Code 1234</p><script>track("5678")</script ><p>bye</p>'), 'Code 1234\n bye')
 })
+
+test('strips javascript, data and vbscript links and ignores mailto as primary link', () => {
+  const result = extract({
+    subject: 'Verify',
+    text: null,
+    html: [
+      '<a href="javascript:alert(1)">Bad</a>',
+      '<a href="data:text/html,<script>alert(1)</script>">Data</a>',
+      '<a href="vbscript:msgbox(1)">VB</a>',
+      '<a href="mailto:help@acme.com">Support</a>',
+      '<a href="https://app.acme.com/confirm">Confirm</a>',
+    ].join(''),
+  })
+  assert.equal(result.link, 'https://app.acme.com/confirm')
+  assert.deepEqual(
+    result.links.map((l) => l.href),
+    ['mailto:help@acme.com', 'https://app.acme.com/confirm'],
+  )
+  const mailtoOnly = extract({ subject: 'Help', text: null, html: '<a href="mailto:help@acme.com">Help</a>' })
+  assert.equal(mailtoOnly.link, null)
+})
+
+test('extracts codes and matches code_pattern from html even when plain text lacks them', () => {
+  const result = extract({
+    subject: 'Sign in',
+    text: 'Please view this email in HTML.',
+    html: '<p>Your verification code is <b>842910</b>.</p>',
+  })
+  assert.equal(result.code, '842910')
+  assert.equal(
+    matchesPattern(
+      { subject: 'Access', text: 'Open in an HTML client.', html: '<p>Your access key is <b>HTML-99-KEY</b></p>' },
+      /access key is ([A-Z0-9-]+)/,
+    ),
+    'HTML-99-KEY',
+  )
+})

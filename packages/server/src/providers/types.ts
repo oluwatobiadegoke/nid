@@ -60,8 +60,11 @@ export interface WebhookInput {
   message: Message
   event: WebhookEvent
   recipient: string
+  recipientOverride?: string | undefined
   secret: string | undefined
   now: Date
+  url?: string | undefined
+  reason?: string | undefined
 }
 
 export interface WebhookRequest {
@@ -73,7 +76,7 @@ export interface Provider {
   name: string
   label: string
   credential(req: IncomingRequest): string | null
-  unauthorized(): ProviderReply
+  unauthorized(req?: IncomingRequest): ProviderReply
   routes: ProviderRoute[]
   setup: { env: string; note: string }
   webhook?(input: WebhookInput): WebhookRequest
