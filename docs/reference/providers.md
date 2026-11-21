@@ -165,7 +165,7 @@ Sends a message you built yourself, for example with Nodemailer. The form needs 
 
 ### Batch sends
 
-With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message with its own provider id, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
+With `recipient-variables` on `POST /v3/{domain}/messages`, each `to` address gets its own message with the id the send returned, and `%recipient.<key>%` in the subject, body, `h:` headers and `v:` fields is replaced with that address's value, as in a Mailgun batch send.
 
 ## Amazon SES
 
