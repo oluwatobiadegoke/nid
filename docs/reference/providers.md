@@ -224,6 +224,8 @@ The payload carries the ids your app got back when it sent, so it can find the e
 | Mailgun | `message.headers.message-id`, without `<` and `>` | `v:` variables as `user-variables`, `tags` | `signature.signature`, an HMAC-SHA256 of `timestamp` and `token` with your signing key. |
 | Amazon SES | `mail.messageId` | `EmailTags` as `mail.tags` | Not signed. With a secret, `Authorization: Bearer <secret>`. |
 
+The Amazon SES payload is the event object itself, with `eventType` and `mail` at the top level. nid does not wrap it in an Amazon SNS notification, so a handler that reads `Type` and parses `Message` must also accept the bare event.
+
 ### SendGrid webhooks
 
 SendGrid signs with a private key only SendGrid has, so nid signs with its own fixed test key instead. In your app's test settings, use nid's public key as SendGrid's verification key:

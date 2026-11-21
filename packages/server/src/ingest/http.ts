@@ -55,7 +55,7 @@ function send(c: Context, reply: ProviderReply) {
   for (const [k, v] of Object.entries(reply.headers ?? {})) c.header(k, v)
   if (reply.body === null || reply.body === undefined) return c.body(null, reply.status as 200)
   if (typeof reply.body === 'string') {
-    return reply.headers?.['content-type']
+    return Object.keys(reply.headers ?? {}).some((k) => k.toLowerCase() === 'content-type')
       ? c.body(reply.body, reply.status as 200)
       : c.text(reply.body, reply.status as 200)
   }

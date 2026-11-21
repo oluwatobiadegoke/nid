@@ -193,6 +193,7 @@ async function parseV2Message(body: unknown, raw: string): Promise<NewMessage> {
     if (mime.recipients.length === 0) throw error('BadRequestException', 'Missing recipients.')
     return {
       ...mime,
+      recipients: mime.recipients.map((r, i) => ({ ...r, kind: recipients[i]?.kind ?? r.kind })),
       providerId: messageId(),
       from,
       replyTo: data.ReplyToAddresses?.length ? validateReplyTo(data.ReplyToAddresses) : mime.replyTo,

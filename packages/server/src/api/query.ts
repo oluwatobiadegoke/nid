@@ -43,7 +43,7 @@ export const streamQuery = z.strictObject({
 export const faultBodySchema = z.strictObject({
   provider: z.string().trim().min(1).optional(),
   to: z.string().trim().min(1).optional(),
-  status: z.number().int().min(100).max(599).optional(),
+  status: z.number().int().min(200).max(599).optional(),
   body: z.unknown().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   delayMs: z.number().int().min(0).max(30_000).optional(),

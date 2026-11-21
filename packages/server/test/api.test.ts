@@ -442,3 +442,42 @@ test('nid serve --token enforces authentication on provider and read routes', as
   const uiPage = await fetch(`${url}/`)
   assert.equal(uiPage.status, 200)
 })
+
+test('a stream resumed with an id from before a restart still delivers new mail', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const response = await server.app.request('/api/stream', { headers: { 'last-event-id': '57' } })
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  await sendResend(server, { ...base, subject: 'After restart', text: 'Hello' })
+  let seen = ''
+  while (!seen.includes('"subject":"After restart"')) {
+    const { value, done } = await reader.read()
+    if (done) break
+    seen += decoder.decode(value)
+  }
+  await reader.cancel()
+  assert.ok(seen.includes('"cursor":0'))
+  assert.ok(seen.includes('"subject":"After restart"'))
+})
+
+test('the html preview fills each inline image, even when one content id starts with another', async (t) => {
+  const server = await createServer()
+  t.after(() => server.close())
+  const image = (name: string, bytes: string) => ({
+    filename: `${name}.png`,
+    content: Buffer.from(bytes).toString('base64'),
+    content_type: 'image/png',
+    content_id: name,
+  })
+  await sendResend(server, {
+    ...base,
+    subject: 'Two logos',
+    html: '<img src="cid:logo"><img src="cid:logo-dark">',
+    attachments: [image('logo', 'light'), image('logo-dark', 'dark')],
+  })
+  const id = ((await get(server, '/api/messages')).body.messages as Array<{ id: number }>)[0]!.id
+  const html = await (await server.app.request(`/api/messages/${id}/html`)).text()
+  const data = (bytes: string) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+  assert.equal(html, `<img src="${data('light')}"><img src="${data('dark')}">`)
+})
