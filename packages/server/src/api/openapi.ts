@@ -376,6 +376,7 @@ export function openapi(version: string) {
               content: { 'application/json': { schema: { type: 'object', properties: { fault: faultRule } } } },
             },
             '400': queryError,
+            '415': { description: 'The body was not sent as application/json' },
           },
         },
         delete: {

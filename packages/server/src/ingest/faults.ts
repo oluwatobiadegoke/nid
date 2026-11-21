@@ -35,10 +35,14 @@ export interface MagicMatch {
   recipient: string
 }
 
+const magicDomain = 'inbox.test'
+
 export function magicMatchFor(recipients: string[]): MagicMatch | null {
   for (const address of recipients) {
     const normalized = address.trim().toLowerCase()
-    const local = normalized.split('@')[0] ?? ''
+    const at = normalized.lastIndexOf('@')
+    if (normalized.slice(at + 1) !== magicDomain) continue
+    const local = normalized.slice(0, at)
     if (/^ratelimit(?:\+|$)/.test(local)) return { action: 'ratelimit', recipient: normalized }
     if (/^bounce(?:\+|$)/.test(local)) return { action: 'bounced', recipient: normalized }
     if (/^defer(?:\+|$)/.test(local)) return { action: 'deferred', recipient: normalized }

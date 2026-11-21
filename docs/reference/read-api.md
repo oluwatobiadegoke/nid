@@ -173,7 +173,7 @@ Lists active fault and latency rules for this project: `200 {"faults": [FaultRul
 
 ### POST /api/faults
 
-Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays:
+Adds a fault or latency rule to simulate provider errors (`429`, `500`, `503`) or delays. The body is JSON, sent with `content-type: application/json`:
 
 ```json
 {"provider": "resend", "to": "ada@inbox.test", "status": 429, "headers": {"retry-after": "2"}, "count": 1}

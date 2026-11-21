@@ -24,10 +24,10 @@ async function readRequest(c: Context): Promise<IncomingRequest> {
   let rawBody = ''
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
     if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const urlEncoded = contentType.includes('application/x-www-form-urlencoded')
+      if (urlEncoded) rawBody = await c.req.text()
       body = await c.req.parseBody({ all: true })
-      rawBody = contentType.includes('application/x-www-form-urlencoded')
-        ? await c.req.text().catch(() => '')
-        : JSON.stringify(body, (_, v) => (v instanceof File ? `(file ${v.name}, ${v.size} bytes)` : v))
+      if (!urlEncoded) rawBody = JSON.stringify(body, (_, v) => (v instanceof File ? `(file ${v.name}, ${v.size} bytes)` : v))
     } else {
       rawBody = await c.req.text()
       if (rawBody.trim()) {

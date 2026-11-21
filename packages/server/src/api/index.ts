@@ -57,6 +57,10 @@ async function renderHtmlPreview(store: Store, projectId: string, message: Messa
   return html
 }
 
+function isJson(contentType: string | undefined): boolean {
+  return /^application\/json\b/i.test(contentType ?? '')
+}
+
 export function readApi(options: ApiOptions): Hono<Env> {
   const { store, events, faults } = options
   const app = new Hono<Env>()
@@ -172,7 +176,7 @@ export function readApi(options: ApiOptions): Hono<Env> {
   app.post('/messages/:id/events', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isInteger(id)) return c.json({ error: 'Message id must be an integer' }, 400)
-    if (!/^application\/json\b/i.test(c.req.header('content-type') ?? '')) {
+    if (!isJson(c.req.header('content-type'))) {
       return c.json({ error: 'Send the event as JSON, with content-type: application/json' }, 415)
     }
     const body = (await c.req.json().catch(() => null)) as {
@@ -265,6 +269,9 @@ export function readApi(options: ApiOptions): Hono<Env> {
   })
 
   app.post('/faults', async (c) => {
+    if (!isJson(c.req.header('content-type'))) {
+      return c.json({ error: 'Send the rule as JSON, with content-type: application/json' }, 415)
+    }
     const raw = await c.req.json().catch(() => undefined)
     const parsed = faultBodySchema.safeParse(raw)
     if (!parsed.success) {

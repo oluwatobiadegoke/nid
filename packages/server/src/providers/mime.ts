@@ -24,6 +24,7 @@ export async function fromMime(raw: Buffer, rcptTo: string[], provider: string):
   const parsed = await simpleParser(raw)
   const to = new Set(addresses(parsed.to))
   const cc = new Set(addresses(parsed.cc))
+  const bcc = new Set(addresses(parsed.bcc))
   const names = new Map<string, string>()
   for (const group of [parsed.to, parsed.cc].flat()) {
     for (const v of group?.value ?? []) if (v.address && v.name) names.set(normalizeAddress(v.address), v.name)
@@ -38,6 +39,7 @@ export async function fromMime(raw: Buffer, rcptTo: string[], provider: string):
       : [
           ...Array.from(to, (address) => ({ address, name: names.get(address) ?? null, kind: 'to' as const })),
           ...Array.from(cc, (address) => ({ address, name: names.get(address) ?? null, kind: 'cc' as const })),
+          ...Array.from(bcc, (address) => ({ address, name: null, kind: 'bcc' as const })),
         ]
   const headers: Record<string, string> = {}
   for (const [key, value] of parsed.headers) {

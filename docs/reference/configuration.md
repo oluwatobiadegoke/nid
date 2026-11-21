@@ -49,7 +49,7 @@ It runs `nid serve` by default. Anything after the image name replaces `serve`, 
 | `ui` | `boolean` | `true` | Serves the web view at `/`. |
 | `maxBodyBytes` | `number` | `52428800` (50 MB) | Largest HTTP body or SMTP message accepted. Larger HTTP bodies get a 413. |
 | `webhooks` | `Record<string, { url, secret? }>` | `{}` | Your app's webhook route and secret per provider name, such as `{ brevo: { url, secret } }`. Same as the `NID_<PROVIDER>_WEBHOOK_*` variables. `createServer` throws on a name that is not a provider or a URL that is not `http://` or `https://`. |
-| `magicAddresses` | `boolean` | `true` locally (`false` when `auth` is set) | Enables special addresses such as `bounce@inbox.test` and `ratelimit@inbox.test`. |
+| `magicAddresses` | `boolean` | `true` locally (`false` when `auth` is set) | Enables the special addresses at `inbox.test`, such as `bounce@inbox.test` and `ratelimit@inbox.test`. |
 | `autoWebhook` | `WebhookEvent` | none | Automatically fires this webhook event after each stored send when a webhook target is configured. |
 | `onMessage` | `(message) => void` | none | Called after each message is stored. |
 | `onError` | `(error) => void` | none | Called on unexpected server errors. |

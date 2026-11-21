@@ -103,7 +103,7 @@ NID_RESEND_WEBHOOK_SECRET=whsec_... \
 npx nid-inbox serve --auto-webhook delivered
 ```
 
-In local mode, nid also recognizes special recipient addresses:
+In local mode, nid also recognizes special recipient addresses at `inbox.test`. The same names at any other domain are ordinary addresses:
 
 - `bounce@inbox.test` or `bounce+anything@inbox.test`: stores the email and sends a `bounced` webhook.
 - `defer@inbox.test` or `defer+anything@inbox.test`: stores the email and sends a `deferred` webhook.
