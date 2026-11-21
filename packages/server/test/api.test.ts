@@ -195,9 +195,11 @@ test('wait wakes up immediately via EventBus with zero polling and cleans up on 
   const aborted = server.app.request('/api/wait?to=never@inbox.test&timeout=20', { signal: controller.signal })
   await sleep(10)
   assert.equal(activeSubs, 1)
+  const callsBeforeAbort = listCalls
   controller.abort()
   await aborted
   assert.equal(activeSubs, 0)
+  assert.equal(listCalls, callsBeforeAbort)
 })
 
 test('a wait with a subject filter matches arriving mail the way the store matches stored mail', async (t) => {

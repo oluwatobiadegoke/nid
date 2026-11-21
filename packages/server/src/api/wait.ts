@@ -116,6 +116,7 @@ export async function waitForMessage(
     while (true) {
       buffered.sort((a, b) => a.message.id - b.message.id)
       const match = buffered.shift() ?? (await nextMatch(deadline - Date.now()))
+      if (params.signal?.aborted) return { message: null, code: null, timedOut: true, arrived: [], rejections: [] }
       if (!match) break
       const hit = params.subject ? await findExisting(store, projectId, { ...params, after: match.message.id - 1 }) : match
       if (hit) return { message: hit.message, code: hit.code, timedOut: false, arrived: [], rejections: [] }
