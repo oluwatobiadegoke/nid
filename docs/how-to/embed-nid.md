@@ -36,6 +36,8 @@ const store = await createSqliteStore({ path: 'mail.sqlite' })
 const server = await createServer({ store })
 ```
 
+To build the store on a Kysely instance of your own, import `KyselyStore` and `NodeSqliteDialect` from `nid-inbox/sqlite`. The `nid-inbox` root export does not include them.
+
 ## Run something on every new email
 
 ```js
