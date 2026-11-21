@@ -113,6 +113,8 @@ test('magic addresses simulate ratelimit 429 and automatic webhooks, and autoWeb
 
   const limited = await sendResend(server, { from: 'a@acme.com', to: 'ratelimit+1@inbox.test', subject: 'RL', text: 'RL' })
   assert.equal(limited.status, 429)
+  assert.equal(limited.body.name, 'rate_limit_exceeded')
+  assert.equal(limited.body.message, 'Rate limit exceeded')
   assert.equal((await server.store.listRejections('default', { to: 'ratelimit+1@inbox.test' })).length, 1)
 
   await sendResend(server, {
@@ -147,6 +149,27 @@ test('magic addresses simulate ratelimit 429 and automatic webhooks, and autoWeb
   await server.close()
   assert.equal(received.length, 3)
   assert.deepEqual((received[2]!.body.data as { to: string[] }).to, ['flush@inbox.test'])
+})
+
+test('a webhook answered after its message was deleted is not recorded', async (t) => {
+  let answer: (() => void) | null = null
+  const app = createHttpServer((req, res) => {
+    req.resume()
+    answer = () => res.writeHead(200).end('ok')
+  })
+  await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => app.close(() => resolve())))
+  const server = await createServer({
+    webhooks: { resend: { url: `http://127.0.0.1:${(app.address() as AddressInfo).port}/hooks`, secret: `whsec_${Buffer.from('late').toString('base64')}` } },
+    autoWebhook: 'delivered',
+  })
+  await sendResend(server, { from: 'a@acme.com', to: 'late@inbox.test', subject: 'Late', text: 'Late' })
+  for (let i = 0; i < 100 && !answer; i++) await sleep(10)
+  const [message] = await server.store.listMessages('default', {})
+  await server.store.deleteMessage('default', message!.id)
+  answer!()
+  await server.close()
+  assert.deepEqual(await server.store.listWebhookDeliveries('default', message!.id), [])
 })
 
 test('a fault keeps the content type it was given, in any case', async (t) => {
