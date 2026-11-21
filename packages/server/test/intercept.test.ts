@@ -207,3 +207,15 @@ test('importing nid-inbox with NID_URL does not patch globals and //host paths s
   const payload = (await res.json()) as { error: string }
   assert.equal(payload.error, 'No route for POST /evil.example/emails')
 })
+
+test('a cleanup from a replaced interceptor leaves the newer one in place', async () => {
+  const { installInterceptor } = await import('../src/intercept-core.js')
+  const original = globalThis.fetch
+  const restoreFirst = installInterceptor('http://127.0.0.1:4401')
+  const restoreSecond = installInterceptor('http://127.0.0.1:4402')
+  const patched = globalThis.fetch
+  restoreFirst()
+  assert.equal(globalThis.fetch, patched)
+  restoreSecond()
+  assert.equal(globalThis.fetch, original)
+})

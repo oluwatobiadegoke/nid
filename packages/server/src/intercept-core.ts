@@ -205,13 +205,14 @@ export function installInterceptor(nidUrl: string): () => void {
   syncBuiltinESMExports()
 
   const restore = () => {
+    if (g[stateKey]?.restore !== restore) return
     globalThis.fetch = originalFetch
     cjsHttp.request = origHttpRequest
     cjsHttp.get = origHttpGet
     cjsHttps.request = origHttpsRequest
     cjsHttps.get = origHttpsGet
     syncBuiltinESMExports()
-    if (g[stateKey]?.restore === restore) delete g[stateKey]
+    delete g[stateKey]
   }
 
   g[stateKey] = { url: nidUrl, restore }
